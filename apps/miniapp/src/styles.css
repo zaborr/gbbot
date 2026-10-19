@@ -1,0 +1,137 @@
+/*
+ * App-wide styles on top of Telegram UI.
+ *
+ * - One background colour per theme: off-white in light mode, grey in dark
+ *   mode, for the page, the sections and Telegram's header alike. Text
+ *   fields use the other shade (white / near-black) so they stand out.
+ * - Text fields get their own background and a border: on iPhone Telegram UI
+ *   draws them with the same colour as the section, so they were invisible.
+ * - Slightly larger text than Telegram UI's defaults.
+ *
+ * `html[data-theme]` is set by the app (hooks/useAppearance.ts).
+ */
+
+:root {
+  color-scheme: light dark;
+  --tma-light-surface: var(--tg-theme-secondary-bg-color, #efeff4);
+  --tma-light-field: var(--tg-theme-bg-color, #ffffff);
+  --tma-dark-surface: var(--tg-theme-bg-color, #212121);
+  --tma-dark-field: var(--tg-theme-secondary-bg-color, #0f0f0f);
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--tma-light-surface);
+}
+
+html[data-theme='dark'],
+html[data-theme='dark'] body {
+  background: var(--tma-dark-surface);
+}
+
+/* Before the app has decided (first paint), follow the device. */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]),
+  html:not([data-theme]) body {
+    background: var(--tma-dark-surface);
+  }
+}
+
+/* Doubled class: wins over Telegram UI's own (single-class) theme rules. */
+.tma-root.tma-root {
+  min-height: 100vh;
+  min-height: var(--tg-viewport-stable-height, 100vh);
+  color-scheme: light;
+
+  /* Same colour for the page, the sections and the header. */
+  --tma-surface: var(--tma-light-surface);
+  --tgui--bg_color: var(--tma-surface);
+  --tgui--secondary_bg_color: var(--tma-surface);
+  --tgui--section_bg_color: var(--tma-surface);
+  --tgui--header_bg_color: var(--tma-surface);
+  --tgui--card_bg_color: var(--tma-field-bg);
+  background: var(--tma-surface);
+
+  --tgui--text--font_size: 17px;
+  --tgui--text--line_height: 24px;
+  --tgui--subheadline1--font_size: 17px;
+  --tgui--subheadline1--line_height: 24px;
+  --tgui--subheadline2--font_size: 16px;
+  --tgui--subheadline2--line_height: 22px;
+  --tgui--caption1--font_size: 14px;
+  --tgui--caption1--line_height: 20px;
+  --tgui--caption2--font_size: 13px;
+  --tgui--caption2--line_height: 18px;
+
+  --tma-field-bg: var(--tma-light-field);
+  --tma-field-border: rgba(0, 0, 0, 0.18);
+}
+
+.tma-root.tma-root.tma-dark {
+  color-scheme: dark;
+  --tma-surface: var(--tma-dark-surface);
+  --tma-field-bg: var(--tma-dark-field);
+  --tma-field-border: rgba(255, 255, 255, 0.22);
+}
+
+/* Text fields (see components/Field.tsx). */
+label.tma-field.tma-field {
+  border-radius: 12px;
+  background: var(--tma-field-bg);
+  box-shadow: inset 0 0 0 1px var(--tma-field-border);
+}
+
+label.tma-field.tma-field:focus-within {
+  box-shadow: inset 0 0 0 1.5px var(--tgui--link_color);
+}
+
+.tma-field input,
+.tma-field textarea {
+  font-size: 17px;
+}
+
+.tma-field input::placeholder,
+.tma-field textarea::placeholder {
+  color: var(--tgui--hint_color);
+  opacity: 0.8;
+}
+
+/* Visible label above each field. */
+.tma-field-label {
+  padding: 12px 22px 4px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--tgui--section_header_text_color, var(--tgui--hint_color));
+}
+
+/*
+ * Shop list: a clearly visible thin line between shops (Telegram UI's own
+ * divider is almost invisible), so each shop reads as its own entry.
+ */
+.tma-shop-list hr {
+  border: 0;
+  height: 1px;
+  margin: 0 16px;
+  background: var(--tgui--hint_color);
+  opacity: 0.3;
+}
+
+/* Quiet note at the top of the catalog (orders still to pay). */
+.tma-notice.tma-notice {
+  border-radius: 12px;
+  margin: 0 12px;
+  width: auto;
+  background: var(--tgui--secondary_fill);
+}
+
+/* "Organised by @ana, @luis" under a GB's name. */
+.tma-organized {
+  display: block;
+}
+
+.tma-organized a {
+  color: var(--tgui--link_color);
+  text-decoration: none;
+}
