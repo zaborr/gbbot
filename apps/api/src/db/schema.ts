@@ -85,6 +85,8 @@ export const shops = pgTable('shops', {
   orderFeeLabel: text('order_fee_label').notNull().default('Service fee'),
   /** The GB's VIPs do not pay the per-order fee. */
   vipNoFee: boolean('vip_no_fee').notNull().default(false),
+  /** The GB's VIPs do not pay shipping. */
+  vipNoShipping: boolean('vip_no_shipping').notNull().default(false),
   /** Text customers must accept before entering the GB (null = none). */
   disclaimer: text('disclaimer'),
   /** Goes up when customers must accept the text again. */

@@ -27,6 +27,7 @@ export const gbSnapshot = z.object({
     orderFee: moneyAmount,
     orderFeeLabel: z.string().min(1).max(64),
     vipNoFee: z.boolean(),
+    vipNoShipping: z.boolean().default(false),
     autoCancelHours: z.number().int().min(0).max(720),
     closingWarnHours: z.number().int().min(0).max(720),
     shippingZones: z.array(shippingZone).max(50),

@@ -414,9 +414,10 @@ export function adminRoutes(): Hono<AppBindings> {
     return c.json(view);
   });
   // Shipping zones (flat cost per order) and the address encryption public key.
-  app.put('/shop/shipping', zValidator('json', updateShippingRequest), async (c) =>
-    c.json(await updateShippingZones(c.get('db'), c.get('shopId'), c.req.valid('json').zones)),
-  );
+  app.put('/shop/shipping', zValidator('json', updateShippingRequest), async (c) => {
+    const { zones, vipNoShipping } = c.req.valid('json');
+    return c.json(await updateShippingZones(c.get('db'), c.get('shopId'), zones, vipNoShipping));
+  });
   app.put('/shop/address-key', requireOwner, zValidator('json', updateAddressKeyRequest), async (c) => {
     const db = c.get('db');
     const env = c.get('env');

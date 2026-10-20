@@ -8,6 +8,7 @@ import {
   currencyCode,
   priceTiers,
   product,
+  shippingCost,
   slug,
   unitPriceFor,
 } from './index.js';
@@ -100,5 +101,14 @@ describe('exchange rates', () => {
     expect(convertAmount(3000, 11_000)).toBe(3300);
     expect(convertAmount(1001, 10_835)).toBe(1085);
     expect(convertBack(1085, 10_835)).toBe(1001);
+  });
+});
+
+describe('shippingCost', () => {
+  const zone = { price: 600, freeFrom: 5000 };
+  it('is free from the threshold, and always for VIPs when the GB says so', () => {
+    expect(shippingCost(zone, 4999)).toBe(600);
+    expect(shippingCost(zone, 5000)).toBe(0);
+    expect(shippingCost(zone, 100, true)).toBe(0);
   });
 });
