@@ -17,7 +17,7 @@ Mini App y API van en el **mismo dominio**: la API en `/api` y el webhook de Tel
 ## Primera vez
 
 ```bash
-git clone https://github.com/zaborr/tma-shop.git && cd tma-shop
+git clone https://github.com/TU_USUARIO/TU_REPO.git && cd TU_REPO
 cp deploy/.env.example .env
 nano .env                      # DOMAIN, POSTGRES_PASSWORD, BOT_TOKEN, JWT_SECRET…
 docker compose up -d --build
