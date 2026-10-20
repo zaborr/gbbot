@@ -1,0 +1,90 @@
+# Everything on one server: Postgres, the API, the Mini App and Caddy in front
+# (HTTPS certificates are obtained automatically for $DOMAIN).
+#
+#   cp deploy/.env.example .env      # fill it in
+#   docker compose up -d --build
+#
+# For local development only the database is needed:
+#   docker compose up -d postgres    # listens on 127.0.0.1:5432
+#
+# See deploy/README.md.
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gb
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gb}
+      POSTGRES_DB: gb
+    # Only reachable from this machine (never exposed to the internet).
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U gb -d gb']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: 3000
+      # The bundled Postgres, unless .env points DATABASE_URL elsewhere (e.g. Neon).
+      DATABASE_URL: ${DATABASE_URL:-postgres://gb:${POSTGRES_PASSWORD:-gb}@postgres:5432/gb}
+      # Telegram webhook and the Mini App both live on $DOMAIN.
+      PUBLIC_URL: https://${DOMAIN}
+      CORS_ORIGIN: https://${DOMAIN}
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  miniapp:
+    build:
+      context: .
+      dockerfile: apps/miniapp/Dockerfile
+      args:
+        # Same domain as the Mini App: no CORS, no extra URL to configure.
+        VITE_API_BASE_URL: /api
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - api
+      - miniapp
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

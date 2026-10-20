@@ -1,0 +1,20 @@
+# One domain for everything; Caddy gets and renews the HTTPS certificate.
+{$DOMAIN} {
+	encode gzip zstd
+
+	# API and Telegram webhook → api container
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle /webhook/* {
+		reverse_proxy api:3000
+	}
+	handle /health {
+		reverse_proxy api:3000
+	}
+
+	# Everything else: the Mini App (static files)
+	handle {
+		reverse_proxy miniapp:80
+	}
+}
