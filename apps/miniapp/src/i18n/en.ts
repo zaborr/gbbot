@@ -750,6 +750,8 @@ export const en = {
   'shipping.offered': 'Offered at checkout',
   'shipping.remove': 'Remove zone',
   'shipping.save': 'Save zones',
+  'shipping.vipFree': '⭐ VIPs do not pay shipping',
+  'shipping.vipFreeHint': "Members of the GB's VIP club get free shipping to any zone.",
   'shipping.zone': 'Zone {n}',
   'shop.allShops': 'All GBs',
   'shop.unavailable': 'GB not available',

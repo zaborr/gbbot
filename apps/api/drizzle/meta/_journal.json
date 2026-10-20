@@ -239,6 +239,13 @@
       "when": 1792560000000,
       "tag": "0033_drop_user_role",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792650000000,
+      "tag": "0034_vip_no_shipping",
+      "breakpoints": true
     }
   ]
 }

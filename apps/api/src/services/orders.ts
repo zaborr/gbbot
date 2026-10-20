@@ -208,7 +208,7 @@ export async function createOrderFromCart(
           'The shop updated its security key. Please reopen the shop and try again.',
         );
       }
-      shipping = shippingCost(zone, draft.total);
+      shipping = shippingCost(zone, draft.total, isVip && shop.vipNoShipping);
       shippingZoneName = zone.name;
       encryptedAddress = checkout.encryptedAddress ?? null;
       addressKeyFingerprint = envelope.kid;
@@ -813,7 +813,7 @@ async function applyUnpaidEdit(
     if (order.shippingZoneName) {
       const shop = await tx.query.shops.findFirst({ where: eq(shops.id, shopId) });
       const zone = shop?.shippingZones.find((z) => z.name === order.shippingZoneName);
-      if (zone) shipping = shippingCost(zone, itemsTotal);
+      if (zone) shipping = shippingCost(zone, itemsTotal, order.isVip && (shop?.vipNoShipping ?? false));
     }
 
     await tx.delete(orderItems).where(eq(orderItems.orderId, order.id));

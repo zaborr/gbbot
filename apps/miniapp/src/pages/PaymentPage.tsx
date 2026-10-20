@@ -170,6 +170,7 @@ export function PaymentPage(): React.JSX.Element {
             feeLabel={feeLabel}
             direct={direct}
             zones={shop.data.shippingZones}
+            vipFreeShipping={current.isVip && shop.data.vipNoShipping}
             onCancel={() => setEditing(false)}
             onRequested={() => {
               setEditing(false);
@@ -686,6 +687,7 @@ function ChangeEditor({
   feeLabel,
   direct,
   zones,
+  vipFreeShipping,
   onCancel,
   onRequested,
 }: {
@@ -694,6 +696,7 @@ function ChangeEditor({
   /** Unpaid order: saved at once instead of sent for approval. */
   direct: boolean;
   zones: ShippingZone[];
+  vipFreeShipping: boolean;
   onCancel: () => void;
   onRequested: () => void;
 }): React.JSX.Element {
@@ -753,7 +756,7 @@ function ChangeEditor({
   // The fee is charged once per order. Shipping stays as it was, except for an
   // unpaid order, where it follows the zone again (free shipping threshold).
   const zone = direct ? zones.find((z) => z.name === order.shippingZoneName) : undefined;
-  const shipping = zone ? shippingCost(zone, itemsTotal) : order.shipping;
+  const shipping = zone ? shippingCost(zone, itemsTotal, vipFreeShipping) : order.shipping;
   const total = itemsTotal + order.fee + shipping;
   const diff = total - coveredAmount(order);
   // One addable entry per product, or per variant for products with options.
