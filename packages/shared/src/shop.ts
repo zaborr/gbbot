@@ -51,6 +51,8 @@ export const shop = z.object({
   orderFeeLabel: z.string().min(1).max(64),
   /** The GB's VIPs do not pay the per-order fee. */
   vipNoFee: z.boolean(),
+  /** The GB's VIPs do not pay shipping. */
+  vipNoShipping: z.boolean(),
   /** Unpaid orders are cancelled after this many hours without activity (0 = never). */
   autoCancelHours: z.number().int().min(0).max(720),
   /** Shipping zones; with active ones, checkout asks for a zone and an address. */
@@ -116,6 +118,7 @@ export const shopConfig = shop
     orderFee: true,
     orderFeeLabel: true,
     vipNoFee: true,
+    vipNoShipping: true,
     autoCancelHours: true,
     shippingZones: true,
     addressPublicKey: true,
@@ -265,6 +268,8 @@ export const updateShippingRequest = z.object({
   zones: z
     .array(shippingZone.extend({ id: z.string().min(1).max(64).optional() }))
     .max(50),
+  /** VIPs do not pay shipping (unchanged when left out). */
+  vipNoShipping: z.boolean().optional(),
 });
 export type UpdateShippingRequest = z.infer<typeof updateShippingRequest>;
 
@@ -309,7 +314,13 @@ export interface DeliveryAddress {
 }
 
 /** Shipping cost of an order with `itemsTotal` worth of products in `zone`. */
-export function shippingCost(zone: Pick<ShippingZone, 'price' | 'freeFrom'>, itemsTotal: number): number {
+export function shippingCost(
+  zone: Pick<ShippingZone, 'price' | 'freeFrom'>,
+  itemsTotal: number,
+  /** A VIP in a GB where VIPs do not pay shipping. */
+  free = false,
+): number {
+  if (free) return 0;
   return zone.freeFrom !== null && itemsTotal >= zone.freeFrom ? 0 : zone.price;
 }
 

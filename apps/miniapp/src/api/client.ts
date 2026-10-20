@@ -549,10 +549,13 @@ export class ApiClient {
     });
   }
 
-  adminUpdateShipping(zones: Array<Omit<ShippingZone, 'id'> & { id?: string }>): Promise<ShopAdminView> {
+  adminUpdateShipping(
+    zones: Array<Omit<ShippingZone, 'id'> & { id?: string }>,
+    vipNoShipping: boolean,
+  ): Promise<ShopAdminView> {
     return this.request<ShopAdminView>('/admin/shop/shipping', {
       method: 'PUT',
-      body: JSON.stringify({ zones }),
+      body: JSON.stringify({ zones, vipNoShipping }),
     });
   }
 

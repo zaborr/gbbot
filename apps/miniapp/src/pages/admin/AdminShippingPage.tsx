@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
+import { Button, Cell, List, Section, Switch } from '@telegram-apps/telegram-ui';
 import { Input } from '../../components/Field.js';
 import type { ShippingZone } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
@@ -33,16 +33,26 @@ export function AdminShippingPage(): React.JSX.Element {
 
 function AdminShipping(): React.JSX.Element {
   const { shop, reload } = useShop();
-  return <ShippingForm key={JSON.stringify(shop.shippingZones)} zones={shop.shippingZones} onSaved={reload} />;
+  return (
+    <ShippingForm
+      key={`${JSON.stringify(shop.shippingZones)}|${shop.vipNoShipping}`}
+      zones={shop.shippingZones}
+      vipNoShipping={shop.vipNoShipping}
+      onSaved={reload}
+    />
+  );
 }
 
 function ShippingForm({
   zones,
+  vipNoShipping,
   onSaved,
 }: {
   zones: ShippingZone[];
+  vipNoShipping: boolean;
   onSaved: () => void;
 }): React.JSX.Element {
+  const [vipFree, setVipFree] = useState(vipNoShipping);
   const navigate = useNavigate();
   const { shop, to } = useShop();
   const actions = useAdminActions(onSaved);
@@ -81,6 +91,7 @@ function ShippingForm({
           freeFrom: r.freeFrom.trim() === '' ? null : toCents(r.freeFrom.trim()) || null,
           isActive: r.active,
         })),
+        vipFree,
       ),
     );
     setBusy(false);
@@ -163,6 +174,19 @@ function ShippingForm({
           </div>
         </Section>
       ))}
+
+      {rows.length > 0 && (
+        <Section>
+          <Cell
+            Component="label"
+            after={<Switch checked={vipFree} onChange={(e) => setVipFree(e.target.checked)} />}
+            subtitle={t('shipping.vipFreeHint')}
+            multiline
+          >
+            {t('shipping.vipFree')}
+          </Cell>
+        </Section>
+      )}
 
       <Section footer={t('shipping.footer')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
