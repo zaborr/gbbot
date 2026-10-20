@@ -251,6 +251,7 @@ export async function updateShippingZones(
   db: Database,
   shopId: string,
   zones: UpdateShippingRequest['zones'],
+  vipNoShipping?: boolean,
 ): Promise<ShopAdminView> {
   const names = new Set(zones.map((z) => z.name.trim().toLowerCase()));
   if (names.size !== zones.length) {
@@ -263,7 +264,12 @@ export async function updateShippingZones(
     freeFrom: z.freeFrom,
     isActive: z.isActive,
   }));
-  return toShopAdminDTO(await updateShop(db, shopId, { shippingZones: cleaned }));
+  return toShopAdminDTO(
+    await updateShop(db, shopId, {
+      shippingZones: cleaned,
+      ...(vipNoShipping === undefined ? {} : { vipNoShipping }),
+    }),
+  );
 }
 
 /** Short fingerprint of a public key: first 16 hex chars of SHA-256 over its DER bytes. */

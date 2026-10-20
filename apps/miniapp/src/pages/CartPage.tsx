@@ -61,7 +61,9 @@ export function CartPage(): React.JSX.Element {
   });
   const [remember, setRemember] = useState(true);
   const itemsTotal = cart ? cart.total - cart.fee : 0;
-  const shipping = zone ? shippingCost(zone, itemsTotal) : 0;
+  // VIPs may not pay shipping in this GB.
+  const vipFreeShipping = (cart?.isVip ?? false) && (shop.data?.vipNoShipping ?? false);
+  const shipping = zone ? shippingCost(zone, itemsTotal, vipFreeShipping) : 0;
   const grandTotal = (cart?.total ?? 0) + shipping;
   // The GB's minimum: how far it would get with this order (when amounts are shown).
   const goal = shop.data?.goal ?? null;
@@ -289,7 +291,7 @@ export function CartPage(): React.JSX.Element {
       {needsShipping && cart && (
         <Section header={t('cart.shippingZone')}>
           {zones.map((z) => {
-            const cost = shippingCost(z, itemsTotal);
+            const cost = shippingCost(z, itemsTotal, vipFreeShipping);
             return (
               <Cell
                 key={z.id}

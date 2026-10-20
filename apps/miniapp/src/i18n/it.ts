@@ -752,6 +752,8 @@ export const it: Record<MessageKey, string> = {
   'shipping.offered': "Proposta al momento dell'ordine",
   'shipping.remove': 'Rimuovi zona',
   'shipping.save': 'Salva zone',
+  'shipping.vipFree': '⭐ I VIP non pagano la spedizione',
+  'shipping.vipFreeHint': 'I membri del club VIP del GB hanno la spedizione gratuita in qualsiasi zona.',
   'shipping.zone': 'Zona {n}',
   'shop.allShops': 'Tutti i GB',
   'shop.unavailable': 'GB non disponibile',
