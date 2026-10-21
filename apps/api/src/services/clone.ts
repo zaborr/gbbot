@@ -177,6 +177,7 @@ export async function cloneProducts(
           stock: input.copyStock ? product.stock : null,
           isActive: false,
           vipOnly: product.vipOnly,
+          minQuantity: product.minQuantity,
           options: product.options,
           priceTiers: product.priceTiers,
         })

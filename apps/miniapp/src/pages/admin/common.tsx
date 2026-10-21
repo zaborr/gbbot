@@ -67,6 +67,7 @@ export function toInput(product: Product, isActive: boolean): ProductInput {
     stock: product.stock,
     isActive,
     vipOnly: product.vipOnly,
+    minQuantity: product.minQuantity,
     options: product.options,
     priceTiers: product.priceTiers,
     variants: product.variants.map((v) => ({

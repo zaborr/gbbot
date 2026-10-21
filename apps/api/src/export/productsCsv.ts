@@ -221,6 +221,17 @@ export function readProductsCsv(
     const activeOf = (row: Row): boolean | null =>
       row.get('activo') === '' ? null : parseActive(row.get('activo'));
 
+    // `minimo`: minimum units per order, all variants together; empty = none.
+    let minQuantity = current?.minQuantity ?? 1;
+    if (first.has('minimo')) {
+      const cell = field('minimo');
+      const value = cell ? Number(cell.value) : 1;
+      if (cell && (!/^\d+$/.test(cell.value) || value < 1 || value > 999)) {
+        issue(cell.row.line, 'bad_minimum', { value: cell.value });
+      }
+      minQuantity = Number.isInteger(value) && value >= 1 && value <= 999 ? value : 1;
+    }
+
     // `solo_vip`: the whole product (si/no); empty = no.
     let vipOnly = current?.vipOnly ?? false;
     if (first.has('solo_vip')) {
@@ -350,6 +361,7 @@ export function readProductsCsv(
       stock,
       isActive,
       vipOnly,
+      minQuantity,
       options,
       priceTiers,
       variants,
@@ -411,6 +423,7 @@ export function writeProductsCsv(
       stock: product.options.length === 0 && product.stock !== null ? String(product.stock) : '',
       activo: yesNo(product.isActive),
       solo_vip: yesNo(product.vipOnly),
+      minimo: product.minQuantity > 1 ? String(product.minQuantity) : '',
       imagen: product.imageUrl ?? '',
       escalones: product.priceTiers.map((t) => `${t.minQty}:${money(t.price)}`).join('|'),
     };

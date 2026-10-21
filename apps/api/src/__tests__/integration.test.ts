@@ -569,6 +569,20 @@ describeDb('API integration', () => {
     await db.delete(shops).where(eq(shops.id, gb!.id));
   });
 
+  it('refuses an order below the product minimum', async () => {
+    const auth = { Authorization: `Bearer ${await authToken(555000888, 'Nora')}`, 'content-type': 'application/json' };
+    await db.update(products).set({ minQuantity: 3 }).where(eq(products.id, productId));
+    await request('/api/cart/items', { method: 'POST', headers: auth, body: JSON.stringify({ productId, quantity: 2 }) });
+    const short = await request('/api/orders', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ contactUsername: '@test_user' }),
+    });
+    expect(short.status).toBe(400);
+    expect(((await short.json()) as { error: { code: string } }).error.code).toBe('below_minimum');
+    await db.update(products).set({ minQuantity: 1 }).where(eq(products.id, productId));
+  });
+
   it('cancels unpaid orders after the shop deadline', async () => {
     const token = await authToken(CUSTOMER_ID, 'Alice');
     const auth = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };

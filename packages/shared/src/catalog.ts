@@ -78,6 +78,8 @@ export const product = z.object({
   isActive: z.boolean(),
   /** Only the GB's VIPs see it and can buy it (admins see it too). */
   vipOnly: z.boolean(),
+  /** Minimum units per order, all variants together (1 = none). */
+  minQuantity: z.number().int().min(1).max(999),
   /** Option groups (max 3). Empty for a product without variants. */
   options: z.array(productOption).max(3),
   /** Every combination of the options (admins also see inactive ones). */
@@ -102,6 +104,7 @@ export const productInput = product
     variants: z.array(variantInput).max(200),
     vipPrice: moneyAmount.nullable().default(null),
     vipOnly: z.boolean().default(false),
+    minQuantity: z.number().int().min(1).max(999).default(1),
     titleEn: z.string().trim().max(256).nullable().default(null),
     descriptionEn: z.string().trim().max(4096).nullable().default(null),
   });

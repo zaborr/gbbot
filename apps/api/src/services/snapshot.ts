@@ -76,6 +76,7 @@ export async function takeSnapshot(db: Database, shop: ShopRow): Promise<GbSnaps
       stock: p.stock,
       isActive: p.isActive,
       vipOnly: p.vipOnly,
+      minQuantity: p.minQuantity,
       options: p.options,
       priceTiers: p.priceTiers,
       variants: variantRows
