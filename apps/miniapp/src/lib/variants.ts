@@ -117,10 +117,18 @@ export function tierTable(
 ): Array<{ from: number; to: number | null; price: number }> {
   // A VIP price is fixed: no tiers.
   if (product.priceTiers.length === 0 || vipPriceFor(product, variant, vip) !== null) return [];
+  // Nobody can buy fewer than the minimum: the table starts there, and tiers
+  // that end below it are left out.
+  const min = Math.max(1, product.minQuantity);
   const starts = [1, ...product.priceTiers.map((t) => t.minQty)];
-  return starts.map((from, i) => ({
-    from,
-    to: i + 1 < starts.length ? (starts[i + 1] ?? from) - 1 : null,
-    price: unitPriceFor(product.price, variant?.priceOverride ?? null, product.priceTiers, from),
-  }));
+  return starts
+    .map((from, i) => ({
+      from: Math.max(from, min),
+      to: i + 1 < starts.length ? (starts[i + 1] ?? from) - 1 : null,
+    }))
+    .filter((row) => row.to === null || row.to >= row.from)
+    .map((row) => ({
+      ...row,
+      price: unitPriceFor(product.price, variant?.priceOverride ?? null, product.priceTiers, row.from),
+    }));
 }
