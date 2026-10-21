@@ -58,7 +58,9 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
     ? isSoldOut(product) || (variant !== null && variant.stock !== null && variant.stock <= 0)
     : product.stock !== null && product.stock <= 0;
   // How many to add: at most what is in stock (999 = the cart's limit).
-  const [quantity, setQuantity] = useState(1);
+  // Products sold from a minimum (without variants) start at it; with variants
+  // the minimum counts all of them together, so each one starts at 1.
+  const [quantity, setQuantity] = useState(() => (hasVariants(product) ? 1 : product.minQuantity));
   const maxQuantity = Math.max(1, Math.min(999, stock ?? 999));
   const qty = Math.min(quantity, maxQuantity);
   const vip = shop.isVip;
@@ -147,6 +149,13 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
           <Title level="3" weight="1" style={{ marginTop: 8 }}>
             {priceText}
           </Title>
+          {product.minQuantity > 1 && (
+            <Text style={{ display: 'block', marginTop: 4, fontWeight: 600 }}>
+              {withVariants
+                ? t('product.minimumMixed', { count: product.minQuantity })
+                : t('product.minimum', { count: product.minQuantity })}
+            </Text>
+          )}
           {vipShown && (
             <Text style={{ display: 'block', marginTop: 4 }}>{t('product.vipPrice')}</Text>
           )}

@@ -35,6 +35,7 @@ const ISSUE_CODES = [
   'bad_url',
   'bad_tiers',
   'bad_stock',
+  'bad_minimum',
   'missing_value',
   'repeated_product',
   'invalid',

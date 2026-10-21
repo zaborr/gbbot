@@ -123,6 +123,25 @@ export interface CheckoutShipping {
   encryptedAddress?: string | undefined;
 }
 
+/**
+ * A product's minimum counts all its variants together: refuses an order (or
+ * a change) with fewer units of it. Leaving a product out entirely is fine.
+ */
+function assertMinimums(
+  products: ReadonlyArray<{ id: string; title: string; minQuantity: number }>,
+  quantities: Map<string, number>,
+): void {
+  for (const product of products) {
+    const quantity = quantities.get(product.id) ?? 0;
+    if (quantity > 0 && quantity < product.minQuantity) {
+      throw ApiError.badRequest(
+        'below_minimum',
+        `"${product.title}" is sold from ${product.minQuantity} units (you have ${quantity})`,
+      );
+    }
+  }
+}
+
 export async function createOrderFromCart(
   db: Database,
   shopId: string,
@@ -173,6 +192,7 @@ export async function createOrderFromCart(
     });
     // Quantity tiers count every unit of a product, across its variants.
     const productQty = quantitiesByProduct(valid.map((v) => v.item));
+    assertMinimums(valid.map((v) => v.product), productQty);
     const draftLines: DraftLine[] = valid.map(({ item, product, variant }) => ({
       productId: product.id,
       variantId: variant?.id ?? null,
@@ -716,6 +736,12 @@ export async function requestOrderChange(
 
   const oldProductQty = quantitiesByProduct(current);
   const newProductQty = quantitiesByProduct([...wanted.values()]);
+  // Only products whose quantity changes (a minimum raised later does not
+  // block changing something else).
+  assertMinimums(
+    rows.filter((row) => newProductQty.get(row.id) !== oldProductQty.get(row.id)),
+    newProductQty,
+  );
 
   const items: OrderChangeRequest['items'] = [];
   for (const [key, { productId, variantId, quantity }] of wanted) {
