@@ -141,6 +141,8 @@ export const products = pgTable(
     isActive: boolean('is_active').notNull().default(true),
     /** Only the GB's VIPs see it and can buy it; for everyone else it does not exist. */
     vipOnly: boolean('vip_only').notNull().default(false),
+    /** Minimum units per order, all variants together (1 = none). */
+    minQuantity: integer('min_quantity').notNull().default(1),
     /** Option groups (Color, Size…); empty for a product without variants. */
     options: jsonb('options').$type<ProductOption[]>().notNull().default([]),
     /** Quantity breaks on the product's price, sorted by `minQty`. */

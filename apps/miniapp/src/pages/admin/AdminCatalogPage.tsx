@@ -180,6 +180,7 @@ function ProductRow({
         stockSummary(product),
         product.isActive ? null : t('adminCatalog.hidden'),
         product.vipOnly ? t('product.vipOnly') : null,
+        product.minQuantity > 1 ? t('adminCatalog.minimum', { count: product.minQuantity }) : null,
       ]
         .filter(Boolean)
         .join(' · ')}

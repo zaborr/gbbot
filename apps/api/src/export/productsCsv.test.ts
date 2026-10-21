@@ -22,6 +22,7 @@ function product(partial: Partial<Product>): Product {
     stock: null,
     isActive: true,
     vipOnly: false,
+    minQuantity: 1,
     options: [],
     variants: [],
     priceTiers: [],
@@ -182,5 +183,15 @@ describe('VIP-only products in the CSV', () => {
     expect(products[0]?.input.vipOnly).toBe(true);
     const kept = readProductsCsv('producto,titulo,precio\ngold,Gold,1', [product({ slug: 'gold', vipOnly: true })], 'USDC');
     expect(kept.products[0]?.input.vipOnly).toBe(true);
+  });
+});
+
+describe('Minimum quantity in the CSV', () => {
+  it('reads and writes minimo', () => {
+    const csv = writeProductsCsv([product({ slug: 'pen', minQuantity: 10 })], [], 'es');
+    const { products, errors } = readProductsCsv(csv, [], 'USDC');
+    expect(errors).toEqual([]);
+    expect(products[0]?.input.minQuantity).toBe(10);
+    expect(readProductsCsv('producto,titulo,precio,minimo\npen,Pen,1,0', [], 'USDC').errors[0]?.code).toBe('bad_minimum');
   });
 });

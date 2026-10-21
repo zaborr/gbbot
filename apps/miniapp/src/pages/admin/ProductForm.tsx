@@ -40,6 +40,7 @@ export function ProductForm({
   );
   const [token, setToken] = useState<string>(product?.currency ?? defaultToken);
   const [vipOnly, setVipOnly] = useState(product?.vipOnly ?? false);
+  const [minQty, setMinQty] = useState(product && product.minQuantity > 1 ? String(product.minQuantity) : '');
   const [stock, setStock] = useState(
     product && product.stock !== null ? String(product.stock) : '',
   );
@@ -63,6 +64,9 @@ export function ProductForm({
   const vipInvalid = vipValue !== '' && !/^\d+([.,]\d{1,2})?$/.test(vipValue);
   const stockValue = stock.trim();
   const stockInvalid = stockValue !== '' && !/^\d+$/.test(stockValue);
+  const minValue = minQty.trim();
+  const minInvalid =
+    minValue !== '' && (!/^\d+$/.test(minValue) || Number(minValue) < 1 || Number(minValue) > 999);
   const built = buildVariants(optionDrafts, variantDrafts);
   const variantError = 'error' in built ? built.error : null;
   const withVariants = !('error' in built) && built.options.length > 0;
@@ -99,6 +103,7 @@ export function ProductForm({
       stock: withVariants || stockValue === '' ? null : Number(stockValue),
       isActive: product?.isActive ?? true,
       vipOnly,
+      minQuantity: minValue === '' || minInvalid ? 1 : Number(minValue),
       options: built.options,
       variants: built.variants,
       priceTiers: builtTiers.tiers,
@@ -114,6 +119,7 @@ export function ProductForm({
         setPrice('');
         setVipPrice('');
         setVipOnly(false);
+        setMinQty('');
         setStock('');
         setImageUrl('');
         setDescription('');
@@ -253,6 +259,15 @@ export function ProductForm({
       >
         {t('productForm.vipOnly')}
       </Cell>
+      <Input
+        header={minInvalid ? t('productForm.minInvalid') : t('productForm.minQuantity')}
+        type="text"
+        inputMode="numeric"
+        placeholder={t('productForm.minPlaceholder')}
+        status={minInvalid ? 'error' : 'default'}
+        value={minQty}
+        onChange={(e) => setMinQty(e.target.value)}
+      />
     </Section>
 
     {!withVariants && (
@@ -305,6 +320,7 @@ export function ProductForm({
             imageInvalid ||
             vipInvalid ||
             (!withVariants && stockInvalid) ||
+            minInvalid ||
             formError !== null
           }
           onClick={() => void submit()}

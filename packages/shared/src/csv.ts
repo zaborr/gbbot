@@ -23,6 +23,7 @@ export const PRODUCT_CSV_COLUMNS = [
   'escalones',
   // Availability.
   'stock',
+  'minimo',
   'activo',
   'solo_vip',
   // Variants.

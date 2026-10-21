@@ -61,6 +61,20 @@ export function CartPage(): React.JSX.Element {
   });
   const [remember, setRemember] = useState(true);
   const itemsTotal = cart ? cart.total - cart.fee : 0;
+  // Products below their minimum (all variants together): checkout waits.
+  const shortfalls = (() => {
+    const byProduct = new Map<string, { name: string; min: number; quantity: number }>();
+    for (const line of cart?.lines ?? []) {
+      const entry = byProduct.get(line.product.id) ?? {
+        name: productTitle(line.product),
+        min: line.product.minQuantity,
+        quantity: 0,
+      };
+      entry.quantity += line.quantity;
+      byProduct.set(line.product.id, entry);
+    }
+    return [...byProduct.values()].filter((p) => p.quantity < p.min);
+  })();
   // VIPs may not pay shipping in this GB.
   const vipFreeShipping = (cart?.isVip ?? false) && (shop.data?.vipNoShipping ?? false);
   const shipping = zone ? shippingCost(zone, itemsTotal, vipFreeShipping) : 0;
@@ -100,6 +114,10 @@ export function CartPage(): React.JSX.Element {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
     try {
+      if (shortfalls.length > 0) {
+        missing(t('cart.belowMinimum'));
+        return;
+      }
       if (!contactValid) {
         missing(t('cart.needUsername'));
         return;
@@ -156,6 +174,7 @@ export function CartPage(): React.JSX.Element {
     remember,
     unpaid.length,
     duplicateOk,
+    shortfalls.length,
   ]);
 
   const hasItems = (cart?.lines.length ?? 0) > 0;
@@ -232,6 +251,15 @@ export function CartPage(): React.JSX.Element {
           <Cell multiline style={{ color: 'var(--tgui--destructive_text_color)' }}>
             {error ?? shop.error}
           </Cell>
+        </Section>
+      )}
+      {shortfalls.length > 0 && (
+        <Section header={t('cart.minimumTitle')}>
+          {shortfalls.map((s) => (
+            <Cell key={s.name} multiline style={{ color: 'var(--tgui--destructive_text_color)' }}>
+              {t('cart.minimumLine', { name: s.name, min: s.min, quantity: s.quantity })}
+            </Cell>
+          ))}
         </Section>
       )}
       <Section header={t('cart.title')}>

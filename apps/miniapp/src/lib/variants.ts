@@ -43,9 +43,13 @@ export function priceRange(product: Product, vip = false): { min: number; max: n
 
 /** Whether nothing can be bought: no stock left anywhere. */
 export function isSoldOut(product: Product): boolean {
-  if (!hasVariants(product)) return product.stock !== null && product.stock <= 0;
+  // Less stock than the minimum per order: it cannot be bought either.
+  const min = Math.max(1, product.minQuantity);
+  if (!hasVariants(product)) return product.stock !== null && product.stock < min;
   const variants = activeVariants(product);
-  return variants.length === 0 || variants.every((v) => v.stock !== null && v.stock <= 0);
+  if (variants.length === 0) return true;
+  if (variants.some((v) => v.stock === null)) return false;
+  return variants.reduce((sum, v) => sum + Math.max(v.stock ?? 0, 0), 0) < min;
 }
 
 /** The variant matching one chosen value per option, if every option is chosen. */

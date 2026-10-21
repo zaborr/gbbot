@@ -86,6 +86,7 @@ export function toProductDTO(
     stock: row.stock,
     isActive: row.isActive,
     vipOnly: row.vipOnly,
+    minQuantity: row.minQuantity,
     options: row.options,
     priceTiers: row.priceTiers,
     variants: row.options.length > 0 ? variants.map((v) => toVariantDTO(v, row, showVip)) : [],
