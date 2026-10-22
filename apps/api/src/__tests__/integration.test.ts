@@ -612,6 +612,14 @@ describeDb('API integration', () => {
     // A web admin is a platform super-admin.
     const auth = { Authorization: `Bearer ${token}` };
     expect((await app.request('/api/platform/shops', { headers: auth })).status).toBe(200);
+    // Files come back in the response (there is no chat with the bot to send them to).
+    const csv = await request('/api/admin/products/csv/export', { method: 'POST', headers: auth });
+    expect(csv.status).toBe(200);
+    const { file } = (await csv.json()) as { file?: { fileName: string; data: string } };
+    expect(file?.fileName).toMatch(/\.csv$/);
+    expect(Buffer.from(file?.data ?? '', 'base64').toString('utf8')).toContain('producto');
+    // No cart or orders of their own.
+    expect((await request('/api/cart', { headers: auth })).status).toBe(403);
 
     // A reset closes the sessions opened before.
     await resetWebAdmin(db, creds.username);

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { mainButton } from '@telegram-apps/sdk-react';
+import { isWebMode, setWebButton } from '../lib/web.js';
 
 export interface MainButtonOptions {
   text: string;
@@ -37,6 +38,10 @@ function applyMainButton(update: ButtonParams): void {
 }
 
 function hideMainButton(): void {
+  if (isWebMode()) {
+    setWebButton({ visible: false, loading: false, onClick: null });
+    return;
+  }
   applyMainButton({ isVisible: false, isLoaderVisible: false });
 }
 
@@ -67,6 +72,11 @@ export function useMainButton({
 
   // One click listener for the life of the screen (always calls the latest handler).
   useEffect(() => {
+    if (isWebMode()) {
+      // In a browser the page draws the button itself.
+      setWebButton({ onClick: () => handler.current() });
+      return hideMainButton;
+    }
     if (!ensureMounted()) return undefined;
     const off = mainButton.onClick(() => handler.current());
     return () => {
@@ -78,6 +88,10 @@ export function useMainButton({
   // Look of the button; re-applied after every screen change, so the reset
   // of the screen change can never win over the screen we are on.
   useEffect(() => {
+    if (isWebMode()) {
+      setWebButton({ text, visible, enabled, loading, onClick: () => handler.current() });
+      return;
+    }
     if (!ensureMounted()) return;
     applyMainButton({
       text,

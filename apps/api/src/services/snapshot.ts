@@ -123,7 +123,8 @@ export async function restoreSnapshot(
         closingWarnHours: s.closingWarnHours,
         vipClub: s.vipClub,
         useGlobalVipClub: s.useGlobalVipClub,
-        ownerIds: [target.ownerId],
+        // A web administrator manages every GB already; it is not listed as its administrator.
+        ownerIds: target.ownerId < 0 ? [] : [target.ownerId],
         paymentSetup: s.paymentSetup,
         currency: s.currency,
         orderFee: s.orderFee,

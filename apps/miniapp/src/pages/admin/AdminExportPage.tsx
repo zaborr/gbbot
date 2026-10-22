@@ -9,6 +9,7 @@ import { copyText } from '../../lib/clipboard.js';
 import { itemName } from '../../lib/variants.js';
 import { useShop } from '../../providers/ShopProvider.js';
 import { askWriteAccess } from '../../lib/writeAccess.js';
+import { isWebMode, saveBase64File } from '../../lib/web.js';
 import { AdminOnly, ErrorBanner, useAdminActions } from './common.js';
 import { PageTitle } from '../../components/PageTitle.js';
 import { locale, t, tn, type MessageKey } from '../../i18n/index.js';
@@ -129,7 +130,13 @@ function AdminExport(): React.JSX.Element {
         ...periodRange(period),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
-      setMessage(t('export.sent', { orders: tn(result.orders, 'count.orders.one', 'count.orders.other') }));
+      const orders = tn(result.orders, 'count.orders.one', 'count.orders.other');
+      if (result.file) {
+        saveBase64File(result.file);
+        setMessage(t('export.downloaded', { orders }));
+      } else {
+        setMessage(t('export.sent', { orders }));
+      }
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : t('export.failed'));
     } finally {
@@ -363,33 +370,45 @@ function AdminExport(): React.JSX.Element {
             </div>
           </Section>
 
-          <Section header={t('export.lessSafeTitle')} footer={t('export.lessSafeFooter')}>
-            <div style={{ padding: 16 }}>
-              <Button
-                stretched
-                mode="bezeled"
-                loading={busy === 'send-list'}
-                onClick={() =>
-                  void actions.twoTap('send-list', async () => {
-                    setBusy('send-list');
-                    try {
-                      await askWriteAccess();
-                      await api.adminSendShippingList(list.fileName, list.csv, list.entries.length);
-                      setCopied('sent');
-                    } catch (err) {
-                      setListError(err instanceof ApiClientError ? err.message : t('export.failed'));
-                    } finally {
-                      setBusy(null);
-                    }
-                  })
-                }
-              >
-                {copied === 'sent'
-                  ? t('export.sentToChat')
-                  : actions.tapLabel('send-list', t('export.sendToBot'), t('export.sendToBotConfirm'))}
-              </Button>
-            </div>
-          </Section>
+          {!isWebMode() && (
+            <Section header={t('export.lessSafeTitle')} footer={t('export.lessSafeFooter')}>
+              <div style={{ padding: 16 }}>
+                <Button
+                  stretched
+                  mode="bezeled"
+                  loading={busy === 'send-list'}
+                  onClick={() =>
+                    void actions.twoTap('send-list', async () => {
+                      setBusy('send-list');
+                      try {
+                        await askWriteAccess();
+                        await api.adminSendShippingList(
+                          list.fileName,
+                          list.csv,
+                          list.entries.length,
+                        );
+                        setCopied('sent');
+                      } catch (err) {
+                        setListError(
+                          err instanceof ApiClientError ? err.message : t('export.failed'),
+                        );
+                      } finally {
+                        setBusy(null);
+                      }
+                    })
+                  }
+                >
+                  {copied === 'sent'
+                    ? t('export.sentToChat')
+                    : actions.tapLabel(
+                        'send-list',
+                        t('export.sendToBot'),
+                        t('export.sendToBotConfirm'),
+                      )}
+                </Button>
+              </div>
+            </Section>
+          )}
           <Section>
             <Cell
               onClick={() => {

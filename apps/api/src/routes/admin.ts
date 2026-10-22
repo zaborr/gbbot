@@ -27,6 +27,7 @@ import {
   broadcastAudience,
   sendBroadcastRequest,
   updateDisclaimerRequest,
+  type WebFile,
 } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth, requireOwner } from '../auth/middleware.js';
@@ -73,6 +74,7 @@ import { orders, users } from '../db/schema.js';
 import { startPaymentCheck } from '../services/paymentCheck.js';
 import { buildReport } from '../export/report.js';
 import { TelegramApi } from '../telegram/api.js';
+import { isWebSession } from '../services/webAdmins.js';
 import { tr } from '../i18n/messages.js';
 import { describeCustomer } from '../services/customers.js';
 import { shopVipClubView, updateShopVipClub } from '../services/vip.js';
@@ -114,6 +116,37 @@ export function manualMethodChanges(
 }
 
 /** The customer's chat, or none once the order is anonymized. */
+/**
+ * Hands a generated file to the admin: the bot sends it to their chat, or for
+ * a web administrator it comes back in the response.
+ */
+async function deliverFile(
+  env: { BOT_TOKEN: string },
+  sub: number,
+  file: { fileName: string; data: Buffer; contentType: string; caption: string },
+): Promise<{ file?: WebFile }> {
+  if (isWebSession(sub)) {
+    return {
+      file: {
+        fileName: file.fileName,
+        contentType: file.contentType,
+        data: file.data.toString('base64'),
+      },
+    };
+  }
+  try {
+    const telegram = new TelegramApi(env.BOT_TOKEN);
+    await telegram.sendDocument(sub, file.fileName, file.data, file.contentType, file.caption);
+  } catch (error) {
+    console.error(`${file.fileName} could not be sent:`, error);
+    throw ApiError.conflict(
+      'send_failed',
+      'The bot could not send you the file. Open your chat with the bot, press Start, and try again.',
+    );
+  }
+  return {};
+}
+
 function customerChat(order: { userId: number | null }): number[] {
   return order.userId === null ? [] : [order.userId];
 }
@@ -185,6 +218,8 @@ export function adminRoutes(): Hono<AppBindings> {
       const shop = c.get('shop');
       const lang = langFrom(c.req.header('X-Lang'));
       const sub = c.get('claims').sub;
+      // Web administrators save the list on their device instead.
+      if (isWebSession(sub)) throw ApiError.forbidden('Only available in Telegram');
       let sent: unknown;
       try {
         sent = await new TelegramApi(c.get('env').BOT_TOKEN).sendDocument(
@@ -312,22 +347,13 @@ export function adminRoutes(): Hono<AppBindings> {
     const lang = langFrom(c.req.header('X-Lang'));
     const snapshot = await takeSnapshot(c.get('db'), shop);
     const fileName = `${shop.slug}-backup-${snapshot.exportedAt.slice(0, 10)}.json`;
-    try {
-      await new TelegramApi(c.get('env').BOT_TOKEN).sendDocument(
-        c.get('claims').sub,
-        fileName,
-        Buffer.from(JSON.stringify(snapshot, null, 2), 'utf8'),
-        'application/json',
-        tr(lang, 'export.backupCaption', { shop: shop.name }),
-      );
-    } catch (error) {
-      console.error('Backup could not be sent:', error);
-      throw ApiError.conflict(
-        'send_failed',
-        'The bot could not send you the file. Open your chat with the bot, press Start, and try again.',
-      );
-    }
-    return c.json({ fileName, products: snapshot.products.length });
+    const delivered = await deliverFile(c.get('env'), c.get('claims').sub, {
+      fileName,
+      data: Buffer.from(JSON.stringify(snapshot, null, 2), 'utf8'),
+      contentType: 'application/json',
+      caption: tr(lang, 'export.backupCaption', { shop: shop.name }),
+    });
+    return c.json({ fileName, products: snapshot.products.length, ...delivered });
   });
 
   // Copy products from another shop the user manages.
@@ -459,22 +485,13 @@ export function adminRoutes(): Hono<AppBindings> {
     const shop = c.get('shop');
     const lang = langFrom(c.req.header('X-Lang'));
     const file = await exportProductsCsv(c.get('db'), shop, lang);
-    try {
-      await new TelegramApi(c.get('env').BOT_TOKEN).sendDocument(
-        c.get('claims').sub,
-        file.fileName,
-        file.data,
-        'text/csv',
-        tr(lang, 'export.productsCaption', { shop: shop.name, count: file.count }),
-      );
-    } catch (error) {
-      console.error('Products CSV could not be sent:', error);
-      throw ApiError.conflict(
-        'send_failed',
-        'The bot could not send you the file. Open your chat with the bot, press Start, and try again.',
-      );
-    }
-    return c.json({ fileName: file.fileName, products: file.count });
+    const delivered = await deliverFile(c.get('env'), c.get('claims').sub, {
+      fileName: file.fileName,
+      data: file.data,
+      contentType: 'text/csv',
+      caption: tr(lang, 'export.productsCaption', { shop: shop.name, count: file.count }),
+    });
+    return c.json({ fileName: file.fileName, products: file.count, ...delivered });
   });
   app.post('/products/csv/preview', zValidator('json', productsCsvRequest), async (c) =>
     c.json(await previewProductsCsv(c.get('db'), c.get('shop'), c.req.valid('json').csv)),
@@ -598,25 +615,16 @@ export function adminRoutes(): Hono<AppBindings> {
     if (file.orderCount === 0) {
       throw ApiError.badRequest('nothing_to_export', 'No orders match these filters');
     }
-    try {
-      await new TelegramApi(c.get('env').BOT_TOKEN).sendDocument(
-        sub,
-        file.fileName,
-        file.data,
-        file.contentType,
-        tr(lang, file.orderCount === 1 ? 'export.captionOne' : 'export.captionOther', {
-          shop: shop.name,
-          count: file.orderCount,
-        }),
-      );
-    } catch (error) {
-      console.error('Export could not be sent:', error);
-      throw ApiError.conflict(
-        'send_failed',
-        'The bot could not send you the file. Open your chat with the bot, press Start, and try again.',
-      );
-    }
-    return c.json({ fileName: file.fileName, orders: file.orderCount });
+    const delivered = await deliverFile(c.get('env'), sub, {
+      fileName: file.fileName,
+      data: file.data,
+      contentType: file.contentType,
+      caption: tr(lang, file.orderCount === 1 ? 'export.captionOne' : 'export.captionOther', {
+        shop: shop.name,
+        count: file.orderCount,
+      }),
+    });
+    return c.json({ fileName: file.fileName, orders: file.orderCount, ...delivered });
   });
 
   // Customer change requests: approve (apply + tell them what to pay) or reject.

@@ -7,6 +7,7 @@ import { api } from '../../api/client.js';
 import { AdminOnly, ErrorBanner, useAdminActions } from './common.js';
 import { PageTitle } from '../../components/PageTitle.js';
 import { t, type MessageKey } from '../../i18n/index.js';
+import { isWebMode, saveBase64File } from '../../lib/web.js';
 
 /** Products as CSV: export through the bot; import with a preview first. */
 export function AdminProductsCsvPage(): React.JSX.Element {
@@ -106,7 +107,8 @@ function ProductsCsv(): React.JSX.Element {
             loading={busy === 'export'}
             onClick={() =>
               void run('export', async () => {
-                await api.adminExportProductsCsv();
+                const result = await api.adminExportProductsCsv();
+                if (result.file) saveBase64File(result.file);
                 setSent(true);
               })
             }
@@ -114,7 +116,7 @@ function ProductsCsv(): React.JSX.Element {
             {t('csv.export')}
           </Button>
         </div>
-        {sent && <Cell multiline>{t('csv.sent')}</Cell>}
+        {sent && <Cell multiline>{t(isWebMode() ? 'web.fileSaved' : 'csv.sent')}</Cell>}
       </Section>
 
       <Section header={t('csv.importTitle')} footer={`${t('csv.importFooter')} ${t('csv.importFooterBot')}`}>
