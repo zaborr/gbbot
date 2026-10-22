@@ -90,6 +90,15 @@ export async function unreadWebNotices(db: Database, adminId: number): Promise<n
   return row?.n ?? 0;
 }
 
+/** Deletes one notice, or with no id the whole inbox; returns how many went. */
+export async function deleteWebNotices(db: Database, id?: number): Promise<number> {
+  const deleted = await db
+    .delete(webNotices)
+    .where(id === undefined ? undefined : eq(webNotices.id, id))
+    .returning({ id: webNotices.id });
+  return deleted.length;
+}
+
 /** Marks the inbox as read up to `upTo` (never goes back). */
 export async function markWebNoticesSeen(db: Database, adminId: number, upTo: number): Promise<void> {
   await db

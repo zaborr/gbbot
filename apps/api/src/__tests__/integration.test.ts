@@ -636,6 +636,13 @@ describeDb('API integration', () => {
     });
     const after = await app.request('/api/platform/notices/unread', { headers: auth });
     expect(((await after.json()) as { unread: number }).unread).toBe(0);
+    // Full platform accounts may delete; the deletion leaves its own notice.
+    const one = notices[0]?.id ?? 0;
+    expect((await app.request(`/api/platform/notices/${one}`, { method: 'DELETE', headers: auth })).status).toBe(204);
+    const left = await app.request('/api/platform/notices', { headers: auth });
+    const listed = ((await left.json()) as { notices: { id: number; text: string }[] }).notices;
+    expect(listed.some((n) => n.id === one)).toBe(false);
+    expect(listed[0]?.text).toContain('web:');
 
     // A reset closes the sessions opened before.
     await resetWebAdmin(db, creds.username);

@@ -4,7 +4,13 @@ import { ApiError } from '../lib/errors.js';
 import { verifySession, type SessionClaims } from './jwt.js';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
-import { isWebSession, webAccountId, webSessionValid } from '../services/webAdmins.js';
+import {
+  getWebAdmin,
+  isWebAdminId,
+  isWebSession,
+  webAccountId,
+  webSessionValid,
+} from '../services/webAdmins.js';
 import { isSuperAdmin } from '../services/shop.js';
 
 /**
@@ -79,6 +85,18 @@ export const requireOwner = createMiddleware<AppBindings>(async (c, next) => {
 export const requireTelegramUser = createMiddleware<AppBindings>(async (c, next) => {
   if (isWebSession(c.get('claims'))) {
     throw ApiError.forbidden('Only available in Telegram');
+  }
+  await next();
+});
+
+/** Full platform web accounts only (they manage web accounts and the inbox). Run after `requireAuth`. */
+export const requireFullPlatform = createMiddleware<AppBindings>(async (c, next) => {
+  const claims = c.get('claims');
+  const id = webAccountId(claims);
+  const platform = id !== undefined && isWebAdminId(claims.sub);
+  const row = platform ? await getWebAdmin(c.get('db'), id) : undefined;
+  if (row?.role !== 'platform') {
+    throw ApiError.forbidden('Only for full platform accounts');
   }
   await next();
 });

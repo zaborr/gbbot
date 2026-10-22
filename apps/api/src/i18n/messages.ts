@@ -135,6 +135,8 @@ const en = {
   'web.role.platform': 'platform, full',
   'web.role.platform_limited': 'platform, without managing web accounts',
   'web.role.linked': 'linked to Telegram',
+  'web.noticeDeleted': '🧹 {who} deleted a notice from the inbox.',
+  'web.noticesDeleted': '🧹 {who} deleted {count} notices from the inbox.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -262,6 +264,8 @@ const es: Record<BotMessageKey, string> = {
   'web.role.platform': 'plataforma completa',
   'web.role.platform_limited': 'plataforma sin gestión de cuentas web',
   'web.role.linked': 'vinculada a Telegram',
+  'web.noticeDeleted': '🧹 {who} ha borrado un aviso del buzón.',
+  'web.noticesDeleted': '🧹 {who} ha borrado {count} avisos del buzón.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -387,6 +391,8 @@ const it: Record<BotMessageKey, string> = {
   'web.role.platform': 'piattaforma completo',
   'web.role.platform_limited': 'piattaforma senza gestione degli account web',
   'web.role.linked': 'collegato a Telegram',
+  'web.noticeDeleted': '🧹 {who} ha eliminato un avviso dalla casella.',
+  'web.noticesDeleted': '🧹 {who} ha eliminato {count} avvisi dalla casella.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -512,6 +518,8 @@ const pt: Record<BotMessageKey, string> = {
   'web.role.platform': 'plataforma completa',
   'web.role.platform_limited': 'plataforma sem gestão de contas web',
   'web.role.linked': 'ligada ao Telegram',
+  'web.noticeDeleted': '🧹 {who} apagou um aviso da caixa.',
+  'web.noticesDeleted': '🧹 {who} apagou {count} avisos da caixa.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };
