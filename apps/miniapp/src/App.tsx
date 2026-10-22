@@ -44,6 +44,11 @@ import { PlatformVipPage } from './pages/platform/PlatformVipPage.js';
 import { PlatformOrganizersPage } from './pages/platform/PlatformOrganizersPage.js';
 import { PlatformNoticesPage } from './pages/platform/PlatformNoticesPage.js';
 import { WebAccessPage } from './pages/WebAccessPage.js';
+import { WebPasswordPage } from './pages/WebPasswordPage.js';
+import {
+  PlatformWebAccountPage,
+  PlatformWebAccountsPage,
+} from './pages/platform/PlatformWebAccountsPage.js';
 import { lang, onLangChange, t } from './i18n/index.js';
 import { isWebMode } from './lib/web.js';
 import { WebMainButton, WebSignIn, WebTopBar } from './components/WebChrome.js';
@@ -91,6 +96,9 @@ function Shell(): React.JSX.Element {
       <Route path="/platform/organizers" element={<PlatformOrganizersPage />} />
       <Route path="/platform/notices" element={<PlatformNoticesPage />} />
       <Route path="/web-access" element={<WebAccessPage />} />
+      <Route path="/web-password" element={<WebPasswordPage />} />
+      <Route path="/platform/web-accounts" element={<PlatformWebAccountsPage />} />
+      <Route path="/platform/web-accounts/:id" element={<PlatformWebAccountPage />} />
       <Route path="/new-gb" element={<NewShopPage />} />
       <Route path="/import-gb" element={<ImportShopPage />} />
       <Route path="/upload/:id" element={<UploadPage />} />

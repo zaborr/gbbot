@@ -48,10 +48,40 @@ export const webCredentials = z.object({
 });
 export type WebCredentials = z.infer<typeof webCredentials>;
 
+/** A web account, as the platform admins see it in the panel. */
+export const webAccountView = z.object({
+  id: z.number().int(),
+  username: z.string(),
+  role: webRole,
+  /** Linked accounts: the Telegram user they act as. */
+  telegram: z.object({ id: z.number().int(), name: z.string() }).nullable(),
+  lastLoginAt: z.string().nullable(),
+  locked: z.boolean(),
+  createdAt: z.string(),
+  /** The account of whoever is looking. */
+  isMe: z.boolean(),
+});
+export type WebAccountView = z.infer<typeof webAccountView>;
+
+/** Platform accounts are created in the panel (linked ones from Telegram). */
+export const platformWebRole = z.enum(['platform', 'platform_limited']);
+export const createWebAccountRequest = z.object({
+  username: z.string().trim().min(3).max(32),
+  role: platformWebRole,
+});
+export const setWebRoleRequest = z.object({ role: platformWebRole });
+
+export const changeWebPasswordRequest = z.object({
+  current: z.string().min(1).max(256),
+  next: z.string().min(12).max(256),
+});
+
 export const authResponse = z.object({
   token: z.string().min(1),
   expiresAt: z.iso.datetime(),
   user: sessionUser,
+  /** Web sessions: the account's role. */
+  webRole: webRole.optional(),
 });
 export type AuthResponse = z.infer<typeof authResponse>;
 

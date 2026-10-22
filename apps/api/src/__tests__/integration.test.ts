@@ -643,6 +643,71 @@ describeDb('API integration', () => {
     await removeWebAdmin(db, creds.username);
   });
 
+  it('lets full platform accounts manage web accounts', async () => {
+    const webSignIn = async (creds: { username: string; password: string; totpSecret: string }) => {
+      const code = totpCode(base32Decode(creds.totpSecret), Math.floor(Date.now() / 30_000));
+      const res = await app.request('http://abc.onion/api/auth/web', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: creds.username, password: creds.password, code }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { token: string; webRole: string };
+      return { body, auth: { Authorization: `Bearer ${body.token}`, 'content-type': 'application/json' } };
+    };
+    const stamp = Date.now() % 100000;
+    const full = await createWebAdmin(db, `full${stamp}`);
+    const { body: fullBody, auth } = await webSignIn(full);
+    expect(fullBody.webRole).toBe('platform');
+
+    const created = await app.request('/api/web-accounts', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ username: `lim${stamp}`, role: 'platform_limited' }),
+    });
+    expect(created.status).toBe(201);
+    const limited = (await created.json()) as { username: string; password: string; totpSecret: string };
+    const list = (await (await app.request('/api/web-accounts', { headers: auth })).json()) as {
+      id: number;
+      username: string;
+      isMe: boolean;
+    }[];
+    const limitedId = list.find((a) => a.username === limited.username)?.id;
+    const fullId = list.find((a) => a.isMe)?.id;
+    expect(limitedId).toBeDefined();
+
+    // A limited account manages everything but web accounts.
+    const { auth: limitedAuth } = await webSignIn(limited);
+    expect((await app.request('/api/platform/shops', { headers: limitedAuth })).status).toBe(200);
+    expect((await app.request('/api/web-accounts', { headers: limitedAuth })).status).toBe(403);
+
+    // The last full account can be neither removed nor downgraded.
+    expect((await app.request(`/api/web-accounts/${fullId}`, { method: 'DELETE', headers: auth })).status).toBe(409);
+    const downgrade = await app.request(`/api/web-accounts/${fullId}/role`, {
+      method: 'PUT',
+      headers: auth,
+      body: JSON.stringify({ role: 'platform_limited' }),
+    });
+    expect(downgrade.status).toBe(409);
+
+    // Own password: the caller gets a fresh session, older ones end.
+    const changed = await app.request('/api/web-accounts/me/password', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ current: full.password, next: 'a-new-long-password' }),
+    });
+    expect(changed.status).toBe(200);
+    const { token } = (await changed.json()) as { token: string };
+    expect((await app.request('/api/web-accounts', { headers: auth })).status).toBe(401);
+    const fresh = { Authorization: `Bearer ${token}` };
+    expect((await app.request('/api/web-accounts', { headers: fresh })).status).toBe(200);
+
+    expect(
+      (await app.request(`/api/web-accounts/${limitedId}`, { method: 'DELETE', headers: fresh })).status,
+    ).toBe(204);
+    await removeWebAdmin(db, full.username);
+  });
+
   it('lets managers activate web access from Telegram, acting as themselves', async () => {
     const webSignIn = (body: Record<string, string>): Promise<Response> =>
       Promise.resolve(

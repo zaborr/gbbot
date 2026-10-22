@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { retrieveRawInitData } from '@telegram-apps/sdk-react';
-import type { AuthResponse, SessionUser } from '@tma-shop/shared';
+import type { AuthResponse, SessionUser, WebRole } from '@tma-shop/shared';
 import { api } from '../api/client.js';
 import { setLang, t } from '../i18n/index.js';
 import { isWebMode, setWebSession, webSession } from '../lib/web.js';
@@ -26,6 +26,10 @@ interface SessionValue {
   signIn: (username: string, password: string, code: string) => Promise<void>;
   /** Web mode: forgets the session in this tab. */
   signOut: () => void;
+  /** Web mode: the account's role (null in Telegram). */
+  webRole: WebRole | null;
+  /** Web mode: keeps working with a new token (after changing the password). */
+  replaceWebToken: (token: string, expiresAt: string) => void;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -34,6 +38,7 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
   const [status, setStatus] = useState<Status>('loading');
   const [user, setUser] = useState<SessionUser | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [webRole, setWebRole] = useState<WebRole | null>(null);
 
   // Web mode: the session of this tab; when it expires, back to the form.
   const startWeb = useCallback((session: AuthResponse | null): void => {
@@ -54,6 +59,7 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
       setLang(session.user.language, session.user.preferredLanguage);
     }
     setUser(session?.user ?? null);
+    setWebRole(session?.webRole ?? null);
     setStatus(session ? 'ready' : 'signin');
   }, []);
 
@@ -64,6 +70,11 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
     [startWeb],
   );
   const signOut = useCallback(() => startWeb(null), [startWeb]);
+  const replaceWebToken = useCallback((token: string, expiresAt: string) => {
+    const session = webSession();
+    if (session) setWebSession({ ...session, token, expiresAt });
+    api.setToken(token);
+  }, []);
 
   useEffect(() => {
     if (isWebMode()) {
@@ -97,8 +108,17 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
   }, [startWeb]);
 
   const value = useMemo<SessionValue>(
-    () => ({ status, user, error, isSuperAdmin: user?.role === 'admin', signIn, signOut }),
-    [status, user, error, signIn, signOut],
+    () => ({
+      status,
+      user,
+      error,
+      isSuperAdmin: user?.role === 'admin',
+      signIn,
+      signOut,
+      webRole,
+      replaceWebToken,
+    }),
+    [status, user, error, signIn, signOut, webRole, replaceWebToken],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

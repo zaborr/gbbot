@@ -43,7 +43,9 @@ import type {
   WebFile,
   WebNotice,
   WebAccessStatus,
+  WebAccountView,
   WebCredentials,
+  WebRole,
 } from '@tma-shop/shared';
 import { lang } from '../i18n/index.js';
 
@@ -158,6 +160,41 @@ export class ApiClient {
     return this.request<AuthResponse>('/auth/web', {
       method: 'POST',
       body: JSON.stringify(input),
+    });
+  }
+
+  // --- web accounts (panel of full platform accounts) ---
+  webAccounts(): Promise<WebAccountView[]> {
+    return this.request<WebAccountView[]>('/web-accounts');
+  }
+
+  createWebAccount(username: string, role: WebRole): Promise<WebCredentials> {
+    return this.request<WebCredentials>('/web-accounts', {
+      method: 'POST',
+      body: JSON.stringify({ username, role }),
+    });
+  }
+
+  resetWebAccount(id: number): Promise<WebCredentials> {
+    return this.request<WebCredentials>(`/web-accounts/${id}/reset`, { method: 'POST' });
+  }
+
+  setWebAccountRole(id: number, role: WebRole): Promise<void> {
+    return this.request<void>(`/web-accounts/${id}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    });
+  }
+
+  deleteWebAccount(id: number): Promise<void> {
+    return this.request<void>(`/web-accounts/${id}`, { method: 'DELETE' });
+  }
+
+  /** The signed-in web account's password; returns the session that replaces this one. */
+  changeWebPassword(current: string, next: string): Promise<{ token: string; expiresAt: string }> {
+    return this.request('/web-accounts/me/password', {
+      method: 'POST',
+      body: JSON.stringify({ current, next }),
     });
   }
 
