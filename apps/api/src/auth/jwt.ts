@@ -2,10 +2,12 @@ import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 import type { UserRole } from '@tma-shop/shared';
 
 export interface SessionClaims {
-  /** Telegram user id (subject). */
+  /** Telegram user id (subject); negative for a web admin (-id). */
   sub: number;
   /** `admin` = platform super-admin when the session was issued. */
   role: UserRole;
+  /** Web admins: the account's session version (a reset ends older sessions). */
+  ver?: number;
 }
 
 const ALG = 'HS256';
@@ -22,7 +24,9 @@ export async function signSession(
   const issuedAt = Math.floor(Date.now() / 1000);
   const expiresAt = new Date((issuedAt + ttlSeconds) * 1000);
 
-  const token = await new SignJWT({ role: claims.role })
+  const token = await new SignJWT(
+    claims.ver === undefined ? { role: claims.role } : { role: claims.role, ver: claims.ver },
+  )
     .setProtectedHeader({ alg: ALG })
     .setSubject(String(claims.sub))
     .setIssuedAt(issuedAt)
@@ -43,5 +47,5 @@ function claimsFromPayload(payload: JWTPayload): SessionClaims {
   if (!Number.isFinite(sub) || (role !== 'customer' && role !== 'admin')) {
     throw new Error('Malformed session token payload');
   }
-  return { sub, role };
+  return typeof payload.ver === 'number' ? { sub, role, ver: payload.ver } : { sub, role };
 }

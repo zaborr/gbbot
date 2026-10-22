@@ -6,6 +6,7 @@ import {
   jsonb,
   primaryKey,
   pgEnum,
+  serial,
   pgTable,
   text,
   timestamp,
@@ -424,3 +425,26 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
   product: one(products, { fields: [orderItems.productId], references: [products.id] }),
 }));
+
+/**
+ * Platform super-admins who sign in on the web (username, password and an
+ * authenticator code) instead of through Telegram. In sessions they appear
+ * with a negative id (-id) so they never collide with Telegram users.
+ */
+export const webAdmins = pgTable('web_admins', {
+  id: serial('id').primaryKey(),
+  /** Lowercase. */
+  username: text('username').notNull().unique(),
+  /** scrypt: "salt:hash", both base64. */
+  passwordHash: text('password_hash').notNull(),
+  /** Base32 secret of the authenticator app (TOTP). */
+  totpSecret: text('totp_secret').notNull(),
+  /** Last 30-second step whose code was used: a code works only once. */
+  totpLastStep: bigint('totp_last_step', { mode: 'number' }).notNull().default(0),
+  /** Goes up on a reset, so sessions opened before stop working. */
+  sessionVersion: integer('session_version').notNull().default(1),
+  failedAttempts: integer('failed_attempts').notNull().default(0),
+  lockedUntil: timestamp('locked_until', { withTimezone: true }),
+  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

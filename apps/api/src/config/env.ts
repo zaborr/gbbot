@@ -45,6 +45,16 @@ const envSchema = z.object({
   RPC_ETHEREUM_URL: z.url().default('https://ethereum-rpc.publicnode.com'),
   RPC_SOLANA_URL: z.url().default('https://api.mainnet-beta.solana.com'),
   CORS_ORIGIN: z.string().default('*'),
+  /**
+   * Web sign-in (username, password and authenticator code) is accepted only
+   * through the Tor .onion address. Set to "false" to allow it anywhere.
+   */
+  WEB_LOGIN_ONION_ONLY: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
+  /** How long a web session lasts. */
+  WEB_SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(8 * 3600),
 });
 
 export type Env = z.infer<typeof envSchema>;
