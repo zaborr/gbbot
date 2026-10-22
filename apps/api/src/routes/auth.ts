@@ -75,6 +75,7 @@ export function authRoutes(): Hono<AppBindings> {
         token,
         expiresAt: expiresAt.toISOString(),
         user: toSessionUserDTO(userRow, role),
+        webRole: account.role,
       };
       return c.json(response);
     }
@@ -101,6 +102,7 @@ export function authRoutes(): Hono<AppBindings> {
         language: 'es',
         preferredLanguage: null,
       },
+      webRole: account.role,
     };
     return c.json(response);
   });

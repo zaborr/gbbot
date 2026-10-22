@@ -20,6 +20,7 @@ export function PlatformPage(): React.JSX.Element {
 
 function Platform(): React.JSX.Element {
   const navigate = useNavigate();
+  const { webRole } = useSession();
   const shops = useAsync(() => api.platformGetShops(), []);
   // The list after moving GBs around (no reload, no flicker).
   const [ordered, setOrdered] = useState<ShopAdminView[] | null>(null);
@@ -56,6 +57,9 @@ function Platform(): React.JSX.Element {
         <Cell onClick={() => navigate('/platform/organizers')}>{t('platform.organizers')}</Cell>
         <Cell onClick={() => navigate('/platform/vip')}>{t('platform.vipClub')}</Cell>
         <Cell onClick={() => navigate('/platform/retention')}>{t('platform.retention')}</Cell>
+        {webRole === 'platform' && (
+          <Cell onClick={() => navigate('/platform/web-accounts')}>{t('webAccounts.title')}</Cell>
+        )}
       </Section>
 
       {list.length === 0 ? (

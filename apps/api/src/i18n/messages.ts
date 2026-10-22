@@ -128,6 +128,13 @@ const en = {
   'web.activated': '🔑 {who} activated their web access (user «{username}»).',
   'web.renewed': '🔑 {who} renewed their web access password and code (user «{username}»).',
   'web.deactivated': '🔑 {who} turned off their web access (user «{username}»).',
+  'web.accountCreated': '👤 {who} created the web account «{username}» ({role}).',
+  'web.accountReset': '👤 {who} reset the password and code of the web account «{username}».',
+  'web.accountRemoved': '👤 {who} removed the web account «{username}».',
+  'web.accountRole': '👤 {who} changed the web account «{username}» to {role}.',
+  'web.role.platform': 'platform, full',
+  'web.role.platform_limited': 'platform, without managing web accounts',
+  'web.role.linked': 'linked to Telegram',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -248,6 +255,13 @@ const es: Record<BotMessageKey, string> = {
   'web.activated': '🔑 {who} ha activado su acceso web (usuario «{username}»).',
   'web.renewed': '🔑 {who} ha renovado la contraseña y el código de su acceso web (usuario «{username}»).',
   'web.deactivated': '🔑 {who} ha desactivado su acceso web (usuario «{username}»).',
+  'web.accountCreated': '👤 {who} ha creado la cuenta web «{username}» ({role}).',
+  'web.accountReset': '👤 {who} ha reseteado la contraseña y el código de la cuenta web «{username}».',
+  'web.accountRemoved': '👤 {who} ha borrado la cuenta web «{username}».',
+  'web.accountRole': '👤 {who} ha cambiado la cuenta web «{username}» a {role}.',
+  'web.role.platform': 'plataforma completa',
+  'web.role.platform_limited': 'plataforma sin gestión de cuentas web',
+  'web.role.linked': 'vinculada a Telegram',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -366,6 +380,13 @@ const it: Record<BotMessageKey, string> = {
   'web.activated': "🔑 {who} ha attivato l'accesso web (utente «{username}»).",
   'web.renewed': "🔑 {who} ha rinnovato password e codice dell'accesso web (utente «{username}»).",
   'web.deactivated': "🔑 {who} ha disattivato l'accesso web (utente «{username}»).",
+  'web.accountCreated': "👤 {who} ha creato l'account web «{username}» ({role}).",
+  'web.accountReset': "👤 {who} ha reimpostato password e codice dell'account web «{username}».",
+  'web.accountRemoved': "👤 {who} ha eliminato l'account web «{username}».",
+  'web.accountRole': "👤 {who} ha cambiato l'account web «{username}» in {role}.",
+  'web.role.platform': 'piattaforma completo',
+  'web.role.platform_limited': 'piattaforma senza gestione degli account web',
+  'web.role.linked': 'collegato a Telegram',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -484,6 +505,13 @@ const pt: Record<BotMessageKey, string> = {
   'web.activated': '🔑 {who} ativou o acesso web (utilizador «{username}»).',
   'web.renewed': '🔑 {who} renovou a palavra-passe e o código do acesso web (utilizador «{username}»).',
   'web.deactivated': '🔑 {who} desativou o acesso web (utilizador «{username}»).',
+  'web.accountCreated': '👤 {who} criou a conta web «{username}» ({role}).',
+  'web.accountReset': '👤 {who} redefiniu a palavra-passe e o código da conta web «{username}».',
+  'web.accountRemoved': '👤 {who} apagou a conta web «{username}».',
+  'web.accountRole': '👤 {who} mudou a conta web «{username}» para {role}.',
+  'web.role.platform': 'plataforma completa',
+  'web.role.platform_limited': 'plataforma sem gestão de contas web',
+  'web.role.linked': 'ligada ao Telegram',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

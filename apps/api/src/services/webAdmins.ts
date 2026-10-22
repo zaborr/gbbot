@@ -182,6 +182,56 @@ export async function webAccountOf(db: Database, telegramId: number): Promise<We
   return db.query.webAdmins.findFirst({ where: eq(webAdmins.telegramId, telegramId) });
 }
 
+export async function getWebAdmin(db: Database, id: number): Promise<WebAdminRow | undefined> {
+  return db.query.webAdmins.findFirst({ where: eq(webAdmins.id, id) });
+}
+
+/** Never leaves the platform without an account that can manage web accounts. */
+export async function assertNotLastFullAdmin(db: Database, row: WebAdminRow): Promise<void> {
+  if (row.role !== 'platform') return;
+  const full = await db.select({ id: webAdmins.id }).from(webAdmins).where(eq(webAdmins.role, 'platform'));
+  if (full.length <= 1) {
+    throw ApiError.conflict(
+      'last_platform_admin',
+      'There must always be at least one full platform account',
+    );
+  }
+}
+
+export async function setWebAdminRole(db: Database, row: WebAdminRow, role: WebRole): Promise<void> {
+  if (row.role === 'linked' || role === 'linked') {
+    throw ApiError.badRequest('bad_role', 'Linked accounts are managed from Telegram');
+  }
+  if (role !== 'platform') await assertNotLastFullAdmin(db, row);
+  await db.update(webAdmins).set({ role }).where(eq(webAdmins.id, row.id));
+}
+
+/**
+ * Changes the password of the signed-in web account. Other sessions end;
+ * returns the new session version for the caller's fresh session.
+ */
+export async function changeWebPassword(
+  db: Database,
+  id: number,
+  current: string,
+  next: string,
+): Promise<number> {
+  const row = await getWebAdmin(db, id);
+  if (!row || !(await verifyPassword(current, row.passwordHash))) {
+    throw ApiError.badRequest('wrong_password', 'The current password is not right');
+  }
+  const [updated] = await db
+    .update(webAdmins)
+    .set({
+      passwordHash: await hashPassword(next),
+      sessionVersion: sql`${webAdmins.sessionVersion} + 1`,
+    })
+    .where(eq(webAdmins.id, id))
+    .returning({ version: webAdmins.sessionVersion });
+  forgetSessions();
+  return updated?.version ?? row.sessionVersion + 1;
+}
+
 export async function listWebAdmins(db: Database): Promise<WebAdminRow[]> {
   return db.select().from(webAdmins).orderBy(asc(webAdmins.username));
 }

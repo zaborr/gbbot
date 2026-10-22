@@ -132,6 +132,12 @@ export function ShopsPage(): React.JSX.Element {
         </Section>
       )}
 
+      {isWebMode() && (
+        <Section header={t('webPassword.section')}>
+          <Cell onClick={() => navigate('/web-password')}>{t('webPassword.title')}</Cell>
+        </Section>
+      )}
+
       {result.data?.canUseWeb && !isWebMode() && (
         <Section>
           <Cell onClick={() => navigate('/web-access')} subtitle={t('webAccess.hint')}>
