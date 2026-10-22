@@ -10,6 +10,7 @@ import { ErrorView } from '../components/ErrorView.js';
 import { ProductImage } from '../components/ProductImage.js';
 import { t, tn } from '../i18n/index.js';
 import { LanguagePicker } from '../components/LanguagePicker.js';
+import { isWebMode } from '../lib/web.js';
 import { closingDate } from '../components/ClosingNotice.js';
 import { shopDescription, shopName } from '../lib/localize.js';
 import { OrganizedBy } from '../components/OrganizedBy.js';
@@ -128,6 +129,14 @@ export function ShopsPage(): React.JSX.Element {
         <Section header={t('shops.organizer')} footer={t('shops.organizerFooter')}>
           <Cell onClick={() => navigate('/new-gb')}>{t('shops.createGb')}</Cell>
           <Cell onClick={() => navigate('/import-gb')}>{t('shops.importGb')}</Cell>
+        </Section>
+      )}
+
+      {result.data?.canUseWeb && !isWebMode() && (
+        <Section>
+          <Cell onClick={() => navigate('/web-access')} subtitle={t('webAccess.hint')}>
+            {t('webAccess.title')}
+          </Cell>
         </Section>
       )}
 

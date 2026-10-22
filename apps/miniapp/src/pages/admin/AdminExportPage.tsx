@@ -293,8 +293,8 @@ function AdminExport(): React.JSX.Element {
       </Section>
 
       <Section
-        header={t('export.toChat')}
-        footer={t('export.toChatFooter')}
+        header={t(isWebMode() ? 'export.toChatWeb' : 'export.toChat')}
+        footer={t(isWebMode() ? 'export.toChatFooterWeb' : 'export.toChatFooter')}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
           <Button stretched loading={busy === 'xlsx'} onClick={() => void send('xlsx')}>

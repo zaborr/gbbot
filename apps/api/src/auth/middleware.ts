@@ -4,7 +4,7 @@ import { ApiError } from '../lib/errors.js';
 import { verifySession, type SessionClaims } from './jwt.js';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
-import { isWebSession, webSessionValid } from '../services/webAdmins.js';
+import { isWebSession, webAccountId, webSessionValid } from '../services/webAdmins.js';
 import { isSuperAdmin } from '../services/shop.js';
 
 /**
@@ -13,7 +13,8 @@ import { isSuperAdmin } from '../services/shop.js';
  */
 export async function authenticate(token: string, env: Env, db: Database): Promise<SessionClaims> {
   const claims = await verifySession(token, env.JWT_SECRET);
-  if (isWebSession(claims.sub) && !(await webSessionValid(db, claims.sub, claims.ver))) {
+  const wid = webAccountId(claims);
+  if (wid !== undefined && !(await webSessionValid(db, wid, claims.ver))) {
     throw new Error('Web session revoked');
   }
   return claims;
@@ -76,7 +77,7 @@ export const requireOwner = createMiddleware<AppBindings>(async (c, next) => {
  * administrators only manage. Run after `requireAuth`.
  */
 export const requireTelegramUser = createMiddleware<AppBindings>(async (c, next) => {
-  if (isWebSession(c.get('claims').sub)) {
+  if (isWebSession(c.get('claims'))) {
     throw ApiError.forbidden('Only available in Telegram');
   }
   await next();

@@ -49,6 +49,10 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
           }
         : null,
     );
+    // A linked account (a Telegram user) uses that user's language.
+    if (session && session.user.telegramId > 0) {
+      setLang(session.user.language, session.user.preferredLanguage);
+    }
     setUser(session?.user ?? null);
     setStatus(session ? 'ready' : 'signin');
   }, []);

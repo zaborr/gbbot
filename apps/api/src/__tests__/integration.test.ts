@@ -643,6 +643,55 @@ describeDb('API integration', () => {
     await removeWebAdmin(db, creds.username);
   });
 
+  it('lets managers activate web access from Telegram, acting as themselves', async () => {
+    const webSignIn = (body: Record<string, string>): Promise<Response> =>
+      Promise.resolve(
+        app.request('http://abc.onion/api/auth/web', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+      );
+    // Customers who manage nothing cannot.
+    const customer = { Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}` };
+    expect((await request('/api/me/web-access', { headers: customer })).status).toBe(403);
+
+    const tg = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const username = `link${Date.now() % 100000}`;
+    const created = await request('/api/me/web-access', {
+      method: 'POST',
+      headers: tg,
+      body: JSON.stringify({ username }),
+    });
+    expect(created.status).toBe(201);
+    const creds = (await created.json()) as { password: string; totpSecret: string };
+    const secret = base32Decode(creds.totpSecret);
+    const code = totpCode(secret, Math.floor(Date.now() / 30_000));
+
+    const ok = await webSignIn({ username, password: creds.password, code });
+    expect(ok.status).toBe(200);
+    const { token, user } = (await ok.json()) as { token: string; user: { telegramId: number } };
+    // The web session is the Telegram user, with the same permissions…
+    expect(user.telegramId).toBe(ADMIN_ID);
+    const web = { Authorization: `Bearer ${token}` };
+    expect((await request('/api/admin/products', { headers: web })).status).toBe(200);
+    // …but only to manage: no cart, and no web access screens from the web.
+    expect((await request('/api/cart', { headers: web })).status).toBe(403);
+    expect((await request('/api/me/web-access', { headers: web })).status).toBe(403);
+
+    // Renewing from Telegram closes the web sessions.
+    const renewed = await request('/api/me/web-access/reset', { method: 'POST', headers: tg });
+    expect(renewed.status).toBe(200);
+    expect((await request('/api/admin/products', { headers: web })).status).toBe(401);
+
+    expect((await request('/api/me/web-access', { method: 'DELETE', headers: tg })).status).toBe(204);
+    const status = await request('/api/me/web-access', { headers: tg });
+    expect(((await status.json()) as { account: unknown }).account).toBeNull();
+  });
+
   it('cancels unpaid orders after the shop deadline', async () => {
     const token = await authToken(CUSTOMER_ID, 'Alice');
     const auth = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };

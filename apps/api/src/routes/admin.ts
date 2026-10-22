@@ -73,7 +73,8 @@ import { orders, users } from '../db/schema.js';
 import { startPaymentCheck } from '../services/paymentCheck.js';
 import { buildReport } from '../export/report.js';
 import { TelegramApi } from '../telegram/api.js';
-import { isWebSession } from '../services/webAdmins.js';
+import { isWebSession, webMark } from '../services/webAdmins.js';
+import type { SessionClaims } from '../auth/jwt.js';
 import { notifyShopTeam } from '../services/webNotices.js';
 import { tr } from '../i18n/messages.js';
 import { describeCustomer } from '../services/customers.js';
@@ -122,10 +123,10 @@ export function manualMethodChanges(
  */
 async function deliverFile(
   env: { BOT_TOKEN: string },
-  sub: number,
+  claims: SessionClaims,
   file: { fileName: string; data: Buffer; contentType: string; caption: string },
 ): Promise<{ file?: WebFile }> {
-  if (isWebSession(sub)) {
+  if (isWebSession(claims)) {
     return {
       file: {
         fileName: file.fileName,
@@ -136,7 +137,13 @@ async function deliverFile(
   }
   try {
     const telegram = new TelegramApi(env.BOT_TOKEN);
-    await telegram.sendDocument(sub, file.fileName, file.data, file.contentType, file.caption);
+    await telegram.sendDocument(
+      claims.sub,
+      file.fileName,
+      file.data,
+      file.contentType,
+      file.caption,
+    );
   } catch (error) {
     console.error(`${file.fileName} could not be sent:`, error);
     throw ApiError.conflict(
@@ -219,7 +226,7 @@ export function adminRoutes(): Hono<AppBindings> {
       const lang = langFrom(c.req.header('X-Lang'));
       const sub = c.get('claims').sub;
       // Web administrators save the list on their device instead.
-      if (isWebSession(sub)) throw ApiError.forbidden('Only available in Telegram');
+      if (isWebSession(c.get('claims'))) throw ApiError.forbidden('Only available in Telegram');
       let sent: unknown;
       try {
         sent = await new TelegramApi(c.get('env').BOT_TOKEN).sendDocument(
@@ -283,7 +290,7 @@ export function adminRoutes(): Hono<AppBindings> {
       !same(before.adminIds, after.adminIds) ||
       !same(before.adminUsernames, after.adminUsernames)
     ) {
-      const who = await describeCustomer(db, c.get('claims').sub);
+      const who = webMark(await describeCustomer(db, c.get('claims').sub), c.get('claims'));
       const team = await getShopTeam(db, after);
       const name = (p: { telegramId: number; username: string | null; firstName: string | null }): string =>
         p.username ? `@${p.username}` : (p.firstName ?? String(p.telegramId));
@@ -316,7 +323,7 @@ export function adminRoutes(): Hono<AppBindings> {
         shop.id,
         c.req.valid('json').confirmName,
       );
-      await notifySuperAdmins(c.get('db'), c.get('env'), c.get('claims').sub, 'platform.gbDeleted', {
+      await notifySuperAdmins(c.get('db'), c.get('env'), c.get('claims'), 'platform.gbDeleted', {
         shop: shop.name,
         orders: contents.orders,
       });
@@ -334,7 +341,7 @@ export function adminRoutes(): Hono<AppBindings> {
       slug: newSlug,
       ownerId: sub,
     });
-    await notifySuperAdmins(db, c.get('env'), sub, 'platform.gbCreated', {
+    await notifySuperAdmins(db, c.get('env'), c.get('claims'), 'platform.gbCreated', {
       shop: copy.name,
       slug: copy.slug,
     });
@@ -347,7 +354,7 @@ export function adminRoutes(): Hono<AppBindings> {
     const lang = langFrom(c.req.header('X-Lang'));
     const snapshot = await takeSnapshot(c.get('db'), shop);
     const fileName = `${shop.slug}-backup-${snapshot.exportedAt.slice(0, 10)}.json`;
-    const delivered = await deliverFile(c.get('env'), c.get('claims').sub, {
+    const delivered = await deliverFile(c.get('env'), c.get('claims'), {
       fileName,
       data: Buffer.from(JSON.stringify(snapshot, null, 2), 'utf8'),
       contentType: 'application/json',
@@ -405,7 +412,7 @@ export function adminRoutes(): Hono<AppBindings> {
       manualChanges.length > 0 ||
       rateChanges.length > 0
     ) {
-      const who = await describeCustomer(db, c.get('claims').sub);
+      const who = webMark(await describeCustomer(db, c.get('claims').sub), c.get('claims'));
       await notifyShopTeam(
         db,
         env,
@@ -455,7 +462,7 @@ export function adminRoutes(): Hono<AppBindings> {
     const view = await updateAddressKey(db, shop.id, c.req.valid('json').publicKey);
     // Like the wallets: every admin hears when the key that protects addresses changes.
     if (shop.addressKeyFingerprint !== view.addressKeyFingerprint) {
-      const who = await describeCustomer(db, c.get('claims').sub);
+      const who = webMark(await describeCustomer(db, c.get('claims').sub), c.get('claims'));
       await notifyShopTeam(
         db,
         env,
@@ -493,7 +500,7 @@ export function adminRoutes(): Hono<AppBindings> {
     const shop = c.get('shop');
     const lang = langFrom(c.req.header('X-Lang'));
     const file = await exportProductsCsv(c.get('db'), shop, lang);
-    const delivered = await deliverFile(c.get('env'), c.get('claims').sub, {
+    const delivered = await deliverFile(c.get('env'), c.get('claims'), {
       fileName: file.fileName,
       data: file.data,
       contentType: 'text/csv',
@@ -595,7 +602,6 @@ export function adminRoutes(): Hono<AppBindings> {
   app.post('/export', zValidator('json', exportRequest), async (c) => {
     const db = c.get('db');
     const shop = c.get('shop');
-    const { sub } = c.get('claims');
     const request = c.req.valid('json');
 
     const allOrders = await listAllOrders(db, shop.id);
@@ -623,7 +629,7 @@ export function adminRoutes(): Hono<AppBindings> {
     if (file.orderCount === 0) {
       throw ApiError.badRequest('nothing_to_export', 'No orders match these filters');
     }
-    const delivered = await deliverFile(c.get('env'), sub, {
+    const delivered = await deliverFile(c.get('env'), c.get('claims'), {
       fileName: file.fileName,
       data: file.data,
       contentType: file.contentType,
