@@ -27,3 +27,28 @@
 		reverse_proxy miniapp:80
 	}
 }
+
+# Internal site for an onion service running on the server (web administration).
+# Plain HTTP on a port that only the server itself can reach: the onion service
+# already encrypts and authenticates the connection. Not the bot's webhook.
+http://:8080 {
+	encode gzip zstd
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		-Server
+	}
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle /webhook/* {
+		respond 404
+	}
+	handle {
+		reverse_proxy miniapp:80
+	}
+}
