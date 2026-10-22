@@ -652,6 +652,7 @@ export const en = {
   'platform.vipClub': '⭐ General VIP club',
   'platform.vipOnly': '⭐ VIP only',
   'platform.visible': 'visible',
+  'platform.webAccounts': '🔐 Web accounts',
   'platformShop.admins': 'GB managers',
   'platformShop.adminsField': 'Managers: @usernames or Telegram IDs',
   'platformShop.adminsFooter': 'They run the GB day to day. Separated by commas. Anyone added by @username who has not opened the app yet stays ⏳ pending, without permissions, until their first visit. The team must have pressed Start in the bot to get notices. All of them appear under “Organised by”.',
