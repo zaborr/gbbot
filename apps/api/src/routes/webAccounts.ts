@@ -60,7 +60,7 @@ export function webAccountRoutes(): Hono<AppBindings> {
     const session = await signSession(
       { ...claims, ver, wid: id },
       env.JWT_SECRET,
-      env.WEB_SESSION_TTL_SECONDS,
+      env.WEB_SESSION_TTL_SECONDS ?? 8 * 3600,
     );
     return c.json({ token: session.token, expiresAt: session.expiresAt.toISOString() });
   });
