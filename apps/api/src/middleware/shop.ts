@@ -1,6 +1,8 @@
 import { createMiddleware } from 'hono/factory';
 import type { AppBindings } from '../context.js';
-import { verifySession } from '../auth/jwt.js';
+import { authenticate } from '../auth/middleware.js';
+import type { Env } from '../config/env.js';
+import type { Database } from '../db/client.js';
 import { ApiError } from '../lib/errors.js';
 import { canManageShop, resolveShop } from '../services/shop.js';
 import { isVipOf } from '../services/vip.js';
@@ -11,10 +13,14 @@ import { isClosedAt } from '@tma-shop/shared';
 import { orders } from '../db/schema.js';
 
 /** Telegram id of the caller when a valid session token is present, else undefined. */
-export async function peekUserId(header: string | undefined, secret: string): Promise<number | undefined> {
+export async function peekUserId(
+  header: string | undefined,
+  env: Env,
+  db: Database,
+): Promise<number | undefined> {
   if (!header?.startsWith('Bearer ')) return undefined;
   try {
-    const claims = await verifySession(header.slice('Bearer '.length).trim(), secret);
+    const claims = await authenticate(header.slice('Bearer '.length).trim(), env, db);
     return claims.sub;
   } catch {
     return undefined;
@@ -29,7 +35,7 @@ export async function peekUserId(header: string | undefined, secret: string): Pr
 export const withShop = createMiddleware<AppBindings>(async (c, next) => {
   const env = c.get('env');
   const shop = await resolveShop(c.get('db'), c.req.header('X-Shop'));
-  const userId = await peekUserId(c.req.header('Authorization'), env.JWT_SECRET);
+  const userId = await peekUserId(c.req.header('Authorization'), env, c.get('db'));
   const canManage = canManageShop(env, shop, userId);
   if (!shop.isVisible && !canManage) throw ApiError.notFound('Shop not found');
   // VIPs matter everywhere now (VIP prices, no fee), not only in VIP-only GBs.

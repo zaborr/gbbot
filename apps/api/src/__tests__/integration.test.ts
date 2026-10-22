@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import type { Pool } from 'pg';
 import { createApp } from '../app.js';
+import { base32Decode, createWebAdmin, removeWebAdmin, resetWebAdmin, totpCode } from '../services/webAdmins.js';
 import type { Env } from '../config/env.js';
 import { createDb, createPool, type Database } from '../db/client.js';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -581,6 +582,41 @@ describeDb('API integration', () => {
     expect(short.status).toBe(400);
     expect(((await short.json()) as { error: { code: string } }).error.code).toBe('below_minimum');
     await db.update(products).set({ minQuantity: 1 }).where(eq(products.id, productId));
+  });
+
+  it('signs platform admins in on the web, only through the onion address', async () => {
+    const creds = await createWebAdmin(db, `web${Date.now() % 100000}`);
+    const secret = base32Decode(creds.totpSecret);
+    const code = (offset = 0): string => totpCode(secret, Math.floor(Date.now() / 30_000) + offset);
+    const signIn = (host: string, body: Record<string, string>): Promise<Response> =>
+      Promise.resolve(
+        app.request(`http://${host}/api/auth/web`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+      );
+
+    expect((await signIn('gb.example.com', { username: creds.username, password: creds.password, code: code() })).status).toBe(403);
+    expect((await signIn('abc.onion', { username: creds.username, password: 'nope', code: code() })).status).toBe(401);
+
+    const now = code();
+    const ok = await signIn('abc.onion', { username: creds.username, password: creds.password, code: now });
+    expect(ok.status).toBe(200);
+    const { token, user } = (await ok.json()) as { token: string; user: { role: string; telegramId: number } };
+    expect(user.role).toBe('admin');
+    expect(user.telegramId).toBeLessThan(0);
+    // The same code works once.
+    expect((await signIn('abc.onion', { username: creds.username, password: creds.password, code: now })).status).toBe(401);
+
+    // A web admin is a platform super-admin.
+    const auth = { Authorization: `Bearer ${token}` };
+    expect((await app.request('/api/platform/shops', { headers: auth })).status).toBe(200);
+
+    // A reset closes the sessions opened before.
+    await resetWebAdmin(db, creds.username);
+    expect((await app.request('/api/platform/shops', { headers: auth })).status).toBe(401);
+    await removeWebAdmin(db, creds.username);
   });
 
   it('cancels unpaid orders after the shop deadline', async () => {

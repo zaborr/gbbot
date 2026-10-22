@@ -10,6 +10,14 @@ export const authRequest = z.object({
 });
 export type AuthRequest = z.infer<typeof authRequest>;
 
+/** Web sign-in of a platform admin: username, password and authenticator code. */
+export const webAuthRequest = z.object({
+  username: z.string().trim().min(1).max(64),
+  password: z.string().min(1).max(256),
+  code: z.string().trim().min(6).max(8),
+});
+export type WebAuthRequest = z.infer<typeof webAuthRequest>;
+
 export const authResponse = z.object({
   token: z.string().min(1),
   expiresAt: z.iso.datetime(),

@@ -25,9 +25,12 @@ export type ShopRow = typeof shops.$inferSelect;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Platform super-admins (ADMIN_TELEGRAM_IDS) manage every shop. */
+/**
+ * Platform super-admins manage every shop: those in ADMIN_TELEGRAM_IDS and the
+ * web admins (negative session ids, only ever issued by the web sign-in).
+ */
 export function isSuperAdmin(env: Env, userId: number | undefined): boolean {
-  return userId !== undefined && env.ADMIN_TELEGRAM_IDS.includes(userId);
+  return userId !== undefined && (userId < 0 || env.ADMIN_TELEGRAM_IDS.includes(userId));
 }
 
 /** Everyone who runs a GB: its administrators, then its managers. */

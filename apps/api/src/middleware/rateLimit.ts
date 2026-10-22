@@ -64,7 +64,7 @@ export const rateLimit = createMiddleware<AppBindings>(async (c, next) => {
   const rule = ruleFor(c.req.method, c.req.path);
   let who = `ip:${clientIp(c)}`;
   if (rule.per === 'user') {
-    const userId = await peekUserId(c.req.header('Authorization'), c.get('env').JWT_SECRET);
+    const userId = await peekUserId(c.req.header('Authorization'), c.get('env'), c.get('db'));
     if (userId !== undefined) who = `user:${userId}`;
   }
   const wait = hit(`${rule.name}|${who}`, rule.limit);

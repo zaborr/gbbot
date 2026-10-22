@@ -253,6 +253,13 @@
       "when": 1792740000000,
       "tag": "0035_product_min_quantity",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792830000000,
+      "tag": "0036_web_admins",
+      "breakpoints": true
     }
   ]
 }

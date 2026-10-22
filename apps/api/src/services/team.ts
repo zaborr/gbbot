@@ -11,7 +11,7 @@ import type { Database } from '../db/client.js';
 import { platformSettings, shops, users } from '../db/schema.js';
 import { tr, type BotMessageKey } from '../i18n/messages.js';
 import { notifyUsers } from './notifications.js';
-import type { ShopRow } from './shop.js';
+import { isSuperAdmin, type ShopRow } from './shop.js';
 
 /**
  * Who runs what:
@@ -225,7 +225,7 @@ export async function claimPendingRoles(
  */
 export function canOwnShop(env: Env, shop: ShopRow, userId: number | undefined): boolean {
   if (userId === undefined) return false;
-  return env.ADMIN_TELEGRAM_IDS.includes(userId) || shop.ownerIds.includes(userId);
+  return isSuperAdmin(env, userId) || shop.ownerIds.includes(userId);
 }
 
 /** "@ana" or "Ana (123)": how a user is named in messages to super-admins. */
@@ -243,7 +243,7 @@ export async function notifySuperAdmins(
   key: Extract<BotMessageKey, 'platform.gbCreated' | 'platform.gbDeleted'>,
   vars: Record<string, string | number>,
 ): Promise<void> {
-  if (env.ADMIN_TELEGRAM_IDS.includes(actorId)) return;
+  if (isSuperAdmin(env, actorId)) return;
   const who = await describeUser(db, actorId);
   await notifyUsers(db, env.BOT_TOKEN, [...env.ADMIN_TELEGRAM_IDS], (lang) =>
     tr(lang, key, { who, ...vars }),
