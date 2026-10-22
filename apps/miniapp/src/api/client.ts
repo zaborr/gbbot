@@ -39,6 +39,8 @@ import type {
   BroadcastAudience,
   BroadcastView,
   DisclaimerAdminView,
+  WebAuthRequest,
+  WebFile,
 } from '@tma-shop/shared';
 import { lang } from '../i18n/index.js';
 
@@ -125,7 +127,7 @@ export class ApiClient {
     headers.set('X-Lang', lang());
 
     const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
-    if (res.status === 401 && !retried && path !== '/auth' && (await this.refreshToken())) {
+    if (res.status === 401 && !retried && !path.startsWith('/auth') && (await this.refreshToken())) {
       return this.request<T>(path, init, true);
     }
     if (res.status === 204) return undefined as T;
@@ -143,6 +145,14 @@ export class ApiClient {
     return this.request<AuthResponse>('/auth', {
       method: 'POST',
       body: JSON.stringify({ initData }),
+    });
+  }
+
+  /** Web administrators: username, password and authenticator code (only through Tor). */
+  webAuth(input: WebAuthRequest): Promise<AuthResponse> {
+    return this.request<AuthResponse>('/auth/web', {
+      method: 'POST',
+      body: JSON.stringify(input),
     });
   }
 
@@ -437,7 +447,7 @@ export class ApiClient {
   }
 
   /** Owner only: the bot sends a JSON backup of the GB (settings and catalog). */
-  adminBackupShop(): Promise<{ fileName: string; products: number }> {
+  adminBackupShop(): Promise<{ fileName: string; products: number; file?: WebFile }> {
     return this.request('/admin/shop/backup', { method: 'POST' });
   }
 
@@ -649,7 +659,7 @@ export class ApiClient {
   }
 
   /** The bot sends the catalog as CSV to the admin's chat. */
-  adminExportProductsCsv(): Promise<{ fileName: string; products: number }> {
+  adminExportProductsCsv(): Promise<{ fileName: string; products: number; file?: WebFile }> {
     return this.request('/admin/products/csv/export', { method: 'POST' });
   }
 

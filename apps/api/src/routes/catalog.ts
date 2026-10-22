@@ -8,7 +8,7 @@ import { getShopConfig, teamIds } from '../services/shop.js';
 import { loadGoalProgress } from '../services/goal.js';
 import { loadPeople, organizerTags } from '../services/team.js';
 import { acceptDisclaimer } from '../services/disclaimer.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireTelegramUser } from '../auth/middleware.js';
 import { ApiError } from '../lib/errors.js';
 
 const idParam = z.object({ id: z.uuid() });
@@ -33,7 +33,7 @@ export function catalogRoutes(): Hono<AppBindings> {
   });
 
   // The customer accepts the GB's conditions (the version they read).
-  app.post('/shop/disclaimer/accept', requireAuth, zValidator('json', acceptDisclaimerRequest), async (c) => {
+  app.post('/shop/disclaimer/accept', requireAuth, requireTelegramUser, zValidator('json', acceptDisclaimerRequest), async (c) => {
     await acceptDisclaimer(c.get('db'), c.get('shop'), c.get('claims').sub, c.req.valid('json').version);
     return c.body(null, 204);
   });

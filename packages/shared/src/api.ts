@@ -112,9 +112,19 @@ export const exportRequest = z.object({
 });
 export type ExportRequest = z.infer<typeof exportRequest>;
 
+/** A file returned to a web administrator (in Telegram, the bot sends it instead). */
+export const webFile = z.object({
+  fileName: z.string(),
+  contentType: z.string(),
+  /** Base64. */
+  data: z.string(),
+});
+export type WebFile = z.infer<typeof webFile>;
+
 export const exportResponse = z.object({
   fileName: z.string(),
   orders: z.number().int().nonnegative(),
+  file: webFile.optional(),
 });
 export type ExportResponse = z.infer<typeof exportResponse>;
 

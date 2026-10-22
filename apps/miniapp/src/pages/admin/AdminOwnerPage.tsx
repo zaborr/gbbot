@@ -16,6 +16,7 @@ import { Input } from '../../components/Field.js';
 import { toSlug } from '../../lib/slug.js';
 import { shopPath } from '../../providers/ShopProvider.js';
 import { t } from '../../i18n/index.js';
+import { isWebMode, saveBase64File } from '../../lib/web.js';
 
 /** The GB's administrators: who runs it, who sees it, copies and deleting it. */
 export function AdminOwnerPage(): React.JSX.Element {
@@ -223,7 +224,8 @@ function BackupSection(): React.JSX.Element {
               setBusy(true);
               void actions
                 .run(async () => {
-                  await api.adminBackupShop();
+                  const result = await api.adminBackupShop();
+                  if (result.file) saveBase64File(result.file);
                   setSent(true);
                 })
                 .finally(() => setBusy(false));
@@ -232,7 +234,7 @@ function BackupSection(): React.JSX.Element {
             {t('backup.send')}
           </Button>
         </div>
-        {sent && <Cell multiline>{t('csv.sent')}</Cell>}
+        {sent && <Cell multiline>{t(isWebMode() ? 'web.fileSaved' : 'csv.sent')}</Cell>}
       </Section>
     </>
   );

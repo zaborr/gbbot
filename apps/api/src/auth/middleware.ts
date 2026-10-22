@@ -70,3 +70,14 @@ export const requireOwner = createMiddleware<AppBindings>(async (c, next) => {
   }
   await next();
 });
+
+/**
+ * Customer actions (cart, orders, own settings) need a Telegram account: web
+ * administrators only manage. Run after `requireAuth`.
+ */
+export const requireTelegramUser = createMiddleware<AppBindings>(async (c, next) => {
+  if (isWebSession(c.get('claims').sub)) {
+    throw ApiError.forbidden('Only available in Telegram');
+  }
+  await next();
+});

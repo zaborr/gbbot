@@ -3,6 +3,7 @@ import { Button, Section } from '@telegram-apps/telegram-ui';
 import type { Lang } from '@tma-shop/shared';
 import { api } from '../api/client.js';
 import { lang, setLang, t } from '../i18n/index.js';
+import { isWebMode } from '../lib/web.js';
 
 const LANGUAGES: Array<{ code: Lang; flag: string; name: string }> = [
   { code: 'es', flag: '🇪🇸', name: 'Español' },
@@ -23,7 +24,8 @@ export function LanguagePicker(): React.JSX.Element {
     if (code === current) return;
     setBusy(code);
     try {
-      await api.setLanguage(code);
+      // Web administrators keep it on this device only.
+      if (!isWebMode()) await api.setLanguage(code);
     } catch {
       // Not saved on the server: still switch on this device.
     }

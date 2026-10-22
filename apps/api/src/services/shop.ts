@@ -448,7 +448,8 @@ export async function createOrganizerShop(
       isVisible: false,
       vipOnly: false,
       sortOrder: await nextSortOrder(db),
-      ownerIds: [ownerId],
+      // A web administrator manages every GB already; it is not listed as its administrator.
+      ownerIds: ownerId < 0 ? [] : [ownerId],
       currency: 'USDC',
     })
     .returning();

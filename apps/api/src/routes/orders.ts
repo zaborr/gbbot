@@ -13,7 +13,7 @@ import {
   type CreateOrderResponse,
 } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireTelegramUser } from '../auth/middleware.js';
 import {
   createOrderFromCart,
   deleteOrder,
@@ -41,7 +41,7 @@ const idParam = z.object({ id: z.uuid() });
 
 export function orderRoutes(): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
-  app.use('*', requireAuth);
+  app.use('*', requireAuth, requireTelegramUser);
 
   app.post('/', zValidator('json', createOrderRequest), async (c) => {
     const { sub } = c.get('claims');

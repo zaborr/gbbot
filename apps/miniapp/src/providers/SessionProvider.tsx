@@ -1,10 +1,20 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { retrieveRawInitData } from '@telegram-apps/sdk-react';
-import type { SessionUser } from '@tma-shop/shared';
+import type { AuthResponse, SessionUser } from '@tma-shop/shared';
 import { api } from '../api/client.js';
 import { setLang, t } from '../i18n/index.js';
+import { isWebMode, setWebSession, webSession } from '../lib/web.js';
 
-type Status = 'loading' | 'ready' | 'error';
+/** `signin`: web mode without a session (the sign-in form is shown). */
+type Status = 'loading' | 'ready' | 'error' | 'signin';
 
 interface SessionValue {
   status: Status;
@@ -12,6 +22,10 @@ interface SessionValue {
   error: string | null;
   /** Platform super-admin: creates shops, hides them and assigns their admins. */
   isSuperAdmin: boolean;
+  /** Web mode: signs in with username, password and authenticator code. */
+  signIn: (username: string, password: string, code: string) => Promise<void>;
+  /** Web mode: forgets the session in this tab. */
+  signOut: () => void;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -21,7 +35,37 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
   const [user, setUser] = useState<SessionUser | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Web mode: the session of this tab; when it expires, back to the form.
+  const startWeb = useCallback((session: AuthResponse | null): void => {
+    setWebSession(session);
+    api.setToken(session?.token ?? null);
+    api.setReauth(
+      session
+        ? async () => {
+            setWebSession(null);
+            setUser(null);
+            setStatus('signin');
+            throw new Error(t('web.expired'));
+          }
+        : null,
+    );
+    setUser(session?.user ?? null);
+    setStatus(session ? 'ready' : 'signin');
+  }, []);
+
+  const signIn = useCallback(
+    async (username: string, password: string, code: string): Promise<void> => {
+      startWeb(await api.webAuth({ username, password, code }));
+    },
+    [startWeb],
+  );
+  const signOut = useCallback(() => startWeb(null), [startWeb]);
+
   useEffect(() => {
+    if (isWebMode()) {
+      startWeb(webSession());
+      return undefined;
+    }
     let cancelled = false;
     async function authenticate(): Promise<void> {
       try {
@@ -46,11 +90,11 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [startWeb]);
 
   const value = useMemo<SessionValue>(
-    () => ({ status, user, error, isSuperAdmin: user?.role === 'admin' }),
-    [status, user, error],
+    () => ({ status, user, error, isSuperAdmin: user?.role === 'admin', signIn, signOut }),
+    [status, user, error, signIn, signOut],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

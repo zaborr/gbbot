@@ -420,6 +420,7 @@ export const en = {
   'export.copyText': '📋 Copy as text (one address per block)',
   'export.csvLines': 'CSV · one row per product',
   'export.csvOrders': 'CSV · one row per order',
+  'export.downloaded': 'Downloaded ✓ ({orders})',
   'export.excel': '📊 Excel report',
   'export.failed': 'Could not export',
   'export.hideAddresses': 'Hide the addresses',
@@ -873,6 +874,16 @@ export const en = {
   'wallets.solanaInvalid': 'That does not look like a Solana address',
   'wallets.solanaTitle': 'Solana',
   'wallets.summary': 'Customers will see {options}. Double-check every address: a payment sent to a wrong address is lost.',
+  'web.back': 'Back',
+  'web.code': 'Authenticator code',
+  'web.expired': 'Your session has ended. Sign in again.',
+  'web.fileSaved': 'Downloaded ✓',
+  'web.footer': 'Username, password and the 6-digit code from your authenticator app.',
+  'web.password': 'Password',
+  'web.signIn': 'Sign in',
+  'web.signOut': 'Sign out',
+  'web.title': 'Web administration',
+  'web.username': 'Username',
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { addToCartRequest, updateCartItemRequest } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireTelegramUser } from '../auth/middleware.js';
 import { addItem, getCart, setItemQuantity } from '../services/cart.js';
 import { assertOpen } from '../services/closing.js';
 
@@ -12,7 +12,7 @@ const lineParam = z.object({ lineId: z.uuid() });
 
 export function cartRoutes(): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
-  app.use('*', requireAuth);
+  app.use('*', requireAuth, requireTelegramUser);
 
   app.get('/', async (c) => {
     const { sub } = c.get('claims');

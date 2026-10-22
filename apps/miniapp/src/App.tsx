@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { HashRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { retrieveLaunchParams } from '@telegram-apps/sdk-react';
 import { AppRoot, Placeholder } from '@telegram-apps/telegram-ui';
 import { SessionProvider, useSession } from './providers/SessionProvider.js';
-import { ShopLayout } from './providers/ShopProvider.js';
+import { ShopLayout, shopPath } from './providers/ShopProvider.js';
 import { useBackButton } from './hooks/useBackButton.js';
 import { useMainButtonReset } from './hooks/useMainButton.js';
 import { useAppearance, useAppearanceChrome } from './hooks/useAppearance.js';
@@ -43,6 +43,18 @@ import { PlatformRetentionPage } from './pages/platform/PlatformRetentionPage.js
 import { PlatformVipPage } from './pages/platform/PlatformVipPage.js';
 import { PlatformOrganizersPage } from './pages/platform/PlatformOrganizersPage.js';
 import { lang, onLangChange, t } from './i18n/index.js';
+import { isWebMode } from './lib/web.js';
+import { WebMainButton, WebSignIn, WebTopBar } from './components/WebChrome.js';
+
+/** Web mode has no customer screens (no cart, no orders): a GB opens on its admin. */
+function WebToAdmin(): React.JSX.Element {
+  const { shopRef = '' } = useParams();
+  return <Navigate to={shopPath(shopRef, '/admin')} replace />;
+}
+
+/** A customer screen; in web mode, the GB's admin instead. */
+const customer = (element: React.JSX.Element): React.JSX.Element =>
+  isWebMode() ? <WebToAdmin /> : element;
 
 function platform(): 'ios' | 'base' {
   try {
@@ -58,6 +70,7 @@ function Shell(): React.JSX.Element {
   const { status, error } = useSession();
 
   if (status === 'loading') return <Loader />;
+  if (status === 'signin') return <WebSignIn />;
   if (status === 'error') {
     return (
       <Placeholder header={t('app.signInFailed')} description={error ?? t('app.reopen')}>
@@ -66,7 +79,7 @@ function Shell(): React.JSX.Element {
     );
   }
 
-  return (
+  const routes = (
     <Routes>
       <Route path="/" element={<ShopsPage />} />
       <Route path="/platform" element={<PlatformPage />} />
@@ -79,11 +92,11 @@ function Shell(): React.JSX.Element {
       <Route path="/upload/:id" element={<UploadPage />} />
 
       <Route path="/s/:shopRef" element={<ShopLayout />}>
-        <Route index element={<CatalogPage />} />
-        <Route path="product/:id" element={<ProductPage />} />
-        <Route path="cart" element={<CartPage />} />
-        <Route path="orders" element={<OrdersPage />} />
-        <Route path="orders/:id" element={<PaymentPage />} />
+        <Route index element={customer(<CatalogPage />)} />
+        <Route path="product/:id" element={customer(<ProductPage />)} />
+        <Route path="cart" element={customer(<CartPage />)} />
+        <Route path="orders" element={customer(<OrdersPage />)} />
+        <Route path="orders/:id" element={customer(<PaymentPage />)} />
         <Route path="admin" element={<AdminHomePage />} />
         <Route path="admin/catalog" element={<AdminCatalogPage />} />
         <Route path="admin/products/:id" element={<AdminProductPage />} />
@@ -108,6 +121,14 @@ function Shell(): React.JSX.Element {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+  );
+  if (!isWebMode()) return routes;
+  return (
+    <>
+      <WebTopBar />
+      {routes}
+      <WebMainButton />
+    </>
   );
 }
 
