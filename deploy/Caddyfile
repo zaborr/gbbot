@@ -2,6 +2,15 @@
 {$DOMAIN} {
 	encode gzip zstd
 
+	# Security headers. No frame blocking: Telegram Web opens the Mini App in an iframe.
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		-Server
+	}
+
 	# API and Telegram webhook → api container
 	handle /api/* {
 		reverse_proxy api:3000
