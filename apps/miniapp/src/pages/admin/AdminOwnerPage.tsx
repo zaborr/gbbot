@@ -214,7 +214,10 @@ function BackupSection(): React.JSX.Element {
   return (
     <>
       <ErrorBanner message={actions.error} />
-      <Section header={t('backup.title')} footer={t('backup.footer')}>
+      <Section
+        header={t('backup.title')}
+        footer={t(isWebMode() ? 'backup.footerWeb' : 'backup.footer')}
+      >
         <div style={{ padding: 16 }}>
           <Button
             stretched
@@ -231,7 +234,7 @@ function BackupSection(): React.JSX.Element {
                 .finally(() => setBusy(false));
             }}
           >
-            {t('backup.send')}
+            {t(isWebMode() ? 'backup.sendWeb' : 'backup.send')}
           </Button>
         </div>
         {sent && <Cell multiline>{t(isWebMode() ? 'web.fileSaved' : 'csv.sent')}</Cell>}

@@ -69,7 +69,8 @@ async function main(): Promise<number> {
         for (const row of rows) {
           const last = row.lastLoginAt ? row.lastLoginAt.toISOString() : 'never';
           const locked = row.lockedUntil && row.lockedUntil > new Date() ? ' (locked)' : '';
-          console.log(`${row.username}  last sign-in: ${last}${locked}`);
+          const linked = row.telegramId === null ? '' : ` → Telegram ${row.telegramId}`;
+          console.log(`${row.username}  [${row.role}${linked}]  last sign-in: ${last}${locked}`);
         }
         return 0;
       }

@@ -22,7 +22,9 @@ export function WebTopBar(): React.JSX.Element {
   // In a browser the catalog leads to the admin screens, so going back from
   // there (or the catalog) goes to the list of GBs.
   const toList = SHOP_ROOT.test(pathname) || SHOP_ADMIN.test(pathname);
-  const unread = useUnreadNotices(pathname);
+  // The inbox belongs to platform accounts (linked ones get the bot's messages).
+  const platform = (user?.telegramId ?? 0) < 0;
+  const unread = useUnreadNotices(pathname, platform);
   return (
     <div
       style={{
@@ -42,11 +44,13 @@ export function WebTopBar(): React.JSX.Element {
           ‹ {t('web.back')}
         </Button>
       )}
-      <Button size="s" mode="plain" onClick={() => navigate('/platform/notices')}>
-        🔔{unread > 0 ? ` ${unread}` : ''}
-      </Button>
+      {platform && (
+        <Button size="s" mode="plain" onClick={() => navigate('/platform/notices')}>
+          🔔{unread > 0 ? ` ${unread}` : ''}
+        </Button>
+      )}
       <span style={{ flex: 1, textAlign: 'right', opacity: 0.7, fontSize: 14 }}>
-        {user?.username}
+        {user?.username ?? user?.firstName}
       </span>
       <Button size="s" mode="bezeled" onClick={signOut}>
         {t('web.signOut')}
@@ -56,9 +60,10 @@ export function WebTopBar(): React.JSX.Element {
 }
 
 /** Unread notices: checked on every screen change and every minute. */
-function useUnreadNotices(pathname: string): number {
+function useUnreadNotices(pathname: string, enabled: boolean): number {
   const [unread, setUnread] = useState(0);
   useEffect(() => {
+    if (!enabled) return undefined;
     let active = true;
     const check = (): void => {
       api
@@ -76,7 +81,7 @@ function useUnreadNotices(pathname: string): number {
       clearInterval(timer);
       off();
     };
-  }, [pathname]);
+  }, [pathname, enabled]);
   return unread;
 }
 

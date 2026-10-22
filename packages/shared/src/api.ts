@@ -18,6 +18,36 @@ export const webAuthRequest = z.object({
 });
 export type WebAuthRequest = z.infer<typeof webAuthRequest>;
 
+/**
+ * Web accounts: `platform` (everything), `platform_limited` (everything but
+ * managing web accounts) or `linked` (acts as its Telegram account).
+ */
+export const webRole = z.enum(['platform', 'platform_limited', 'linked']);
+export type WebRole = z.infer<typeof webRole>;
+
+/** Web access of the Telegram user (managers activate it from the app). */
+export const webAccessStatus = z.object({
+  account: z.object({ username: z.string(), lastLoginAt: z.string().nullable() }).nullable(),
+  /** Address of the web panel, when the server shows it. */
+  onionUrl: z.string().nullable(),
+});
+export type WebAccessStatus = z.infer<typeof webAccessStatus>;
+
+export const createWebAccessRequest = z.object({
+  username: z.string().trim().min(3).max(32),
+});
+
+/** Shown once: the password and the authenticator secret. */
+export const webCredentials = z.object({
+  username: z.string(),
+  password: z.string(),
+  totpSecret: z.string(),
+  /** `otpauth://` link for authenticator apps (also drawn as a QR code). */
+  otpauth: z.string(),
+  onionUrl: z.string().nullable(),
+});
+export type WebCredentials = z.infer<typeof webCredentials>;
+
 export const authResponse = z.object({
   token: z.string().min(1),
   expiresAt: z.iso.datetime(),

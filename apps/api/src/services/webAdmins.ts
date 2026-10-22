@@ -4,6 +4,8 @@ import { asc, eq, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { webAdmins } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
+import type { SessionClaims } from '../auth/jwt.js';
+import type { WebRole } from '@tma-shop/shared';
 
 /**
  * Platform super-admins who sign in on the web: username, password and a code
@@ -122,16 +124,25 @@ function newCredentials(): { password: string; totpSecret: string } {
   };
 }
 
-export async function createWebAdmin(db: Database, rawUsername: string): Promise<NewCredentials> {
+export async function createWebAdmin(
+  db: Database,
+  rawUsername: string,
+  { role = 'platform', telegramId = null }: { role?: WebRole; telegramId?: number | null } = {},
+): Promise<NewCredentials> {
   const username = rawUsername.trim().toLowerCase();
   if (!USERNAME_RE.test(username)) {
-    throw new Error('Use 3–32 characters: letters, numbers, ".", "_" or "-"');
+    throw ApiError.badRequest(
+      'bad_username',
+      'Use 3–32 characters: letters, numbers, ".", "_" or "-"',
+    );
   }
   const taken = await db.query.webAdmins.findFirst({ where: eq(webAdmins.username, username) });
-  if (taken) throw new Error(`"${username}" already exists (use reset)`);
+  if (taken) throw ApiError.conflict('username_taken', 'That username is taken');
   const { password, totpSecret } = newCredentials();
   await db.insert(webAdmins).values({
     username,
+    role,
+    telegramId: role === 'linked' ? telegramId : null,
     passwordHash: await hashPassword(password),
     totpSecret,
   });
@@ -154,7 +165,7 @@ export async function resetWebAdmin(db: Database, rawUsername: string): Promise<
     })
     .where(eq(webAdmins.username, username))
     .returning();
-  if (!row) throw new Error(`There is no "${username}"`);
+  if (!row) throw ApiError.notFound(`There is no "${username}"`);
   forgetSessions();
   return { username, password, totpSecret, otpauth: otpauthUri(username, totpSecret) };
 }
@@ -162,8 +173,13 @@ export async function resetWebAdmin(db: Database, rawUsername: string): Promise<
 export async function removeWebAdmin(db: Database, rawUsername: string): Promise<void> {
   const username = rawUsername.trim().toLowerCase();
   const deleted = await db.delete(webAdmins).where(eq(webAdmins.username, username)).returning();
-  if (deleted.length === 0) throw new Error(`There is no "${username}"`);
+  if (deleted.length === 0) throw ApiError.notFound(`There is no "${username}"`);
   forgetSessions();
+}
+
+/** The web account linked to a Telegram user, if they activated one. */
+export async function webAccountOf(db: Database, telegramId: number): Promise<WebAdminRow | undefined> {
+  return db.query.webAdmins.findFirst({ where: eq(webAdmins.telegramId, telegramId) });
 }
 
 export async function listWebAdmins(db: Database): Promise<WebAdminRow[]> {
@@ -222,9 +238,23 @@ export async function signInWebAdmin(
 
 // --- Sessions ------------------------------------------------------------------
 
-/** Session ids of web admins are negative, so they never match a Telegram user. */
+/** Session ids of platform web accounts are negative, so they never match a Telegram user. */
 export const webSessionId = (adminId: number): number => -adminId;
-export const isWebSession = (sub: number): boolean => sub < 0;
+/** A platform web account (not a Telegram user). */
+export const isWebAdminId = (id: number): boolean => id < 0;
+
+/** The web account a session was opened with (none for Telegram sessions). */
+export function webAccountId(claims: SessionClaims): number | undefined {
+  return claims.wid ?? (claims.sub < 0 ? -claims.sub : undefined);
+}
+
+/** Opened on the web (platform or linked account), not in Telegram. */
+export const isWebSession = (claims: SessionClaims): boolean => webAccountId(claims) !== undefined;
+
+/** "Ana (@ana)" → "Ana (@ana) (web)" when a linked account did it on the web. */
+export function webMark(who: string, claims: SessionClaims): string {
+  return isWebSession(claims) && !isWebAdminId(claims.sub) ? `${who} (web)` : who;
+}
 
 /** How a web administrator is named in messages: "web: ana". */
 export async function describeWebAdmin(db: Database, sub: number): Promise<string> {
@@ -242,8 +272,11 @@ const forgetSessions = (): void => sessionCache.clear();
  * Whether a web session is still good: the account exists and was not reset
  * since. Checked on each request (cached for a few seconds).
  */
-export async function webSessionValid(db: Database, sub: number, version: number | undefined): Promise<boolean> {
-  const id = -sub;
+export async function webSessionValid(
+  db: Database,
+  id: number,
+  version: number | undefined,
+): Promise<boolean> {
   const now = Date.now();
   let cached = sessionCache.get(id);
   if (!cached || cached.until < now) {

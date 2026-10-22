@@ -33,7 +33,7 @@ export function organizerRoutes(): Hono<AppBindings> {
     const db = c.get('db');
     const { sub } = c.get('claims');
     const shop = await createOrganizerShop(db, sub, c.req.valid('json'));
-    await notifySuperAdmins(db, c.get('env'), sub, 'platform.gbCreated', {
+    await notifySuperAdmins(db, c.get('env'), c.get('claims'), 'platform.gbCreated', {
       shop: shop.name,
       slug: shop.slug,
     });
@@ -69,7 +69,7 @@ export function organizerRoutes(): Hono<AppBindings> {
       slug: input.slug,
       ownerId: sub,
     });
-    await notifySuperAdmins(db, c.get('env'), sub, 'platform.gbCreated', {
+    await notifySuperAdmins(db, c.get('env'), c.get('claims'), 'platform.gbCreated', {
       shop: shop.name,
       slug: shop.slug,
     });

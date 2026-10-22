@@ -99,7 +99,10 @@ function ProductsCsv(): React.JSX.Element {
       <PageTitle title={t('csv.title')} />
       <ErrorBanner message={actions.error} />
 
-      <Section header={t('csv.exportTitle')} footer={t('csv.exportFooter')}>
+      <Section
+        header={t('csv.exportTitle')}
+        footer={t(isWebMode() ? 'csv.exportFooterWeb' : 'csv.exportFooter')}
+      >
         <div style={{ padding: 16 }}>
           <Button
             stretched
@@ -113,13 +116,20 @@ function ProductsCsv(): React.JSX.Element {
               })
             }
           >
-            {t('csv.export')}
+            {t(isWebMode() ? 'csv.exportWeb' : 'csv.export')}
           </Button>
         </div>
         {sent && <Cell multiline>{t(isWebMode() ? 'web.fileSaved' : 'csv.sent')}</Cell>}
       </Section>
 
-      <Section header={t('csv.importTitle')} footer={`${t('csv.importFooter')} ${t('csv.importFooterBot')}`}>
+      <Section
+        header={t('csv.importTitle')}
+        footer={
+          isWebMode()
+            ? t('csv.importFooter')
+            : `${t('csv.importFooter')} ${t('csv.importFooterBot')}`
+        }
+      >
         <div style={{ padding: '12px 16px' }}>
           <label style={{ display: 'block' }}>
             <span className="tma-field-label" style={{ padding: 0 }}>

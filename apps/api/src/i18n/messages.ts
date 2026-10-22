@@ -125,6 +125,9 @@ const en = {
   // To platform super-admins
   'platform.gbCreated': '🆕 {who} created the GB «{shop}» (/{slug}). It starts hidden.',
   'platform.gbDeleted': '🗑 {who} deleted the GB «{shop}» ({orders} orders).',
+  'web.activated': '🔑 {who} activated their web access (user «{username}»).',
+  'web.renewed': '🔑 {who} renewed their web access password and code (user «{username}»).',
+  'web.deactivated': '🔑 {who} turned off their web access (user «{username}»).',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -242,6 +245,9 @@ const es: Record<BotMessageKey, string> = {
   // To platform super-admins
   'platform.gbCreated': '🆕 {who} ha creado el GB «{shop}» (/{slug}). Empieza oculto.',
   'platform.gbDeleted': '🗑 {who} ha borrado el GB «{shop}» ({orders} pedidos).',
+  'web.activated': '🔑 {who} ha activado su acceso web (usuario «{username}»).',
+  'web.renewed': '🔑 {who} ha renovado la contraseña y el código de su acceso web (usuario «{username}»).',
+  'web.deactivated': '🔑 {who} ha desactivado su acceso web (usuario «{username}»).',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -357,6 +363,9 @@ const it: Record<BotMessageKey, string> = {
   // To platform super-admins
   'platform.gbCreated': '🆕 {who} ha creato il GB «{shop}» (/{slug}). Parte nascosto.',
   'platform.gbDeleted': '🗑 {who} ha eliminato il GB «{shop}» ({orders} ordini).',
+  'web.activated': "🔑 {who} ha attivato l'accesso web (utente «{username}»).",
+  'web.renewed': "🔑 {who} ha rinnovato password e codice dell'accesso web (utente «{username}»).",
+  'web.deactivated': "🔑 {who} ha disattivato l'accesso web (utente «{username}»).",
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -472,6 +481,9 @@ const pt: Record<BotMessageKey, string> = {
   // To platform super-admins
   'platform.gbCreated': '🆕 {who} criou o GB «{shop}» (/{slug}). Começa oculto.',
   'platform.gbDeleted': '🗑 {who} apagou o GB «{shop}» ({orders} pedidos).',
+  'web.activated': '🔑 {who} ativou o acesso web (utilizador «{username}»).',
+  'web.renewed': '🔑 {who} renovou a palavra-passe e o código do acesso web (utilizador «{username}»).',
+  'web.deactivated': '🔑 {who} desativou o acesso web (utilizador «{username}»).',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

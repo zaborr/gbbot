@@ -11,7 +11,8 @@ import type { Database } from '../db/client.js';
 import { platformSettings, shops, users } from '../db/schema.js';
 import { tr, type BotMessageKey } from '../i18n/messages.js';
 import { notifyPlatform } from './webNotices.js';
-import { describeWebAdmin, isWebSession } from './webAdmins.js';
+import { describeWebAdmin, isWebAdminId, webMark } from './webAdmins.js';
+import type { SessionClaims } from '../auth/jwt.js';
 import { isSuperAdmin, type ShopRow } from './shop.js';
 
 /**
@@ -111,6 +112,20 @@ export async function getShopTeam(db: Database, shop: ShopRow): Promise<ShopTeam
 
 async function platformRow(db: Database) {
   return db.query.platformSettings.findFirst({ where: eq(platformSettings.id, 1) });
+}
+
+/**
+ * Who may activate web access: anyone who manages something (platform
+ * admins, organisers, administrators and managers of a GB).
+ */
+export async function managesSomething(db: Database, env: Env, userId: number): Promise<boolean> {
+  if (isSuperAdmin(env, userId) || (await isOrganizer(db, userId))) return true;
+  const member = JSON.stringify([userId]);
+  const row = await db.query.shops.findFirst({
+    where: sql`${shops.ownerIds} @> ${member}::jsonb OR ${shops.adminIds} @> ${member}::jsonb`,
+    columns: { id: true },
+  });
+  return row !== undefined;
 }
 
 export async function isOrganizer(db: Database, userId: number | undefined): Promise<boolean> {
@@ -231,7 +246,7 @@ export function canOwnShop(env: Env, shop: ShopRow, userId: number | undefined):
 
 /** "@ana" or "Ana (123)": how a user is named in messages to super-admins. */
 export async function describeUser(db: Database, userId: number): Promise<string> {
-  if (isWebSession(userId)) return describeWebAdmin(db, userId);
+  if (isWebAdminId(userId)) return describeWebAdmin(db, userId);
   const info = (await loadPeople(db, [userId])).get(userId);
   if (info?.username) return `@${info.username}`;
   return info ? `${info.firstName} (${userId})` : String(userId);
@@ -241,11 +256,11 @@ export async function describeUser(db: Database, userId: number): Promise<string
 export async function notifySuperAdmins(
   db: Database,
   env: Env,
-  actorId: number,
+  actor: SessionClaims,
   key: Extract<BotMessageKey, 'platform.gbCreated' | 'platform.gbDeleted'>,
   vars: Record<string, string | number>,
 ): Promise<void> {
-  if (isSuperAdmin(env, actorId)) return;
-  const who = await describeUser(db, actorId);
+  if (isSuperAdmin(env, actor.sub)) return;
+  const who = webMark(await describeUser(db, actor.sub), actor);
   await notifyPlatform(db, env, (lang) => tr(lang, key, { who, ...vars }));
 }

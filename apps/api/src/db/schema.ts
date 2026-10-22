@@ -23,6 +23,7 @@ import type {
   PaymentCheck,
   PaymentSetup,
   VipClub,
+  WebRole,
 } from '@tma-shop/shared';
 
 
@@ -435,6 +436,15 @@ export const webAdmins = pgTable('web_admins', {
   id: serial('id').primaryKey(),
   /** Lowercase. */
   username: text('username').notNull().unique(),
+  /**
+   * `platform`: everything; `platform_limited`: everything but managing web
+   * accounts; `linked`: what its Telegram account may do in the bot.
+   */
+  role: text('role').$type<WebRole>().notNull().default('platform'),
+  /** `linked` accounts: the Telegram user they act as (one web account each). */
+  telegramId: bigint('telegram_id', { mode: 'number' })
+    .unique()
+    .references(() => users.telegramId, { onDelete: 'cascade' }),
   /** scrypt: "salt:hash", both base64. */
   passwordHash: text('password_hash').notNull(),
   /** Base32 secret of the authenticator app (TOTP). */

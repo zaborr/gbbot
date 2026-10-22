@@ -42,6 +42,8 @@ import type {
   WebAuthRequest,
   WebFile,
   WebNotice,
+  WebAccessStatus,
+  WebCredentials,
 } from '@tma-shop/shared';
 import { lang } from '../i18n/index.js';
 
@@ -50,6 +52,8 @@ export interface ShopsResponse {
   isSuperAdmin: boolean;
   /** May create GBs of their own. */
   isOrganizer: boolean;
+  /** Manages something, so may activate web access. */
+  canUseWeb?: boolean;
 }
 
 export interface ShopContents {
@@ -155,6 +159,26 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify(input),
     });
+  }
+
+  // --- web access (activated from Telegram) ---
+  getWebAccess(): Promise<WebAccessStatus> {
+    return this.request<WebAccessStatus>('/me/web-access');
+  }
+
+  createWebAccess(username: string): Promise<WebCredentials> {
+    return this.request<WebCredentials>('/me/web-access', {
+      method: 'POST',
+      body: JSON.stringify({ username }),
+    });
+  }
+
+  resetWebAccess(): Promise<WebCredentials> {
+    return this.request<WebCredentials>('/me/web-access/reset', { method: 'POST' });
+  }
+
+  deleteWebAccess(): Promise<void> {
+    return this.request<void>('/me/web-access', { method: 'DELETE' });
   }
 
   /** Saves the app language for this user (null = follow Telegram). */

@@ -55,6 +55,11 @@ const envSchema = z.object({
     .transform((value) => value === 'true'),
   /** How long a web session lasts. */
   WEB_SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(8 * 3600),
+  /**
+   * Address of the web panel, shown to managers when they activate their web
+   * access in the app. Unset = they ask the platform admin for it.
+   */
+  WEB_ONION_URL: optional(z.url()),
 });
 
 export type Env = z.infer<typeof envSchema>;
