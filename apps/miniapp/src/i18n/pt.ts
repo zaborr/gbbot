@@ -654,6 +654,7 @@ export const pt: Record<MessageKey, string> = {
   'platform.vipClub': '⭐ Clube VIP geral',
   'platform.vipOnly': '⭐ só VIP',
   'platform.visible': 'visível',
+  'platform.webAccounts': '🔐 Contas web',
   'platformShop.admins': 'Gestores do GB',
   'platformShop.adminsField': 'Gestores: @utilizadores ou IDs do Telegram',
   'platformShop.adminsFooter': 'Tratam do dia a dia do GB. Separados por vírgulas. Quem adicionar por @utilizador e ainda não tiver aberto a app fica ⏳ pendente, sem permissões, até à primeira visita. A equipa tem de ter carregado em Iniciar no bot para receber os avisos. Todos aparecem em «Organizado por».',
