@@ -64,15 +64,7 @@ export function Credentials({
       </Section>
 
       <Section header={t('webAccess.authTitle')} footer={t('webAccess.authFooter')}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16 }}>
-          <Button
-            stretched
-            onClick={() => {
-              window.location.href = creds.otpauth;
-            }}
-          >
-            {t('webAccess.addToApp')}
-          </Button>
+        <div style={{ padding: 16 }}>
           <QrCode text={creds.otpauth} />
         </div>
         <Cell
