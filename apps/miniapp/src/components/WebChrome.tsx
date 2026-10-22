@@ -12,7 +12,7 @@ const SHOP_ROOT = /^\/s\/[^/]+\/?$/;
 const SHOP_ADMIN = /^\/s\/[^/]+\/admin\/?$/;
 
 /**
- * Web mode: what Telegram draws around the app. A bar on top (back, the
+ * Web mode: what Telegram draws around the app. A bar on top (back, home, the
  * inbox with its unread notices, the signed-in administrator, sign out) …
  */
 export function WebTopBar(): React.JSX.Element {
@@ -40,9 +40,14 @@ export function WebTopBar(): React.JSX.Element {
       }}
     >
       {pathname !== '/' && (
-        <Button size="s" mode="plain" onClick={() => (toList ? navigate('/') : navigate(-1))}>
-          ‹ {t('web.back')}
-        </Button>
+        <>
+          <Button size="s" mode="plain" onClick={() => (toList ? navigate('/') : navigate(-1))}>
+            ‹ {t('web.back')}
+          </Button>
+          <Button size="s" mode="plain" title={t('web.home')} onClick={() => navigate('/')}>
+            🏠
+          </Button>
+        </>
       )}
       {platform && (
         <Button size="s" mode="plain" onClick={() => navigate('/platform/notices')}>
