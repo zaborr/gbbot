@@ -4,6 +4,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import type { Pool } from 'pg';
 import { createApp } from '../app.js';
 import { base32Decode, createWebAdmin, removeWebAdmin, resetWebAdmin, totpCode } from '../services/webAdmins.js';
+import { addWebNotice } from '../services/webNotices.js';
 import type { Env } from '../config/env.js';
 import { createDb, createPool, type Database } from '../db/client.js';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -620,6 +621,21 @@ describeDb('API integration', () => {
     expect(Buffer.from(file?.data ?? '', 'base64').toString('utf8')).toContain('producto');
     // No cart or orders of their own.
     expect((await request('/api/cart', { headers: auth })).status).toBe(403);
+
+    // Their inbox: what Telegram admins get from the bot, in their language.
+    await addWebNotice(db, (lang) => `notice-${lang}`);
+    const unread = await app.request('/api/platform/notices/unread', { headers: auth });
+    expect(((await unread.json()) as { unread: number }).unread).toBeGreaterThan(0);
+    const inbox = await app.request('/api/platform/notices', { headers: { ...auth, 'X-Lang': 'es' } });
+    const { notices } = (await inbox.json()) as { notices: { id: number; text: string }[] };
+    expect(notices[0]?.text).toBe('notice-es');
+    await app.request('/api/platform/notices/seen', {
+      method: 'POST',
+      headers: { ...auth, 'content-type': 'application/json' },
+      body: JSON.stringify({ upTo: notices[0]?.id ?? 0 }),
+    });
+    const after = await app.request('/api/platform/notices/unread', { headers: auth });
+    expect(((await after.json()) as { unread: number }).unread).toBe(0);
 
     // A reset closes the sessions opened before.
     await resetWebAdmin(db, creds.username);

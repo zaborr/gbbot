@@ -28,7 +28,7 @@ import {
   buildStatusMessage,
   notifyUsers,
 } from './notifications.js';
-import { shopNotificationChatIds } from './shop.js';
+import { notifyShopTeam } from './webNotices.js';
 import { announceGoalMilestones } from './goal.js';
 
 /** Orders store minor units (cents); USDC/EURC have 6 decimals on-chain. */
@@ -235,9 +235,7 @@ export async function runPaymentCheck(
       const order = await getOrder(db, row.shopId, orderId);
       if (!order) return;
       const customer = order.userId === null ? '—' : await describeCustomer(db, order.userId);
-      await notifyUsers(db, env.BOT_TOKEN, shopNotificationChatIds(env, shop), (lang) =>
-        autoConfirmedMessage(lang, order, customer),
-      );
+      await notifyShopTeam(db, env, shop, (lang) => autoConfirmedMessage(lang, order, customer));
       if (order.userId !== null) {
         await notifyUsers(db, env.BOT_TOKEN, [order.userId], (lang) =>
           buildStatusMessage(lang, shop.name, order, 'awaiting_payment'),
@@ -256,7 +254,7 @@ export async function runPaymentCheck(
     if (!order) return;
     const customer = order.userId === null ? '—' : await describeCustomer(db, order.userId);
     const network = method?.network ?? row.paymentNetwork ?? '—';
-    await notifyUsers(db, env.BOT_TOKEN, shopNotificationChatIds(env, shop), (lang) =>
+    await notifyShopTeam(db, env, shop, (lang) =>
       [
         buildPaymentReviewMessage(lang, order, customer),
         '',

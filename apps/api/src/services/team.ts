@@ -10,7 +10,8 @@ import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { platformSettings, shops, users } from '../db/schema.js';
 import { tr, type BotMessageKey } from '../i18n/messages.js';
-import { notifyUsers } from './notifications.js';
+import { notifyPlatform } from './webNotices.js';
+import { describeWebAdmin, isWebSession } from './webAdmins.js';
 import { isSuperAdmin, type ShopRow } from './shop.js';
 
 /**
@@ -230,6 +231,7 @@ export function canOwnShop(env: Env, shop: ShopRow, userId: number | undefined):
 
 /** "@ana" or "Ana (123)": how a user is named in messages to super-admins. */
 export async function describeUser(db: Database, userId: number): Promise<string> {
+  if (isWebSession(userId)) return describeWebAdmin(db, userId);
   const info = (await loadPeople(db, [userId])).get(userId);
   if (info?.username) return `@${info.username}`;
   return info ? `${info.firstName} (${userId})` : String(userId);
@@ -245,7 +247,5 @@ export async function notifySuperAdmins(
 ): Promise<void> {
   if (isSuperAdmin(env, actorId)) return;
   const who = await describeUser(db, actorId);
-  await notifyUsers(db, env.BOT_TOKEN, [...env.ADMIN_TELEGRAM_IDS], (lang) =>
-    tr(lang, key, { who, ...vars }),
-  );
+  await notifyPlatform(db, env, (lang) => tr(lang, key, { who, ...vars }));
 }

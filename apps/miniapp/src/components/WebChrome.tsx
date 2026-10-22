@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button, List, Section } from '@telegram-apps/telegram-ui';
 import { useSession } from '../providers/SessionProvider.js';
-import { useWebButton } from '../lib/web.js';
+import { onNoticesSeen, useWebButton } from '../lib/web.js';
 import { Input } from './Field.js';
 import { PageTitle } from './PageTitle.js';
-import { ApiClientError } from '../api/client.js';
+import { api, ApiClientError } from '../api/client.js';
 import { t } from '../i18n/index.js';
 
 const SHOP_ROOT = /^\/s\/[^/]+\/?$/;
@@ -13,7 +13,7 @@ const SHOP_ADMIN = /^\/s\/[^/]+\/admin\/?$/;
 
 /**
  * Web mode: what Telegram draws around the app. A bar on top (back, the
- * signed-in administrator, sign out) …
+ * inbox with its unread notices, the signed-in administrator, sign out) …
  */
 export function WebTopBar(): React.JSX.Element {
   const navigate = useNavigate();
@@ -22,6 +22,7 @@ export function WebTopBar(): React.JSX.Element {
   // In a browser the catalog leads to the admin screens, so going back from
   // there (or the catalog) goes to the list of GBs.
   const toList = SHOP_ROOT.test(pathname) || SHOP_ADMIN.test(pathname);
+  const unread = useUnreadNotices(pathname);
   return (
     <div
       style={{
@@ -41,6 +42,9 @@ export function WebTopBar(): React.JSX.Element {
           ‹ {t('web.back')}
         </Button>
       )}
+      <Button size="s" mode="plain" onClick={() => navigate('/platform/notices')}>
+        🔔{unread > 0 ? ` ${unread}` : ''}
+      </Button>
       <span style={{ flex: 1, textAlign: 'right', opacity: 0.7, fontSize: 14 }}>
         {user?.username}
       </span>
@@ -49,6 +53,31 @@ export function WebTopBar(): React.JSX.Element {
       </Button>
     </div>
   );
+}
+
+/** Unread notices: checked on every screen change and every minute. */
+function useUnreadNotices(pathname: string): number {
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    let active = true;
+    const check = (): void => {
+      api
+        .platformUnreadNotices()
+        .then((r) => {
+          if (active) setUnread(r.unread);
+        })
+        .catch(() => undefined);
+    };
+    check();
+    const timer = setInterval(check, 60_000);
+    const off = onNoticesSeen(() => setUnread(0));
+    return () => {
+      active = false;
+      clearInterval(timer);
+      off();
+    };
+  }, [pathname]);
+  return unread;
 }
 
 /** … and the button at the bottom that screens use for their main action. */

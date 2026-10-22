@@ -6,7 +6,8 @@ import { carts, orders, shops } from '../db/schema.js';
 import { toOrderDTO } from '../db/mappers.js';
 import { ApiError } from '../lib/errors.js';
 import { buildChangeDecisionMessage, notifyUsers } from './notifications.js';
-import { shopNotificationChatIds, type ShopRow } from './shop.js';
+import type { ShopRow } from './shop.js';
+import { notifyShopTeam } from './webNotices.js';
 import { goalTotals, missedGoalText } from './goal.js';
 
 /** Refuses anything that would create or grow an order in a closed GB. */
@@ -139,7 +140,7 @@ export async function closeDueShops(db: Database, env: Env, now = new Date()): P
         const paid = (await goalTotals(db, [row.id])).get(row.id)?.paid ?? 0;
         if (paid < row.goalAmount) {
           const shopRow = row;
-          await notifyUsers(db, env.BOT_TOKEN, shopNotificationChatIds(env, row), (lang) =>
+          await notifyShopTeam(db, env, shopRow, (lang) =>
             missedGoalText(lang, shopRow, paid),
           ).catch((error: unknown) => console.error('Missed goal notice failed:', error));
         }

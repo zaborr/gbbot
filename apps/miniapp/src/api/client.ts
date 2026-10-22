@@ -41,6 +41,7 @@ import type {
   DisclaimerAdminView,
   WebAuthRequest,
   WebFile,
+  WebNotice,
 } from '@tma-shop/shared';
 import { lang } from '../i18n/index.js';
 
@@ -167,6 +168,22 @@ export class ApiClient {
   // --- shops & platform ---
   getShops(): Promise<ShopsResponse> {
     return this.request<ShopsResponse>('/shops');
+  }
+
+  /** Web administrators: their inbox (newest first). */
+  platformNotices(): Promise<{ notices: WebNotice[]; unread: number }> {
+    return this.request('/platform/notices');
+  }
+
+  platformUnreadNotices(): Promise<{ unread: number }> {
+    return this.request('/platform/notices/unread');
+  }
+
+  platformNoticesSeen(upTo: number): Promise<void> {
+    return this.request<void>('/platform/notices/seen', {
+      method: 'POST',
+      body: JSON.stringify({ upTo }),
+    });
   }
 
   platformGetShops(): Promise<ShopAdminView[]> {
