@@ -1,8 +1,10 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { bodyLimit } from 'hono/body-limit';
 import type { AppBindings, AppDeps } from './context.js';
 import { ApiError, errorResponse } from './lib/errors.js';
 import { withShop } from './middleware/shop.js';
+import { rateLimit } from './middleware/rateLimit.js';
 import { requireDisclaimer } from './auth/middleware.js';
 import { authRoutes } from './routes/auth.js';
 import { catalogRoutes } from './routes/catalog.js';
@@ -43,6 +45,17 @@ export function createApp(deps: AppDeps): Hono<AppBindings> {
   });
 
   app.get('/health', (c) => c.json({ status: 'ok' }));
+
+  // Nothing legitimate is bigger than this (the largest is a 2 MB CSV); a
+  // huge body would only fill the memory of a small server.
+  const tooBig = (): never => {
+    throw new ApiError(413, 'too_large', 'The request is too large');
+  };
+  app.use('/api/*', bodyLimit({ maxSize: 3 * 1024 * 1024, onError: tooBig }));
+  app.use('/webhook/*', bodyLimit({ maxSize: 1024 * 1024, onError: tooBig }));
+  // Requests per minute per client (the webhook is not limited: Telegram
+  // proves itself with its secret, and a limit could lose bot messages).
+  app.use('/api/*', rateLimit);
 
   // Telegram webhook is not shop-scoped (it reconciles by order id).
   app.route('/webhook', webhookRoutes());

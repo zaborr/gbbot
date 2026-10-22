@@ -11,7 +11,7 @@ import { isClosedAt } from '@tma-shop/shared';
 import { orders } from '../db/schema.js';
 
 /** Telegram id of the caller when a valid session token is present, else undefined. */
-async function peekUserId(header: string | undefined, secret: string): Promise<number | undefined> {
+export async function peekUserId(header: string | undefined, secret: string): Promise<number | undefined> {
   if (!header?.startsWith('Bearer ')) return undefined;
   try {
     const claims = await verifySession(header.slice('Bearer '.length).trim(), secret);
