@@ -29,11 +29,10 @@ Después, en **@BotFather**: *Bot Settings → Menu Button* (y la Mini App, si l
 ## Actualizar
 
 ```bash
-git pull
-docker compose up -d --build
+./deploy/update.sh
 ```
 
-La API aplica sola las migraciones nuevas al arrancar.
+Busca cambios en GitHub y, si los hay: hace una copia de la base de datos, descarga la versión nueva, reconstruye las imágenes (de una en una, para no agotar la memoria), reinicia, comprueba que la API responde y borra las imágenes viejas. Con `--force` reconstruye aunque no haya cambios. La API aplica sola las migraciones nuevas al arrancar.
 
 ## Datos
 
