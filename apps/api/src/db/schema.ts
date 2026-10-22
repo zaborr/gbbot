@@ -446,5 +446,23 @@ export const webAdmins = pgTable('web_admins', {
   failedAttempts: integer('failed_attempts').notNull().default(0),
   lockedUntil: timestamp('locked_until', { withTimezone: true }),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  /** Last notice of the inbox this admin has seen. */
+  noticesSeenId: integer('notices_seen_id').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Inbox of the web administrators: what the bot tells the platform admins in
+ * Telegram (new or deleted GBs, wallet changes, orders of GBs without a team),
+ * in every app language.
+ */
+export const webNotices = pgTable(
+  'web_notices',
+  {
+    id: serial('id').primaryKey(),
+    shopId: uuid('shop_id').references(() => shops.id, { onDelete: 'set null' }),
+    texts: jsonb('texts').$type<Record<string, string>>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('web_notices_created_at_idx').on(table.createdAt)],
+);

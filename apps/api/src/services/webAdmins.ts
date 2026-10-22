@@ -226,6 +226,15 @@ export async function signInWebAdmin(
 export const webSessionId = (adminId: number): number => -adminId;
 export const isWebSession = (sub: number): boolean => sub < 0;
 
+/** How a web administrator is named in messages: "web: ana". */
+export async function describeWebAdmin(db: Database, sub: number): Promise<string> {
+  const row = await db.query.webAdmins.findFirst({
+    where: eq(webAdmins.id, -sub),
+    columns: { username: true },
+  });
+  return `web: ${row?.username ?? -sub}`;
+}
+
 const sessionCache = new Map<number, { version: number | null; until: number }>();
 const forgetSessions = (): void => sessionCache.clear();
 

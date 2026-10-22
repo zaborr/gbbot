@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import {
+  langFrom,
   platformShopInput,
   retentionSettings,
   updateOrganizersRequest,
@@ -24,6 +25,8 @@ import { getOrganizers, getShopTeam, updateOrganizers } from '../services/team.j
 import { ApiError } from '../lib/errors.js';
 import { shops } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { isWebSession } from '../services/webAdmins.js';
+import { listWebNotices, markWebNoticesSeen, unreadWebNotices } from '../services/webNotices.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -33,6 +36,33 @@ export function platformRoutes(): Hono<AppBindings> {
   app.use('*', requireAuth, requireSuperAdmin);
 
   app.get('/shops', async (c) => c.json(await listAllShops(c.get('db'))));
+
+  // Inbox of the web administrators (in Telegram the bot sends these messages).
+  const webAdminId = (sub: number): number => {
+    if (!isWebSession(sub)) throw ApiError.forbidden('Only for web administrators');
+    return -sub;
+  };
+  app.get('/notices', async (c) =>
+    c.json(
+      await listWebNotices(
+        c.get('db'),
+        webAdminId(c.get('claims').sub),
+        langFrom(c.req.header('X-Lang')),
+      ),
+    ),
+  );
+  app.get('/notices/unread', async (c) =>
+    c.json({ unread: await unreadWebNotices(c.get('db'), webAdminId(c.get('claims').sub)) }),
+  );
+  app.post(
+    '/notices/seen',
+    zValidator('json', z.object({ upTo: z.number().int().nonnegative() })),
+    async (c) => {
+      const adminId = webAdminId(c.get('claims').sub);
+      await markWebNoticesSeen(c.get('db'), adminId, c.req.valid('json').upTo);
+      return c.body(null, 204);
+    },
+  );
 
   app.post('/shops', zValidator('json', platformShopInput), async (c) =>
     c.json(await createShop(c.get('db'), c.req.valid('json')), 201),

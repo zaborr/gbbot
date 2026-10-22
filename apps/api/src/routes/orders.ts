@@ -23,17 +23,13 @@ import {
   requestOrderChange,
   submitCryptoPayment,
 } from '../services/orders.js';
-import {
-  buildChangeRequestMessage,
-  buildPaymentReviewMessage,
-  notifyUsers,
-} from '../services/notifications.js';
+import { buildChangeRequestMessage, buildPaymentReviewMessage } from '../services/notifications.js';
 import { describeCustomer } from '../services/customers.js';
 import { startPaymentCheck } from '../services/paymentCheck.js';
 import { EVM_TX_RE } from '../chain/evm.js';
 import { SOLANA_SIGNATURE_RE } from '../chain/solana.js';
 import { paymentMethodLabel } from '../config/payment-methods.js';
-import { shopNotificationChatIds } from '../services/shop.js';
+import { notifyShopTeam } from '../services/webNotices.js';
 import { ApiError } from '../lib/errors.js';
 import { assertOpen } from '../services/closing.js';
 
@@ -160,7 +156,7 @@ export function orderRoutes(): Hono<AppBindings> {
 
       // Nothing to check on-chain: the admins hear about it now.
       const customer = await describeCustomer(db, sub);
-      await notifyUsers(db, env.BOT_TOKEN, shopNotificationChatIds(env, shop), (lang) =>
+      await notifyShopTeam(db, env, shop, (lang) =>
         buildPaymentReviewMessage(lang, order, customer),
       );
       return c.json(order);
@@ -187,7 +183,7 @@ export function orderRoutes(): Hono<AppBindings> {
       );
       if (order.changeRequest) {
         const customer = await describeCustomer(db, sub);
-        await notifyUsers(db, env.BOT_TOKEN, shopNotificationChatIds(env, c.get('shop')), (lang) =>
+        await notifyShopTeam(db, env, c.get('shop'), (lang) =>
           buildChangeRequestMessage(lang, order, customer),
         );
       }

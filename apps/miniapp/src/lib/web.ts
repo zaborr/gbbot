@@ -71,6 +71,20 @@ export function useWebButton(): WebButtonState {
   );
 }
 
+const seenListeners = new Set<() => void>();
+
+/** The inbox was read: the counter on the top bar goes back to zero. */
+export function notifyNoticesSeen(): void {
+  for (const listener of seenListeners) listener();
+}
+
+export function onNoticesSeen(listener: () => void): () => void {
+  seenListeners.add(listener);
+  return () => {
+    seenListeners.delete(listener);
+  };
+}
+
 /** Saves a file the server returned (base64) on this device. */
 export function saveBase64File(file: WebFile): void {
   const bytes = Uint8Array.from(atob(file.data), (ch) => ch.charCodeAt(0));

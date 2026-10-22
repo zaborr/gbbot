@@ -44,12 +44,6 @@ export function canManageShop(env: Env, shop: ShopRow, userId: number | undefine
   return isSuperAdmin(env, userId) || teamIds(shop).includes(userId);
 }
 
-/** Who gets the bot's messages about a shop's orders: its team, else the super-admins. */
-export function shopNotificationChatIds(env: Env, shop: ShopRow): number[] {
-  const team = teamIds(shop);
-  return team.length > 0 ? team : env.ADMIN_TELEGRAM_IDS;
-}
-
 /** Finds the GB a request is for: `ref` (the `X-Shop` header) is its id or link name. */
 export async function resolveShop(db: Database, ref: string | undefined): Promise<ShopRow> {
   const value = ref?.trim();

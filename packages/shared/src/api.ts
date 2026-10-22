@@ -121,6 +121,17 @@ export const webFile = z.object({
 });
 export type WebFile = z.infer<typeof webFile>;
 
+/** A notice of the web administrators' inbox, in their language. */
+export const webNotice = z.object({
+  id: z.number().int(),
+  text: z.string(),
+  /** Link name of the GB it is about (null when there is none or it was deleted). */
+  shopSlug: z.string().nullable(),
+  createdAt: z.string(),
+  unread: z.boolean(),
+});
+export type WebNotice = z.infer<typeof webNotice>;
+
 export const exportResponse = z.object({
   fileName: z.string(),
   orders: z.number().int().nonnegative(),

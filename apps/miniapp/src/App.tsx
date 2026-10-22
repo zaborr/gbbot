@@ -42,6 +42,7 @@ import { PlatformShopPage } from './pages/platform/PlatformShopPage.js';
 import { PlatformRetentionPage } from './pages/platform/PlatformRetentionPage.js';
 import { PlatformVipPage } from './pages/platform/PlatformVipPage.js';
 import { PlatformOrganizersPage } from './pages/platform/PlatformOrganizersPage.js';
+import { PlatformNoticesPage } from './pages/platform/PlatformNoticesPage.js';
 import { lang, onLangChange, t } from './i18n/index.js';
 import { isWebMode } from './lib/web.js';
 import { WebMainButton, WebSignIn, WebTopBar } from './components/WebChrome.js';
@@ -87,6 +88,7 @@ function Shell(): React.JSX.Element {
       <Route path="/platform/retention" element={<PlatformRetentionPage />} />
       <Route path="/platform/vip" element={<PlatformVipPage />} />
       <Route path="/platform/organizers" element={<PlatformOrganizersPage />} />
+      <Route path="/platform/notices" element={<PlatformNoticesPage />} />
       <Route path="/new-gb" element={<NewShopPage />} />
       <Route path="/import-gb" element={<ImportShopPage />} />
       <Route path="/upload/:id" element={<UploadPage />} />

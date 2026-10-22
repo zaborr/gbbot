@@ -67,7 +67,6 @@ import {
   updateShippingZones,
   updateShopProfile,
   updatePaymentSetup,
-  shopNotificationChatIds,
 } from '../services/shop.js';
 import { ApiError } from '../lib/errors.js';
 import { orders, users } from '../db/schema.js';
@@ -75,6 +74,7 @@ import { startPaymentCheck } from '../services/paymentCheck.js';
 import { buildReport } from '../export/report.js';
 import { TelegramApi } from '../telegram/api.js';
 import { isWebSession } from '../services/webAdmins.js';
+import { notifyShopTeam } from '../services/webNotices.js';
 import { tr } from '../i18n/messages.js';
 import { describeCustomer } from '../services/customers.js';
 import { shopVipClubView, updateShopVipClub } from '../services/vip.js';
@@ -406,35 +406,39 @@ export function adminRoutes(): Hono<AppBindings> {
       rateChanges.length > 0
     ) {
       const who = await describeCustomer(db, c.get('claims').sub);
-      const recipients = [...new Set([...shopNotificationChatIds(env, shop), ...env.ADMIN_TELEGRAM_IDS])];
-      await notifyUsers(db, env.BOT_TOKEN, recipients, (lang) =>
-        [
-          tr(lang, 'wallets.changed', { shop: shop.name, who }),
-          '',
-          tr(lang, 'wallets.evm', {
-            before: before.evmAddress ?? '—',
-            after: after.evmAddress ?? '—',
-          }),
-          tr(lang, 'wallets.solana', {
-            before: before.solanaAddress ?? '—',
-            after: after.solanaAddress ?? '—',
-          }),
-          ...manualChanges.map((m) =>
-            m.instructions === null
-              ? tr(lang, 'wallets.manualRemoved', { name: m.name })
-              : tr(lang, 'wallets.manual', { name: m.name, instructions: m.instructions }),
-          ),
-          ...rateChanges.map((token) =>
-            tr(lang, 'wallets.rate', {
-              from: token,
-              to: token === 'EURC' ? 'USDC' : 'EURC',
-              before: rate(before.exchange?.[token]),
-              after: rate(after.exchange?.[token]),
+      await notifyShopTeam(
+        db,
+        env,
+        shop,
+        (lang) =>
+          [
+            tr(lang, 'wallets.changed', { shop: shop.name, who }),
+            '',
+            tr(lang, 'wallets.evm', {
+              before: before.evmAddress ?? '—',
+              after: after.evmAddress ?? '—',
             }),
-          ),
-          '',
-          tr(lang, 'wallets.checkIt'),
-        ].join('\n'),
+            tr(lang, 'wallets.solana', {
+              before: before.solanaAddress ?? '—',
+              after: after.solanaAddress ?? '—',
+            }),
+            ...manualChanges.map((m) =>
+              m.instructions === null
+                ? tr(lang, 'wallets.manualRemoved', { name: m.name })
+                : tr(lang, 'wallets.manual', { name: m.name, instructions: m.instructions }),
+            ),
+            ...rateChanges.map((token) =>
+              tr(lang, 'wallets.rate', {
+                from: token,
+                to: token === 'EURC' ? 'USDC' : 'EURC',
+                before: rate(before.exchange?.[token]),
+                after: rate(after.exchange?.[token]),
+              }),
+            ),
+            '',
+            tr(lang, 'wallets.checkIt'),
+          ].join('\n'),
+        { platformToo: true },
       );
     }
     return c.json(view);
@@ -452,18 +456,22 @@ export function adminRoutes(): Hono<AppBindings> {
     // Like the wallets: every admin hears when the key that protects addresses changes.
     if (shop.addressKeyFingerprint !== view.addressKeyFingerprint) {
       const who = await describeCustomer(db, c.get('claims').sub);
-      const recipients = [...new Set([...shopNotificationChatIds(env, shop), ...env.ADMIN_TELEGRAM_IDS])];
-      await notifyUsers(db, env.BOT_TOKEN, recipients, (lang) =>
-        [
-          tr(lang, 'addressKey.changed', { shop: shop.name, who }),
-          '',
-          tr(lang, 'addressKey.fingerprint', {
-            before: shop.addressKeyFingerprint ?? '—',
-            after: view.addressKeyFingerprint ?? '—',
-          }),
-          '',
-          tr(lang, 'addressKey.checkIt'),
-        ].join('\n'),
+      await notifyShopTeam(
+        db,
+        env,
+        shop,
+        (lang) =>
+          [
+            tr(lang, 'addressKey.changed', { shop: shop.name, who }),
+            '',
+            tr(lang, 'addressKey.fingerprint', {
+              before: shop.addressKeyFingerprint ?? '—',
+              after: view.addressKeyFingerprint ?? '—',
+            }),
+            '',
+            tr(lang, 'addressKey.checkIt'),
+          ].join('\n'),
+        { platformToo: true },
       );
     }
     return c.json(view);
