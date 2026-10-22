@@ -890,6 +890,7 @@ export const it: Record<MessageKey, string> = {
   'web.expired': 'La sessione è terminata. Accedi di nuovo.',
   'web.fileSaved': 'Scaricato ✓',
   'web.footer': 'Utente, password e il codice di 6 cifre della tua app di autenticazione.',
+  'web.home': 'Home',
   'web.password': 'Password',
   'web.signIn': 'Accedi',
   'web.signOut': 'Esci',

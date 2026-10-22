@@ -888,6 +888,7 @@ export const en = {
   'web.expired': 'Your session has ended. Sign in again.',
   'web.fileSaved': 'Downloaded ✓',
   'web.footer': 'Username, password and the 6-digit code from your authenticator app.',
+  'web.home': 'Home',
   'web.password': 'Password',
   'web.signIn': 'Sign in',
   'web.signOut': 'Sign out',
