@@ -9,7 +9,9 @@ import {
   updateVipClubRequest,
 } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
-import { requireAuth, requireSuperAdmin } from '../auth/middleware.js';
+import type { Database } from '../db/client.js';
+import type { Env } from '../config/env.js';
+import { requireAuth, requireFullPlatform, requireSuperAdmin } from '../auth/middleware.js';
 import {
   createShop,
   deleteShop,
@@ -25,9 +27,16 @@ import { getOrganizers, getShopTeam, updateOrganizers } from '../services/team.j
 import { ApiError } from '../lib/errors.js';
 import { shops } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
-import { webAccountId } from '../services/webAdmins.js';
 import type { SessionClaims } from '../auth/jwt.js';
-import { listWebNotices, markWebNoticesSeen, unreadWebNotices } from '../services/webNotices.js';
+import {
+  deleteWebNotices,
+  listWebNotices,
+  markWebNoticesSeen,
+  notifyPlatform,
+  unreadWebNotices,
+} from '../services/webNotices.js';
+import { describeWebAdmin, webAccountId } from '../services/webAdmins.js';
+import { tr } from '../i18n/messages.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -62,6 +71,30 @@ export function platformRoutes(): Hono<AppBindings> {
     async (c) => {
       const adminId = webAdminId(c.get('claims'));
       await markWebNoticesSeen(c.get('db'), adminId, c.req.valid('json').upTo);
+      return c.body(null, 204);
+    },
+  );
+  // Full platform accounts clear the shared inbox; each deletion leaves a notice.
+  const deleted = async (db: Database, env: Env, sub: number, count: number): Promise<void> => {
+    if (count === 0) return;
+    const who = await describeWebAdmin(db, sub);
+    await notifyPlatform(db, env, (lang) =>
+      tr(lang, count === 1 ? 'web.noticeDeleted' : 'web.noticesDeleted', { who, count }),
+    );
+  };
+  app.delete('/notices', requireFullPlatform, async (c) => {
+    const db = c.get('db');
+    await deleted(db, c.get('env'), c.get('claims').sub, await deleteWebNotices(db));
+    return c.body(null, 204);
+  });
+  app.delete(
+    '/notices/:id',
+    requireFullPlatform,
+    zValidator('param', z.object({ id: z.coerce.number().int().positive() })),
+    async (c) => {
+      const db = c.get('db');
+      const count = await deleteWebNotices(db, c.req.valid('param').id);
+      await deleted(db, c.get('env'), c.get('claims').sub, count);
       return c.body(null, 204);
     },
   );

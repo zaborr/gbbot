@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { createMiddleware } from 'hono/factory';
 import {
   changeWebPasswordRequest,
   createWebAccountRequest,
@@ -14,7 +13,7 @@ import {
 import type { AppBindings } from '../context.js';
 import type { Database } from '../db/client.js';
 import type { Env } from '../config/env.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireFullPlatform } from '../auth/middleware.js';
 import { signSession } from '../auth/jwt.js';
 import { ApiError } from '../lib/errors.js';
 import { tr, type BotMessageKey } from '../i18n/messages.js';
@@ -26,7 +25,6 @@ import {
   createWebAdmin,
   describeWebAdmin,
   getWebAdmin,
-  isWebAdminId,
   listWebAdmins,
   removeWebAdmin,
   resetWebAdmin,
@@ -65,18 +63,7 @@ export function webAccountRoutes(): Hono<AppBindings> {
     return c.json({ token: session.token, expiresAt: session.expiresAt.toISOString() });
   });
 
-  // The panel of accounts: full platform accounts only.
-  const requireFullPlatform = createMiddleware<AppBindings>(async (c, next) => {
-    const claims = c.get('claims');
-    const id = webAccountId(claims);
-    const platform = id !== undefined && isWebAdminId(claims.sub);
-    const row = platform ? await getWebAdmin(c.get('db'), id) : undefined;
-    if (row?.role !== 'platform') {
-      throw ApiError.forbidden('Only for full platform accounts');
-    }
-    await next();
-  });
-
+  // The panel of accounts: full platform accounts only (`requireFullPlatform`).
   const tellPlatform = async (
     db: Database,
     env: Env,

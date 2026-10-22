@@ -247,6 +247,15 @@ export class ApiClient {
     });
   }
 
+  /** Full platform accounts: one notice out of the shared inbox, or all of them. */
+  platformDeleteNotice(id: number): Promise<void> {
+    return this.request<void>(`/platform/notices/${id}`, { method: 'DELETE' });
+  }
+
+  platformDeleteNotices(): Promise<void> {
+    return this.request<void>('/platform/notices', { method: 'DELETE' });
+  }
+
   platformGetShops(): Promise<ShopAdminView[]> {
     return this.request<ShopAdminView[]>('/platform/shops');
   }
