@@ -15,6 +15,17 @@ type ButtonParams = NonNullable<Parameters<typeof mainButton.setParams>[0]>;
 
 let pending: ButtonParams | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
+let settle: ReturnType<typeof setTimeout> | null = null;
+
+/** Sends the button's whole current state again (the SDK keeps it). */
+function resendMainButton(): void {
+  settle = null;
+  try {
+    if (mainButton.isMounted()) mainButton.setParams({});
+  } catch {
+    // Not inside Telegram (or too old a client).
+  }
+}
 
 /**
  * Sends button changes to Telegram a moment later, merged into one. Leaving a
@@ -34,6 +45,10 @@ function applyMainButton(update: ButtonParams): void {
     } catch {
       // Not inside Telegram (or too old a client).
     }
+    // Some clients also drop an update that comes right after another (a new
+    // total while choosing shipping): the final state goes once more.
+    if (settle !== null) clearTimeout(settle);
+    settle = setTimeout(resendMainButton, 400);
   }, 30);
 }
 
