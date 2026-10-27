@@ -22,7 +22,7 @@ export function Input({
   ...props
 }: ComponentProps<typeof TgInput>): React.JSX.Element {
   return (
-    <div>
+    <div className="tma-field-wrap">
       {header ? <Label>{header}</Label> : null}
       <TgInput className={fieldClass(className)} {...props} />
     </div>
@@ -35,7 +35,7 @@ export function Textarea({
   ...props
 }: ComponentProps<typeof TgTextarea>): React.JSX.Element {
   return (
-    <div>
+    <div className="tma-field-wrap">
       {header ? <Label>{header}</Label> : null}
       <TgTextarea className={fieldClass(className)} {...props} />
     </div>
