@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Button, Cell, Section } from '@telegram-apps/telegram-ui';
+import { Button, Cell } from '@telegram-apps/telegram-ui';
 import { payBefore, type Order } from '@tma-shop/shared';
 import { formatPrice } from '../lib/format.js';
 import { useShop, useShopPath } from '../providers/ShopProvider.js';
@@ -38,9 +38,8 @@ export function UnpaidOrdersBanner({ orders }: { orders: Order[] }): React.JSX.E
     : t('unpaid.manyHint');
 
   return (
-    <Section>
+    <div className="gb-notice">
       <Cell
-        className="tma-notice"
         before={<span style={{ fontSize: 22 }}>🧾</span>}
         subtitle={subtitle}
         after={
@@ -55,6 +54,6 @@ export function UnpaidOrdersBanner({ orders }: { orders: Order[] }): React.JSX.E
       >
         {single ? t('unpaid.one') : t('unpaid.many', { count: orders.length })}
       </Cell>
-    </Section>
+    </div>
   );
 }

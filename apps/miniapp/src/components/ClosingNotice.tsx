@@ -1,4 +1,4 @@
-import { Cell, Section } from '@telegram-apps/telegram-ui';
+import { Cell } from '@telegram-apps/telegram-ui';
 import type { ShopConfig } from '@tma-shop/shared';
 import { locale, t } from '../i18n/index.js';
 
@@ -28,29 +28,27 @@ export function closingSoon(shop: ShopConfig, now = Date.now()): boolean {
 export function ClosingNotice({ shop }: { shop: ShopConfig }): React.JSX.Element | null {
   if (shop.isClosed) {
     return (
-      <Section>
+      <div className="gb-notice">
         <Cell
-          className="tma-notice"
           before={<span style={{ fontSize: 22 }}>🔒</span>}
           subtitle={t('closed.hint')}
           multiline
         >
           {t('closed.title')}
         </Cell>
-      </Section>
+      </div>
     );
   }
   if (!shop.closesAt || !closingSoon(shop)) return null;
   return (
-    <Section>
+    <div className="gb-notice">
       <Cell
-        className="tma-notice"
         before={<span style={{ fontSize: 22 }}>⏳</span>}
         subtitle={t('closing.hint')}
         multiline
       >
         {t('closing.title', { date: closingDate(shop.closesAt) })}
       </Cell>
-    </Section>
+    </div>
   );
 }
