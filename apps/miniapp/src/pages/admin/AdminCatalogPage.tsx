@@ -175,7 +175,7 @@ function ProductRow({
   const key = `product:${product.id}`;
   return (
     <Cell
-      before={<ProductImage url={product.imageUrl} alt={product.title} size={48} />}
+      before={product.imageUrl ? <ProductImage url={product.imageUrl} alt={product.title} size={48} /> : undefined}
       subtitle={[
         formatPrice(product.price, product.currency),
         stockSummary(product),

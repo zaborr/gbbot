@@ -162,7 +162,13 @@ export function App(): React.JSX.Element {
     <AppRoot
       appearance={appearance}
       platform={platform()}
-      className={appearance === 'dark' ? 'tma-root tma-dark' : 'tma-root'}
+      className={[
+        'tma-root',
+        appearance === 'dark' ? 'tma-dark' : '',
+        platform() === 'ios' ? 'tma-ios' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
       <SessionProvider>
         <HashRouter key={language}>
