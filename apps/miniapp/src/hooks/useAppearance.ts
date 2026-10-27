@@ -40,7 +40,8 @@ export function useAppearanceChrome(appearance: 'light' | 'dark'): void {
   useEffect(() => {
     document.documentElement.dataset.theme = appearance;
     if (!mounted) return;
-    const color = appearance === 'dark' ? 'bg_color' : 'secondary_bg_color';
+    // The page colour (sections are the lighter cards on it).
+    const color = 'secondary_bg_color';
     const steps = [
       () => miniApp.setHeaderColor.isAvailable() && miniApp.setHeaderColor(color),
       () => miniApp.setBackgroundColor.isAvailable() && miniApp.setBackgroundColor(color),

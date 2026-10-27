@@ -1,9 +1,9 @@
 /*
  * App-wide styles on top of Telegram UI.
  *
- * - One background colour per theme: off-white in light mode, grey in dark
- *   mode, for the page, the sections and Telegram's header alike. Text
- *   fields use the other shade (white / near-black) so they stand out.
+ * - Like Telegram's own screens: a page colour (light grey / near-black, also
+ *   Telegram's header) and sections as cards on it (white / dark grey). Text
+ *   fields have a border so they stand out on the cards.
  * - Text fields get their own background and a border: on iPhone Telegram UI
  *   draws them with the same colour as the section, so they were invisible.
  * - Slightly larger text than Telegram UI's defaults.
@@ -14,9 +14,9 @@
 :root {
   color-scheme: light dark;
   --tma-light-surface: var(--tg-theme-secondary-bg-color, #efeff4);
-  --tma-light-field: var(--tg-theme-bg-color, #ffffff);
-  --tma-dark-surface: var(--tg-theme-bg-color, #212121);
-  --tma-dark-field: var(--tg-theme-secondary-bg-color, #0f0f0f);
+  --tma-light-card: var(--tg-theme-bg-color, #ffffff);
+  --tma-dark-surface: var(--tg-theme-secondary-bg-color, #0f0f0f);
+  --tma-dark-card: var(--tg-theme-bg-color, #212121);
 }
 
 html,
@@ -66,13 +66,14 @@ html[data-theme='dark'] body {
   min-height: var(--tg-viewport-stable-height, 100vh);
   color-scheme: light;
 
-  /* Same colour for the page, the sections and the header. */
+  /* The page (and header) in one colour, sections and cards in the other. */
   --tma-surface: var(--tma-light-surface);
-  --tgui--bg_color: var(--tma-surface);
+  --tma-card: var(--tma-light-card);
+  --tgui--bg_color: var(--tma-card);
   --tgui--secondary_bg_color: var(--tma-surface);
-  --tgui--section_bg_color: var(--tma-surface);
+  --tgui--section_bg_color: var(--tma-card);
   --tgui--header_bg_color: var(--tma-surface);
-  --tgui--card_bg_color: var(--tma-field-bg);
+  --tgui--card_bg_color: var(--tma-card);
   background: var(--tma-surface);
 
   --tgui--text--font_size: 17px;
@@ -86,14 +87,14 @@ html[data-theme='dark'] body {
   --tgui--caption2--font_size: 13px;
   --tgui--caption2--line_height: 18px;
 
-  --tma-field-bg: var(--tma-light-field);
+  --tma-field-bg: var(--tma-card);
   --tma-field-border: rgba(0, 0, 0, 0.18);
 }
 
 .tma-root.tma-root.tma-dark {
   color-scheme: dark;
   --tma-surface: var(--tma-dark-surface);
-  --tma-field-bg: var(--tma-dark-field);
+  --tma-card: var(--tma-dark-card);
   --tma-field-border: rgba(255, 255, 255, 0.22);
 }
 
@@ -154,8 +155,7 @@ label.tma-field.tma-field:focus-within {
   margin: 0 12px 12px;
   border-radius: 16px;
   overflow: hidden;
-  background: var(--tma-field-bg);
-  box-shadow: inset 0 0 0 1px var(--tma-field-border);
+  background: var(--tma-card);
   color: var(--tgui--text_color);
 }
 
@@ -248,8 +248,7 @@ label.tma-field.tma-field:focus-within {
   padding: 10px 12px;
   border: 0;
   border-radius: 14px;
-  background: var(--tma-field-bg);
-  box-shadow: inset 0 0 0 1px var(--tma-field-border);
+  background: var(--tma-card);
   color: var(--tgui--text_color);
   font: inherit;
   font-size: 16px;
@@ -325,7 +324,7 @@ label.tma-field.tma-field:focus-within {
   gap: 16px;
   padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
   border-radius: 20px 20px 0 0;
-  background: var(--tma-field-bg);
+  background: var(--tma-card);
   color: var(--tgui--text_color);
 }
 
