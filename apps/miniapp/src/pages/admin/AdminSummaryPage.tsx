@@ -168,6 +168,24 @@ function AdminSummary(): React.JSX.Element {
         </div>
       </Section>
 
+      {/* The key figures, big (one row per currency sold in). */}
+      {currencies.map((c) => (
+        <div key={`stats-${c.currency}`} className="gb-stats">
+          <div className="gb-stat">
+            <span className="gb-stat-value">{c.orders}</span>
+            <span className="gb-stat-label">{t('summary.statOrders')}</span>
+          </div>
+          <div className="gb-stat">
+            <span className="gb-stat-value">{c.items}</span>
+            <span className="gb-stat-label">{t('summary.statUnits')}</span>
+          </div>
+          <div className="gb-stat">
+            <span className="gb-stat-value">{(c.revenue / 100).toFixed(2)}</span>
+            <span className="gb-stat-label">{c.currency}</span>
+          </div>
+        </div>
+      ))}
+
       <Section header={t('summary.totals')}>
         {currencies.length === 0 && <Cell>{t('summary.empty')}</Cell>}
         {currencies.map((c) => (

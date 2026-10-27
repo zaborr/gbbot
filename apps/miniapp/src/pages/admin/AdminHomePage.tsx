@@ -5,6 +5,7 @@ import { useAsync } from '../../hooks/useAsync.js';
 import { AdminOnly, isSale, needsAttention, toMajor } from './common.js';
 import { useShop, useShopPath } from '../../providers/ShopProvider.js';
 import { closingDate } from '../../components/ClosingNotice.js';
+import { GoalBar } from '../../components/GoalBar.js';
 import { t, tn } from '../../i18n/index.js';
 
 /**
@@ -51,31 +52,57 @@ function AdminHome(): React.JSX.Element {
 
   return (
     <List>
-      {/* State at a glance, and what needs doing first. */}
-      <Section>
-        <Cell
-          onClick={config.canOwn ? go('/admin/owner?section=team') : go('/admin/close')}
-          subtitle={visibility}
-          multiline
-        >
-          <strong>{config.name}</strong> · {openState}
-        </Cell>
-        {toReview > 0 && (
-          <Cell onClick={go('/admin/orders?filter=attention')} multiline>
-            {tn(toReview, 'adminHome.warnReview.one', 'adminHome.warnReview.other')}
-          </Cell>
-        )}
-        {payOptions === 0 && (
-          <Cell onClick={go('/admin/wallets')} multiline style={warning}>
-            {t('adminHome.warnNoPay')}
-          </Cell>
-        )}
-        {missingKey && (
-          <Cell onClick={go('/admin/address-key')} multiline style={warning}>
-            {t('adminHome.warnNoKey')}
-          </Cell>
-        )}
-      </Section>
+      {/* State at a glance (tap: visibility, or closing for managers)… */}
+      <div
+        className="gb-card"
+        style={{ cursor: 'pointer' }}
+        onClick={config.canOwn ? go('/admin/owner?section=team') : go('/admin/close')}
+      >
+        <div className="gb-card-body">
+          <div style={{ fontSize: 19, fontWeight: 700, lineHeight: '24px' }}>{config.name}</div>
+          <div className="gb-chips">
+            <span
+              className={
+                config.isClosed
+                  ? 'gb-chip'
+                  : config.closesAt
+                    ? 'gb-chip gb-chip--warn'
+                    : 'gb-chip gb-chip--ok'
+              }
+            >
+              {openState}
+            </span>
+            <span
+              className={
+                !config.isVisible
+                  ? 'gb-chip'
+                  : config.vipOnly
+                    ? 'gb-chip gb-chip--vip'
+                    : 'gb-chip gb-chip--ok'
+              }
+            >
+              {visibility}
+            </span>
+          </div>
+          {config.goal && <GoalBar goal={config.goal} compact />}
+        </div>
+      </div>
+      {/* …and what needs doing first. */}
+      {toReview > 0 && (
+        <button type="button" className="gb-banner" onClick={go('/admin/orders?filter=attention')}>
+          {tn(toReview, 'adminHome.warnReview.one', 'adminHome.warnReview.other')}
+        </button>
+      )}
+      {payOptions === 0 && (
+        <button type="button" className="gb-banner" onClick={go('/admin/wallets')}>
+          {t('adminHome.warnNoPay')}
+        </button>
+      )}
+      {missingKey && (
+        <button type="button" className="gb-banner" onClick={go('/admin/address-key')}>
+          {t('adminHome.warnNoKey')}
+        </button>
+      )}
 
       <Section header={t('adminHome.orders')}>
         <Cell

@@ -255,11 +255,11 @@ export function CartPage(): React.JSX.Element {
         </Section>
       )}
       {(error ?? shop.error) && (
-        <Section>
-          <Cell multiline style={{ color: 'var(--tgui--destructive_text_color)' }}>
+        <div className="gb-notice gb-notice--error" role="alert">
+          <Cell multiline>
             {error ?? shop.error}
           </Cell>
-        </Section>
+        </div>
       )}
       {shortfalls.length > 0 && (
         <Section header={t('cart.minimumTitle')}>

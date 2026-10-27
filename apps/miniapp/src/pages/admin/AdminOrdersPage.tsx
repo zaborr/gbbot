@@ -10,7 +10,7 @@ import { formatPrice } from '../../lib/format.js';
 import { itemName } from '../../lib/variants.js';
 import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
-import { AdminOnly, formatDate, itemsSummary, needsAttention, statusLabel } from './common.js';
+import { AdminOnly, AdminStatusChip, formatDate, itemsSummary, needsAttention } from './common.js';
 import { useShopPath } from '../../providers/ShopProvider.js';
 import { t, tn, type MessageKey } from '../../i18n/index.js';
 
@@ -101,13 +101,22 @@ function AdminOrders(): React.JSX.Element {
           <Cell
             key={order.id}
             onClick={() => navigate(to(`/admin/orders/${order.id}`))}
-            subtitle={`${statusLabel(order)} · ${formatDate(order.createdAt)}`}
-            description={itemsSummary(order)}
+            subtitle={formatDate(order.createdAt)}
+            description={
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span>{itemsSummary(order)}</span>
+                <span className="gb-chips">
+                  <AdminStatusChip order={order} />
+                  {order.customerBlocked && (
+                    <span className="gb-chip gb-chip--warn">{t('blacklist.badge')}</span>
+                  )}
+                </span>
+              </span>
+            }
             after={formatPrice(order.total, order.currency)}
             multiline
           >
             {`#${order.id.slice(0, 8)}${order.contactUsername ? ` · @${order.contactUsername}` : ''}`}
-            {order.customerBlocked ? ` · ${t('blacklist.badge')}` : ''}
           </Cell>
         ))}
       </Section>
