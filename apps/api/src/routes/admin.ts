@@ -15,6 +15,7 @@ import {
   slug,
   updateAddressKeyRequest,
   updateAutoCancelRequest,
+  updateOverpayMarginRequest,
   updateOrderFeeRequest,
   updateOrderStatusRequest,
   updateShippingRequest,
@@ -67,6 +68,7 @@ import {
   updateOwnerSettings,
   updateAddressKey,
   updateAutoCancel,
+  updateOverpayMargin,
   updateOrderFee,
   updateShippingZones,
   updateShopProfile,
@@ -504,6 +506,36 @@ export function adminRoutes(): Hono<AppBindings> {
   // Unpaid orders are cancelled after this many hours (0 = never).
   app.put('/shop/auto-cancel', zValidator('json', updateAutoCancelRequest), async (c) =>
     c.json(await updateAutoCancel(c.get('db'), c.get('shopId'), c.req.valid('json').hours)),
+  );
+  // Overpayment margin (administrators): a little too much counts as the price.
+  app.put(
+    '/shop/overpay-margin',
+    requireOwner,
+    zValidator('json', updateOverpayMarginRequest),
+    async (c) => {
+      const db = c.get('db');
+      const shop = c.get('shop');
+      const { amount } = c.req.valid('json');
+      const view = await updateOverpayMargin(db, shop.id, amount);
+      if (amount !== shop.overpayMargin) {
+        const who = webMark(await describeCustomer(db, c.get('claims').sub), c.get('claims'));
+        const money = (value: number): string => `${(value / 100).toFixed(2)} ${shop.currency}`;
+        await notifyShopTeam(
+          db,
+          c.get('env'),
+          shop,
+          (lang) =>
+            tr(lang, 'payments.marginChanged', {
+              who,
+              shop: shop.name,
+              before: money(shop.overpayMargin),
+              after: money(amount),
+            }),
+          { platformToo: true },
+        );
+      }
+      return c.json(view);
+    },
   );
   // Fixed fee added once to every new order (0 hides it).
   app.put('/shop/fee', zValidator('json', updateOrderFeeRequest), async (c) =>

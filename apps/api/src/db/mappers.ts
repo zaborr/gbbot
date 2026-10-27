@@ -134,6 +134,7 @@ export function toShopConfigDTO(
     vipNoFee: row.vipNoFee,
     vipNoShipping: row.vipNoShipping,
     autoCancelHours: row.autoCancelHours,
+    overpayMargin: row.overpayMargin,
     shippingZones: row.shippingZones,
     addressPublicKey: row.addressPublicKey,
     addressKeyFingerprint: row.addressKeyFingerprint,
