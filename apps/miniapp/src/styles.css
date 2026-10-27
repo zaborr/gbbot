@@ -106,18 +106,6 @@ label.tma-field.tma-field:focus-within {
   color: var(--tgui--section_header_text_color, var(--tgui--hint_color));
 }
 
-/*
- * Shop list: a clearly visible thin line between shops (Telegram UI's own
- * divider is almost invisible), so each shop reads as its own entry.
- */
-.tma-shop-list hr {
-  border: 0;
-  height: 1px;
-  margin: 0 16px;
-  background: var(--tgui--hint_color);
-  opacity: 0.3;
-}
-
 /* Quiet note at the top of the catalog (orders still to pay). */
 .tma-notice.tma-notice {
   border-radius: 12px;
@@ -134,4 +122,233 @@ label.tma-field.tma-field:focus-within {
 .tma-organized a {
   color: var(--tgui--link_color);
   text-decoration: none;
+}
+
+/*
+ * Cards and labels of the start screen, the catalog and the cart. They use
+ * the field colour (white / near-black) so they stand out from the page in
+ * both themes; label colours have a light and a dark version.
+ */
+.gb-card {
+  margin: 0 12px 12px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--tma-field-bg);
+  box-shadow: inset 0 0 0 1px var(--tma-field-border);
+  color: var(--tgui--text_color);
+}
+
+.gb-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px 16px;
+}
+
+.gb-card-image {
+  display: block;
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+}
+
+.gb-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 20px 12px;
+}
+
+.gb-hint {
+  font-size: 15px;
+  line-height: 21px;
+  color: var(--tgui--hint_color);
+}
+
+.gb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gb-chip {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--tgui--secondary_fill, rgba(127, 127, 127, 0.15));
+  color: var(--tgui--hint_color);
+}
+
+.gb-chip--warn {
+  background: rgba(229, 57, 53, 0.12);
+  color: #b3261e;
+}
+.gb-chip--ok {
+  background: rgba(49, 181, 69, 0.14);
+  color: #1e7a2e;
+}
+.gb-chip--info {
+  background: rgba(36, 129, 204, 0.14);
+  color: #1d5f99;
+}
+.gb-chip--vip {
+  background: rgba(230, 170, 0, 0.18);
+  color: #7a5a00;
+}
+
+/* Something to do (an order to pay): stands out, in both themes. */
+.gb-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 12px 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(230, 140, 0, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(230, 140, 0, 0.45);
+  color: #6b3d00;
+}
+
+/* The catalog's two shortcuts: cart and my orders. */
+.gb-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 12px 12px;
+}
+
+.gb-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--tma-field-bg);
+  box-shadow: inset 0 0 0 1px var(--tma-field-border);
+  color: var(--tgui--text_color);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Cart steps: 1 Review → 2 Shipping → 3 Contact. */
+.gb-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 20px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tgui--hint_color);
+}
+
+.gb-step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  background: var(--tgui--secondary_fill, rgba(127, 127, 127, 0.2));
+  color: var(--tgui--hint_color);
+}
+
+.gb-step-dot--done {
+  background: #31b545;
+  color: #ffffff;
+}
+.gb-step-dot--now {
+  background: var(--tgui--button_color, #2481cc);
+  color: var(--tgui--button_text_color, #ffffff);
+}
+
+.gb-step--now {
+  color: var(--tgui--text_color);
+}
+
+.gb-step-line {
+  flex: 1;
+  height: 2px;
+  min-width: 8px;
+  background: var(--tgui--secondary_fill, rgba(127, 127, 127, 0.3));
+}
+
+.gb-step-line--done {
+  background: #31b545;
+}
+
+/* "How it works" sheet, shown once. */
+.gb-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.gb-sheet {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  border-radius: 20px 20px 0 0;
+  background: var(--tma-field-bg);
+  color: var(--tgui--text_color);
+}
+
+.gb-sheet-step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.gb-sheet-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  flex-shrink: 0;
+  font-weight: 700;
+  background: rgba(36, 129, 204, 0.14);
+  color: var(--tgui--link_color, #2481cc);
+}
+
+/* Dark theme: lighter label colours that keep their contrast. */
+.tma-dark .gb-chip--warn {
+  background: rgba(255, 120, 110, 0.16);
+  color: #ff9a90;
+}
+.tma-dark .gb-chip--ok {
+  background: rgba(90, 210, 110, 0.16);
+  color: #86e096;
+}
+.tma-dark .gb-chip--info {
+  background: rgba(100, 170, 240, 0.18);
+  color: #9cccf5;
+}
+.tma-dark .gb-chip--vip {
+  background: rgba(255, 200, 60, 0.16);
+  color: #ffd36b;
+}
+.tma-dark .gb-banner {
+  background: rgba(255, 160, 40, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 160, 40, 0.45);
+  color: #ffc68a;
+}
+.tma-dark .gb-sheet-num {
+  background: rgba(100, 170, 240, 0.18);
 }

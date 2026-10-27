@@ -7,6 +7,7 @@ import { ProductImage } from './ProductImage.js';
 import { hasVipPrice, isSoldOut, priceRange } from '../lib/variants.js';
 import { useShop, useShopPath } from '../providers/ShopProvider.js';
 import { t } from '../i18n/index.js';
+import { useCart } from '../providers/CartProvider.js';
 
 export function ProductCard({ product }: { product: Product }): React.JSX.Element {
   const navigate = useNavigate();
@@ -19,13 +20,26 @@ export function ProductCard({ product }: { product: Product }): React.JSX.Elemen
       ? formatPrice(min, product.currency)
       : t('product.from', { price: formatPrice(min, product.currency) });
   const price = hasVipPrice(product, vip) ? `⭐ ${amount}` : amount;
+  // Already in the cart: said on the product, so the list shows what was chosen.
+  const inCart = (useCart().cart?.lines ?? [])
+    .filter((line) => line.product.id === product.id)
+    .reduce((sum, line) => sum + line.quantity, 0);
 
   return (
     <Cell
       onClick={() => navigate(to(`/product/${product.id}`))}
       before={<ProductImage url={product.imageUrl} alt={productTitle(product)} size={56} />}
       subtitle={productDescription(product)}
-      after={price}
+      after={
+        inCart > 0 ? (
+          <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+            <span>{price}</span>
+            <span className="gb-chip gb-chip--info">{t('catalog.inCart', { count: inCart })}</span>
+          </span>
+        ) : (
+          price
+        )
+      }
       hint={outOfStock ? t('product.outOfStock') : product.vipOnly ? t('product.vipOnly') : undefined}
       multiline
     >

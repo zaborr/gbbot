@@ -17,6 +17,8 @@ import { t } from '../i18n/index.js';
 import { shopDescription, shopName } from '../lib/localize.js';
 import { OrganizedBy } from '../components/OrganizedBy.js';
 import { GoalBar } from '../components/GoalBar.js';
+import { useMainButton } from '../hooks/useMainButton.js';
+import { formatPrice } from '../lib/format.js';
 
 /** Products loaded at a time; "Show more" brings the next ones. */
 const PAGE_SIZE = 30;
@@ -36,7 +38,7 @@ const places = new Map<string, CatalogPlace>();
 export function CatalogPage(): React.JSX.Element {
   const navigate = useNavigate();
   const to = useShopPath();
-  const { itemCount } = useCart();
+  const { itemCount, cart } = useCart();
   const { shop, canManage } = useShop();
   const [place] = useState(() => places.get(shop.id));
   const [categoryId, setCategoryId] = useState<string | undefined>(place?.categoryId);
@@ -104,6 +106,15 @@ export function CatalogPage(): React.JSX.Element {
   );
   const total = products.data?.total ?? 0;
 
+  // With something in the cart, the bottom button leads to it (with its total).
+  useMainButton({
+    text: cart
+      ? t('catalog.toCartTotal', { total: formatPrice(cart.total, cart.currency) })
+      : t('catalog.toCart'),
+    visible: itemCount > 0 && !shop.isClosed,
+    onClick: () => navigate(to('/cart')),
+  });
+
   const headerLine = [
     !shop.isVisible ? t('catalog.hiddenShop') : shop.vipOnly ? t('catalog.vipShop') : null,
     // Far from the closing: just a short line here (the big notice comes later).
@@ -140,29 +151,34 @@ export function CatalogPage(): React.JSX.Element {
       </Section>
       <ClosingNotice shop={shop} />
       <UnpaidOrdersBanner orders={unpaid} />
-      <Section>
+      {/* The two places a customer comes back to, always in sight. */}
+      <div className="gb-tiles">
         {!shop.isClosed && (
-          <Cell
-            onClick={() => navigate(to('/cart'))}
-            after={itemCount > 0 ? <Badge type="number">{itemCount}</Badge> : undefined}
-          >
+          <button type="button" className="gb-tile" onClick={() => navigate(to('/cart'))}>
             {t('catalog.cart')}
-          </Cell>
+            {itemCount > 0 && (
+              <span style={{ marginLeft: 'auto' }}>
+                <Badge type="number">{itemCount}</Badge>
+              </span>
+            )}
+          </button>
         )}
-        <Cell
-          onClick={() => navigate(to('/orders'))}
-          after={
-            unpaid.length > 0 ? (
+        <button type="button" className="gb-tile" onClick={() => navigate(to('/orders'))}>
+          {t('catalog.myOrders')}
+          {unpaid.length > 0 && (
+            <span style={{ marginLeft: 'auto' }}>
               <Badge type="number" mode="critical">
                 {unpaid.length}
               </Badge>
-            ) : undefined
-          }
-        >
-          {t('catalog.myOrders')}
-        </Cell>
-        {canManage && <Cell onClick={() => navigate(to('/admin'))}>{t('catalog.admin')}</Cell>}
-      </Section>
+            </span>
+          )}
+        </button>
+      </div>
+      {canManage && (
+        <Section>
+          <Cell onClick={() => navigate(to('/admin'))}>{t('catalog.admin')}</Cell>
+        </Section>
+      )}
 
       <Section header={t('catalog.title')}>
         <Input

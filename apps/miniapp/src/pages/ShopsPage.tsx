@@ -1,20 +1,18 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { retrieveLaunchParams } from '@telegram-apps/sdk-react';
-import { Cell, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
+import { Button, Cell, List, Placeholder, Section, Title } from '@telegram-apps/telegram-ui';
 import { api } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { shopPath } from '../providers/ShopProvider.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
-import { ProductImage } from '../components/ProductImage.js';
 import { t, tn } from '../i18n/index.js';
 import { LanguagePicker } from '../components/LanguagePicker.js';
 import { isWebMode } from '../lib/web.js';
-import { closingDate } from '../components/ClosingNotice.js';
-import { shopDescription, shopName } from '../lib/localize.js';
-import { OrganizedBy } from '../components/OrganizedBy.js';
-import { GoalBar } from '../components/GoalBar.js';
+import { shopName } from '../lib/localize.js';
+import { ShopCard } from '../components/ShopCard.js';
+import { HowItWorks } from '../components/HowItWorks.js';
 
 let startParamUsed = false;
 
@@ -81,46 +79,34 @@ export function ShopsPage(): React.JSX.Element {
           <span style={{ fontSize: 48 }}>🏪</span>
         </Placeholder>
       ) : (
-        <Section header={t('shops.title')} footer={t('shops.footer')} className="tma-shop-list">
-          {shops.map((shop) => {
-            const status = [
-              shop.unpaidOrders > 0
-                ? tn(shop.unpaidOrders, 'shops.unpaid.one', 'shops.unpaid.other')
-                : null,
-              shop.cartItems > 0 ? t('shops.inCart', { count: shop.cartItems }) : null,
-              shop.isClosed
-                ? t('shops.closed')
-                : shop.closesAt
-                  ? t('shops.closes', { date: closingDate(shop.closesAt) })
-                  : null,
-              shop.isVisible ? null : t('shops.hidden'),
-              shop.isVisible && shop.vipOnly ? t('shops.vip') : null,
-              shop.canManage ? t('shops.youManage') : null,
-            ]
-              .filter(Boolean)
-              .join(' · ');
-            return (
-            <Cell
-              key={shop.id}
-              onClick={() => navigate(shopPath(shop.slug))}
-              before={<ProductImage url={shop.imageUrl} alt={shopName(shop)} size={56} />}
-              subtitle={shopDescription(shop) || undefined}
-              description={
-                status || shop.organizers.length > 0 || shop.goal ? (
-                  <>
-                    {status}
-                    <OrganizedBy organizers={shop.organizers} />
-                    {shop.goal && <GoalBar goal={shop.goal} compact />}
-                  </>
-                ) : undefined
-              }
-              multiline
-            >
-              {shopName(shop)}
-            </Cell>
-            );
-          })}
-        </Section>
+        <>
+          <div className="gb-intro">
+            <Title level="2" weight="2">
+              {t('shops.pick')}
+            </Title>
+            <span className="gb-hint">{t('shops.pickHint')}</span>
+          </div>
+          {/* Something to do first: orders still to pay. */}
+          {shops
+            .filter((shop) => shop.unpaidOrders > 0)
+            .map((shop) => (
+              <div key={`pay-${shop.id}`} className="gb-banner">
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <strong>{tn(shop.unpaidOrders, 'shops.toPay.one', 'shops.toPay.other')}</strong>
+                  <span style={{ fontSize: 14 }}>{shopName(shop)}</span>
+                </div>
+                <Button size="s" onClick={() => navigate(shopPath(shop.slug, '/orders'))}>
+                  {t('shops.pay')}
+                </Button>
+              </div>
+            ))}
+          {shops.map((shop) => (
+            <ShopCard key={shop.id} shop={shop} onOpen={() => navigate(shopPath(shop.slug))} />
+          ))}
+          <div className="gb-hint" style={{ padding: '0 20px 12px', fontSize: 14 }}>
+            {t('shops.footer')}
+          </div>
+        </>
       )}
 
 
@@ -153,6 +139,7 @@ export function ShopsPage(): React.JSX.Element {
         </Section>
       )}
       <LanguagePicker />
+      {!isWebMode() && shops.length > 0 && <HowItWorks />}
     </List>
   );
 }
