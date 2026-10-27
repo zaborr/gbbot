@@ -114,6 +114,11 @@ function AdminHome(): React.JSX.Element {
         >
           {t('adminHome.vip')}
         </Cell>
+        {config.canOwn && (
+          <Cell onClick={go('/admin/blacklist')} subtitle={t('blacklist.hint')}>
+            {t('blacklist.title')}
+          </Cell>
+        )}
       </Section>
 
       <Section header={t('catalog.title')}>

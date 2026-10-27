@@ -42,6 +42,8 @@ import type {
   WebAuthRequest,
   WebFile,
   WebNotice,
+  BlacklistCheck,
+  BlacklistView,
   WebAccessStatus,
   WebAccountView,
   WebCredentials,
@@ -254,6 +256,57 @@ export class ApiClient {
 
   platformDeleteNotices(): Promise<void> {
     return this.request<void>('/platform/notices', { method: 'DELETE' });
+  }
+
+  // --- blacklists: of the GB (its administrators) and of the platform ---
+  adminBlacklist(): Promise<BlacklistView> {
+    return this.request<BlacklistView>('/admin/blacklist');
+  }
+
+  adminBlacklistCheck(who: string): Promise<BlacklistCheck> {
+    return this.request<BlacklistCheck>('/admin/blacklist/check', {
+      method: 'POST',
+      body: JSON.stringify({ who }),
+    });
+  }
+
+  adminBlacklistAdd(who: string, removeData: boolean): Promise<BlacklistView> {
+    return this.request<BlacklistView>('/admin/blacklist', {
+      method: 'POST',
+      body: JSON.stringify({ who, removeData }),
+    });
+  }
+
+  adminBlacklistRemove(who: string): Promise<BlacklistView> {
+    return this.request<BlacklistView>('/admin/blacklist/remove', {
+      method: 'POST',
+      body: JSON.stringify({ who }),
+    });
+  }
+
+  platformBlacklist(): Promise<BlacklistView> {
+    return this.request<BlacklistView>('/platform/blacklist');
+  }
+
+  platformBlacklistCheck(who: string): Promise<BlacklistCheck> {
+    return this.request<BlacklistCheck>('/platform/blacklist/check', {
+      method: 'POST',
+      body: JSON.stringify({ who }),
+    });
+  }
+
+  platformBlacklistAdd(who: string, removeData: boolean): Promise<BlacklistView> {
+    return this.request<BlacklistView>('/platform/blacklist', {
+      method: 'POST',
+      body: JSON.stringify({ who, removeData }),
+    });
+  }
+
+  platformBlacklistRemove(who: string): Promise<BlacklistView> {
+    return this.request<BlacklistView>('/platform/blacklist/remove', {
+      method: 'POST',
+      body: JSON.stringify({ who }),
+    });
   }
 
   platformGetShops(): Promise<ShopAdminView[]> {

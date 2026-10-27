@@ -764,6 +764,80 @@ describeDb('API integration', () => {
     expect(((await status.json()) as { account: unknown }).account).toBeNull();
   });
 
+  it('hides the GB from blacklisted customers, here or on the whole platform', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const customer = {
+      Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}`,
+      'content-type': 'application/json',
+    };
+    const sees = async (): Promise<boolean> => {
+      const list = (await (await request('/api/shops', { headers: customer })).json()) as {
+        shops: { id: string }[];
+      };
+      return list.shops.some((s) => s.id === shopId);
+    };
+    expect(await sees()).toBe(true);
+    await request('/api/cart/items', {
+      method: 'POST',
+      headers: customer,
+      body: JSON.stringify({ productId, quantity: 1 }),
+    });
+
+    // Before blocking, the admin sees what they have.
+    const check = await request('/api/admin/blacklist/check', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ who: String(CUSTOMER_ID) }),
+    });
+    expect(((await check.json()) as { cartItems: number }).cartItems).toBeGreaterThan(0);
+    // The team cannot be blocked.
+    const self = await request('/api/admin/blacklist', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ who: String(ADMIN_ID), removeData: false }),
+    });
+    expect(self.status).toBe(400);
+
+    const blocked = await request('/api/admin/blacklist', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ who: String(CUSTOMER_ID), removeData: true }),
+    });
+    expect(blocked.status).toBe(200);
+    expect(await sees()).toBe(false);
+    expect((await request('/api/shop', { headers: customer })).status).toBe(404);
+    const after = await request('/api/admin/blacklist/check', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ who: String(CUSTOMER_ID) }),
+    });
+    expect(((await after.json()) as { cartItems: number }).cartItems).toBe(0);
+
+    await request('/api/admin/blacklist/remove', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ who: String(CUSTOMER_ID) }),
+    });
+    expect(await sees()).toBe(true);
+
+    // The platform blacklist hides every GB.
+    await app.request('/api/platform/blacklist', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ who: String(CUSTOMER_ID), removeData: false }),
+    });
+    expect(await sees()).toBe(false);
+    await app.request('/api/platform/blacklist/remove', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ who: String(CUSTOMER_ID) }),
+    });
+    expect(await sees()).toBe(true);
+  });
+
   it('cancels unpaid orders after the shop deadline', async () => {
     const token = await authToken(CUSTOMER_ID, 'Alice');
     const auth = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };

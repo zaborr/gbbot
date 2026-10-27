@@ -107,6 +107,7 @@ function AdminOrders(): React.JSX.Element {
             multiline
           >
             {`#${order.id.slice(0, 8)}${order.contactUsername ? ` · @${order.contactUsername}` : ''}`}
+            {order.customerBlocked ? ` · ${t('blacklist.badge')}` : ''}
           </Cell>
         ))}
       </Section>

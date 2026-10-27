@@ -6,6 +6,7 @@ import { validateInitData } from '../auth/init-data.js';
 import { signSession } from '../auth/jwt.js';
 import { getUser, upsertUser } from '../services/users.js';
 import { claimPendingRoles } from '../services/team.js';
+import { claimBlacklisted } from '../services/blacklist.js';
 import { toSessionUserDTO } from '../db/mappers.js';
 import { ApiError } from '../lib/errors.js';
 import { signInWebAdmin, webSessionId } from '../services/webAdmins.js';
@@ -31,6 +32,7 @@ export function authRoutes(): Hono<AppBindings> {
     const userRow = await upsertUser(db, result.data.user);
     // Added by @username to a GB's admins or to the organisers: the role is theirs now.
     await claimPendingRoles(db, userRow.telegramId, userRow.username);
+    await claimBlacklisted(db, userRow.telegramId, userRow.username);
     // Platform super-admin status always follows the current ADMIN_TELEGRAM_IDS.
     const role = env.ADMIN_TELEGRAM_IDS.includes(userRow.telegramId) ? 'admin' : 'customer';
     const { token, expiresAt } = await signSession(

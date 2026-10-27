@@ -15,6 +15,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import type {
+  Blacklist,
   OrderChangeRequest,
   PaymentLogEntry,
   PriceTier,
@@ -67,6 +68,8 @@ export const shops = pgTable('shops', {
   vipClub: jsonb('vip_club').$type<VipClub>().notNull().default({ groups: [], userIds: [], usernames: [] }),
   /** Whether members of the platform's VIP club count as VIPs here too. */
   useGlobalVipClub: boolean('use_global_vip_club').notNull().default(true),
+  /** People who must not see this GB (ids, and @usernames not seen yet). */
+  blacklist: jsonb('blacklist').$type<Blacklist>().notNull().default({ userIds: [], usernames: [] }),
   sortOrder: integer('sort_order').notNull().default(0),
   /** Telegram ids of this GB's managers ("gestores"): they run it day to day. */
   adminIds: jsonb('admin_ids').$type<number[]>().notNull().default([]),
@@ -295,6 +298,8 @@ export const platformSettings = pgTable('platform_settings', {
   organizerIds: jsonb('organizer_ids').$type<number[]>().notNull().default([]),
   /** Organisers added by @username not seen yet (lowercase, no "@"). */
   organizerUsernames: jsonb('organizer_usernames').$type<string[]>().notNull().default([]),
+  /** People who must not see any GB. */
+  blacklist: jsonb('blacklist').$type<Blacklist>().notNull().default({ userIds: [], usernames: [] }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

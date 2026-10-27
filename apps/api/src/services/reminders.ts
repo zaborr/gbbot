@@ -6,6 +6,7 @@ import { tr } from '../i18n/messages.js';
 import { TelegramApi } from '../telegram/api.js';
 import { miniAppUrl } from './bot.js';
 import { languagesOf } from './notifications.js';
+import { withoutBlockedIn } from './blacklist.js';
 
 /** Without automatic cancellation, the reminder goes out after this long. */
 export const DEFAULT_REMINDER_HOURS = 24;
@@ -53,6 +54,7 @@ export async function sendPaymentReminders(
   const due = await db
     .select({
       id: orders.id,
+      shopId: orders.shopId,
       userId: orders.userId,
       total: orders.total,
       amountPaid: orders.amountPaid,
@@ -87,6 +89,8 @@ export async function sendPaymentReminders(
   let sent = 0;
   for (const row of due) {
     if (row.userId === null) continue;
+    // The blacklisted hear nothing from the GB (the order may stay pending).
+    if ((await withoutBlockedIn(db, env, row.shopId, [row.userId])).length === 0) continue;
     // Claim it first, so a reminder is never sent twice. `updated_at` is left
     // alone: it measures the customer's inactivity for the auto-cancel.
     const [claimed] = await db
