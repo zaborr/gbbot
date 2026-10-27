@@ -718,6 +718,14 @@ export class ApiClient {
   }
 
   /** Hours without activity before an unpaid order is cancelled (0 = never). */
+  /** Administrators: paying up to this much too much counts as the price (minor units). */
+  adminUpdateOverpayMargin(amount: number): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/admin/shop/overpay-margin', {
+      method: 'PUT',
+      body: JSON.stringify({ amount }),
+    });
+  }
+
   adminUpdateAutoCancel(hours: number): Promise<ShopAdminView> {
     return this.request<ShopAdminView>('/admin/shop/auto-cancel', {
       method: 'PUT',

@@ -21,6 +21,7 @@ import {
 } from '../db/schema.js';
 import { runRetention } from '../services/retention.js';
 import { cancelExpiredOrders } from '../services/autoCancel.js';
+import { markOrderPaid } from '../services/orders.js';
 import { sendPaymentReminders } from '../services/reminders.js';
 import { resetMiniAppUrlCache } from '../services/bot.js';
 import { closeDueShops } from '../services/closing.js';
@@ -836,6 +837,57 @@ describeDb('API integration', () => {
       body: JSON.stringify({ who: String(CUSTOMER_ID) }),
     });
     expect(await sees()).toBe(true);
+  });
+
+  it('counts a little overpayment, within the GB margin, as the exact price', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const customer = {
+      Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}`,
+      'content-type': 'application/json',
+    };
+    const margin = await request('/api/admin/shop/overpay-margin', {
+      method: 'PUT',
+      headers: admin,
+      body: JSON.stringify({ amount: 10 }),
+    });
+    expect(margin.status).toBe(200);
+    const newOrder = async (): Promise<{ id: string; total: number }> => {
+      await request('/api/cart/items', {
+        method: 'POST',
+        headers: customer,
+        body: JSON.stringify({ productId, quantity: 1 }),
+      });
+      const created = await request('/api/orders', {
+        method: 'POST',
+        headers: customer,
+        body: JSON.stringify({ contactUsername: '@test_user' }),
+      });
+      const { orderId } = (await created.json()) as { orderId: string };
+      const [row] = await db.select().from(orders).where(eq(orders.id, orderId));
+      return { id: orderId, total: row?.total ?? 0 };
+    };
+
+    // 0.05 too much: paid, nothing to refund.
+    const small = await newOrder();
+    const paid = await markOrderPaid(db, small.id, 'tx-small', { received: small.total + 5 });
+    expect(paid.status).toBe('paid');
+    expect(paid.amountPaid).toBe(small.total);
+    expect(paid.amountDue).toBe(0);
+
+    // 0.50 too much: beyond the margin, the refund is noted as before.
+    const big = await newOrder();
+    const over = await markOrderPaid(db, big.id, 'tx-big', { received: big.total + 50 });
+    expect(over.amountPaid).toBe(big.total + 50);
+    expect(over.amountDue).toBe(-50);
+
+    await request('/api/admin/shop/overpay-margin', {
+      method: 'PUT',
+      headers: admin,
+      body: JSON.stringify({ amount: 0 }),
+    });
   });
 
   it('cancels unpaid orders after the shop deadline', async () => {

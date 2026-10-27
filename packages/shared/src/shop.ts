@@ -55,6 +55,11 @@ export const shop = z.object({
   vipNoShipping: z.boolean(),
   /** Unpaid orders are cancelled after this many hours without activity (0 = never). */
   autoCancelHours: z.number().int().min(0).max(720),
+  /**
+   * Paying up to this much too much (minor units) counts as paying exactly the
+   * price: no refund noted. Paying too little still goes to review. 0 = off.
+   */
+  overpayMargin: z.number().int().nonnegative(),
   /** Shipping zones; with active ones, checkout asks for a zone and an address. */
   shippingZones: z.array(shippingZone),
   /**
@@ -120,6 +125,7 @@ export const shopConfig = shop
     vipNoFee: true,
     vipNoShipping: true,
     autoCancelHours: true,
+    overpayMargin: true,
     shippingZones: true,
     addressPublicKey: true,
     addressKeyFingerprint: true,
@@ -283,6 +289,11 @@ export const updateAutoCancelRequest = z.object({
   hours: z.number().int().min(0).max(720),
 });
 export type UpdateAutoCancelRequest = z.infer<typeof updateAutoCancelRequest>;
+
+/** The GB's overpayment margin, in minor units (up to 100.00). */
+export const updateOverpayMarginRequest = z.object({
+  amount: z.number().int().min(0).max(10_000),
+});
 
 /** When an unpaid order will be cancelled, or null when it will not be. */
 export function payBefore(

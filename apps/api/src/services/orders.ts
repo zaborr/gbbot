@@ -354,9 +354,17 @@ export async function markOrderPaid(
       }
     }
 
-    const received =
+    let received =
       options.received ??
       (order.amountSubmitted > 0 ? order.amountSubmitted : Math.max(order.total - order.amountPaid, 0));
+    // A little too much, within the GB's margin, counts as the exact price:
+    // nothing to refund. Too little is left as it is (it goes to review).
+    const [shopRow] = await tx
+      .select({ overpayMargin: shops.overpayMargin })
+      .from(shops)
+      .where(eq(shops.id, order.shopId));
+    const extra = order.amountPaid + received - order.total;
+    if (extra > 0 && extra <= (shopRow?.overpayMargin ?? 0)) received -= extra;
     const amountPaid = order.amountPaid + received;
     const exchange = order.paymentExchange;
     const entry: PaymentLogEntry = {

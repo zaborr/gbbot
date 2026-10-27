@@ -87,6 +87,8 @@ export const shops = pgTable('shops', {
   currency: text('currency').notNull().default('USDC'),
   /** Fixed fee added once to every order (minor units of the order's token). */
   orderFee: integer('order_fee').notNull().default(0),
+  /** Paying up to this much too much counts as paying the price (minor units, 0 = off). */
+  overpayMargin: integer('overpay_margin').notNull().default(0),
   orderFeeLabel: text('order_fee_label').notNull().default('Service fee'),
   /** The GB's VIPs do not pay the per-order fee. */
   vipNoFee: boolean('vip_no_fee').notNull().default(false),

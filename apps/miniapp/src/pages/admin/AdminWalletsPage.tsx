@@ -18,7 +18,7 @@ import { useAsync } from '../../hooks/useAsync.js';
 import { useShop } from '../../providers/ShopProvider.js';
 import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
-import { AdminOnly, ErrorBanner, useAdminActions } from './common.js';
+import { AdminOnly, ErrorBanner, toMajor, useAdminActions } from './common.js';
 import { PageTitle } from '../../components/PageTitle.js';
 import { t, tn } from '../../i18n/index.js';
 
@@ -207,6 +207,8 @@ function PaymentsForm({
         />
       </Section>
 
+      <OverpayMarginSection readOnly={readOnly} />
+
       <Section header={t('manualPay.title')} footer={t('manualPay.footer')}>
         {manual.map((m, index) => {
           const duplicate = manualNames.indexOf(manualNames[index] ?? '') !== index;
@@ -296,4 +298,52 @@ function newMethodId(): string {
   } catch {
     return `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   }
+}
+
+/**
+ * Overpayment margin: paying up to this much too much counts as paying the
+ * price (no refund noted). Saved on its own; administrators only.
+ */
+function OverpayMarginSection({ readOnly }: { readOnly: boolean }): React.JSX.Element {
+  const { shop, reload } = useShop();
+  const actions = useAdminActions(reload);
+  const [text, setText] = useState(shop.overpayMargin > 0 ? toMajor(shop.overpayMargin) : '');
+  const [busy, setBusy] = useState(false);
+  const value = text.trim() === '' ? 0 : Math.round(Number(text.replace(',', '.')) * 100);
+  const invalid = !Number.isFinite(value) || value < 0 || value > 10_000;
+
+  return (
+    <Section
+      header={t('margin.title')}
+      footer={t('margin.footer', { currency: shop.currency })}
+    >
+      <ErrorBanner message={actions.error} />
+      <Input
+        header={invalid ? t('margin.invalid') : t('margin.amount', { currency: shop.currency })}
+        placeholder="0.00"
+        type="text"
+        inputMode="decimal"
+        status={invalid ? 'error' : 'default'}
+        disabled={readOnly}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+      />
+      <div style={{ padding: 16 }}>
+        <Button
+          stretched
+          mode="bezeled"
+          loading={busy}
+          disabled={readOnly || invalid || value === shop.overpayMargin}
+          onClick={() => {
+            setBusy(true);
+            void actions
+              .run(() => api.adminUpdateOverpayMargin(value))
+              .finally(() => setBusy(false));
+          }}
+        >
+          {t('common.save')}
+        </Button>
+      </div>
+    </Section>
+  );
 }
