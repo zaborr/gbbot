@@ -76,7 +76,7 @@ function Platform(): React.JSX.Element {
             <Cell
               key={shop.id}
               onClick={() => navigate(shopPath(shop.slug, '/admin'))}
-              before={<ProductImage url={shop.imageUrl} alt={shop.name} size={48} />}
+              before={shop.imageUrl ? <ProductImage url={shop.imageUrl} alt={shop.name} size={48} /> : undefined}
               subtitle={[
                 `/${shop.slug}`,
                 !shop.isVisible

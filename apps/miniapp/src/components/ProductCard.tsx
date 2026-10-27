@@ -28,7 +28,7 @@ export function ProductCard({ product }: { product: Product }): React.JSX.Elemen
   return (
     <Cell
       onClick={() => navigate(to(`/product/${product.id}`))}
-      before={<ProductImage url={product.imageUrl} alt={productTitle(product)} size={56} />}
+      before={product.imageUrl ? <ProductImage url={product.imageUrl} alt={productTitle(product)} size={56} /> : undefined}
       subtitle={productDescription(product)}
       after={
         inCart > 0 ? (

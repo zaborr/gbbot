@@ -111,7 +111,7 @@ export function ShopsPage(): React.JSX.Element {
               }
             />
           ))}
-          <div className="gb-hint" style={{ padding: '0 20px 12px', fontSize: 14 }}>
+          <div className="gb-hint gb-note" style={{ fontSize: 14 }}>
             {t('shops.footer')}
           </div>
         </>

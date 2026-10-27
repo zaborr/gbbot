@@ -129,7 +129,7 @@ export function CatalogPage(): React.JSX.Element {
     <List>
       <Section>
         <Cell
-          before={<ProductImage url={shop.imageUrl} alt={shopName(shop)} size={48} />}
+          before={shop.imageUrl ? <ProductImage url={shop.imageUrl} alt={shopName(shop)} size={48} /> : undefined}
           subtitle={shopDescription(shop) || undefined}
           description={
             headerLine || shop.organizers.length > 0 ? (
