@@ -60,6 +60,7 @@ function AdminCatalog(): React.JSX.Element {
         <Cell onClick={() => navigate(to('/admin/products-csv'))} subtitle={t('csv.hint')}>
           {t('csv.title')}
         </Cell>
+        <Cell onClick={() => navigate(to('/admin/clone'))}>{t('adminHome.clone')}</Cell>
       </Section>
 
       <CategoriesSection

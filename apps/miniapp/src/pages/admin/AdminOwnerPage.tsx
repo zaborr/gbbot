@@ -56,8 +56,8 @@ function OwnerForm({ team, onSaved }: { team: ShopTeam; onSaved: () => void }): 
   const show = (part: string): boolean => section === null || section === part;
   const titles: Record<string, string> = {
     team: t('adminHome.ownerTeam'),
-    duplicate: t('duplicate.title'),
-    backup: t('backup.title'),
+    duplicate: t('adminHome.duplicate'),
+    backup: t('adminHome.backup'),
     delete: t('adminHome.ownerDelete'),
   };
 
