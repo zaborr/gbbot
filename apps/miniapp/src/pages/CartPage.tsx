@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { Fragment, useCallback, useState } from 'react';
 import { awaitsPayment, shippingCost, type DeliveryAddress } from '@tma-shop/shared';
 import { useNavigate } from 'react-router-dom';
 import { Button, Cell, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
@@ -211,6 +211,14 @@ export function CartPage(): React.JSX.Element {
   }
 
   const firstUnpaid = unpaid[0];
+  // Where the customer is: what is done, and what the button will ask for next.
+  const steps = [
+    { label: t('cart.stepReview'), done: hasItems && shortfalls.length === 0 },
+    ...(needsShipping
+      ? [{ label: t('cart.stepShipping'), done: zone !== undefined && addressComplete(address) }]
+      : []),
+    { label: t('cart.stepContact'), done: contactValid },
+  ];
 
   return (
     <List>
@@ -262,7 +270,8 @@ export function CartPage(): React.JSX.Element {
           ))}
         </Section>
       )}
-      <Section header={t('cart.title')}>
+      <CartSteps steps={steps} />
+      <Section header={`1 · ${t('cart.title')}`}>
         {cart?.lines.map((line) => (
           <Cell
             key={line.id}
@@ -317,7 +326,7 @@ export function CartPage(): React.JSX.Element {
         )}
       </Section>
       {needsShipping && cart && (
-        <Section header={t('cart.shippingZone')}>
+        <Section header={`2 · ${t('cart.shippingZone')}`}>
           {zones.map((z) => {
             const cost = shippingCost(z, itemsTotal, vipFreeShipping);
             return (
@@ -361,7 +370,7 @@ export function CartPage(): React.JSX.Element {
         </>
       )}
       <Section
-        header={t('cart.usernameSection')}
+        header={`${needsShipping ? 3 : 2} · ${t('cart.usernameSection')}`}
         footer={contactValid ? t('cart.usernameOk') : t('cart.usernameRule')}
       >
         <Input
@@ -373,5 +382,39 @@ export function CartPage(): React.JSX.Element {
         />
       </Section>
     </List>
+  );
+}
+
+/** 1 Review → 2 Shipping → 3 Contact: done ones in green, the current one highlighted. */
+function CartSteps({
+  steps,
+}: {
+  steps: Array<{ label: string; done: boolean }>;
+}): React.JSX.Element {
+  const current = steps.findIndex((step) => !step.done);
+  return (
+    <div className="gb-steps">
+      {steps.map((step, i) => (
+        <Fragment key={step.label}>
+          {i > 0 && (
+            <span
+              className={steps[i - 1]?.done ? 'gb-step-line gb-step-line--done' : 'gb-step-line'}
+            />
+          )}
+          <span
+            className={
+              step.done
+                ? 'gb-step-dot gb-step-dot--done'
+                : i === current
+                  ? 'gb-step-dot gb-step-dot--now'
+                  : 'gb-step-dot'
+            }
+          >
+            {step.done ? '✓' : i + 1}
+          </span>
+          <span className={i === current ? 'gb-step--now' : undefined}>{step.label}</span>
+        </Fragment>
+      ))}
+    </div>
   );
 }
