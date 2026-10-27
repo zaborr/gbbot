@@ -91,33 +91,38 @@ html[data-theme='dark'] body {
   --tma-field-border: rgba(0, 0, 0, 0.18);
 
   /* Lines between rows: visible on white cards too (Telegram UI's are too faint). */
-  --tgui--divider: rgba(0, 0, 0, 0.12);
-  --tgui--outline: rgba(0, 0, 0, 0.12);
+  --tgui--divider: rgba(0, 0, 0, 0.2);
+  --tgui--outline: rgba(0, 0, 0, 0.2);
 }
 
 .tma-root.tma-root.tma-dark {
   color-scheme: dark;
   --tma-surface: var(--tma-dark-surface);
   --tma-card: var(--tma-dark-card);
-  --tgui--divider: rgba(255, 255, 255, 0.1);
-  --tgui--outline: rgba(255, 255, 255, 0.1);
+  --tgui--divider: rgba(255, 255, 255, 0.16);
+  --tgui--outline: rgba(255, 255, 255, 0.16);
   --tma-field-border: rgba(255, 255, 255, 0.22);
 }
 
-/* Text fields (see components/Field.tsx). */
+/*
+ * Text fields (see components/Field.tsx). The wrapper gives the space around
+ * the field with padding (a margin would leak out of the section's card and
+ * leave the field against its edge).
+ */
+.tma-field-wrap {
+  padding: 8px 16px;
+}
+
 label.tma-field.tma-field {
-  margin: 8px 16px;
+  margin: 0;
   border-radius: 12px;
   background: var(--tma-field-bg);
   box-shadow: inset 0 0 0 1px var(--tma-field-border);
 }
 
-/* In a padded block (a form with its button), the block gives the margin. */
-div[style*='padding'] > div > label.tma-field.tma-field {
-  margin: 0;
-}
-div[style*='padding'] > div > .tma-field-label {
-  padding: 0 4px 4px;
+/* In a padded block (a form with its button), the block gives the space. */
+div[style*='padding'] > .tma-field-wrap {
+  padding: 0;
 }
 
 label.tma-field.tma-field:focus-within {
@@ -137,7 +142,7 @@ label.tma-field.tma-field:focus-within {
 
 /* Visible label above each field. */
 .tma-field-label {
-  padding: 12px 22px 0;
+  padding: 4px 6px 4px;
   font-size: 14px;
   line-height: 20px;
   color: var(--tgui--section_header_text_color, var(--tgui--hint_color));
