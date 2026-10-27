@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Section } from '@telegram-apps/telegram-ui';
+import { Button } from '@telegram-apps/telegram-ui';
 import type { Lang } from '@tma-shop/shared';
 import { api } from '../api/client.js';
 import { lang, setLang, t } from '../i18n/index.js';
@@ -34,23 +34,26 @@ export function LanguagePicker(): React.JSX.Element {
   };
 
   return (
-    <Section header={t('language.title')}>
-      <div style={{ display: 'flex', gap: 8, padding: 12 }}>
-        {LANGUAGES.map((option) => (
-          <Button
-            key={option.code}
-            size="s"
-            mode={option.code === current ? 'filled' : 'bezeled'}
-            loading={busy === option.code}
-            title={option.name}
-            onClick={() => void choose(option.code)}
-          >
-            <span aria-label={option.name} role="img" style={{ fontSize: 22, lineHeight: 1 }}>
-              {option.flag}
-            </span>
-          </Button>
-        ))}
-      </div>
-    </Section>
+    // No card: the flags alone, centred at the bottom of the screen.
+    <div
+      role="group"
+      aria-label={t('language.title')}
+      style={{ display: 'flex', justifyContent: 'center', gap: 8, padding: '8px 12px 16px' }}
+    >
+      {LANGUAGES.map((option) => (
+        <Button
+          key={option.code}
+          size="s"
+          mode={option.code === current ? 'filled' : 'bezeled'}
+          loading={busy === option.code}
+          title={option.name}
+          onClick={() => void choose(option.code)}
+        >
+          <span aria-label={option.name} role="img" style={{ fontSize: 22, lineHeight: 1 }}>
+            {option.flag}
+          </span>
+        </Button>
+      ))}
+    </div>
   );
 }
