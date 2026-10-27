@@ -93,12 +93,21 @@ function canShareFiles(): boolean {
 export function AdminExportPage(): React.JSX.Element {
   return (
     <AdminOnly>
-      <AdminExport />
+      <AdminExport part="files" />
     </AdminOnly>
   );
 }
 
-function AdminExport(): React.JSX.Element {
+/** The shipping list on its own screen (it belongs with shipping, not with reports). */
+export function AdminShippingListPage(): React.JSX.Element {
+  return (
+    <AdminOnly>
+      <AdminExport part="shipping" />
+    </AdminOnly>
+  );
+}
+
+function AdminExport({ part }: { part: 'files' | 'shipping' }): React.JSX.Element {
   const { shop } = useShop();
   const [params] = useSearchParams();
   const initialScope = SCOPES.find((s) => s.key === params.get('scope'))?.key ?? 'paid';
@@ -255,7 +264,7 @@ function AdminExport(): React.JSX.Element {
 
   return (
     <List>
-      <PageTitle title={t('adminHome.export')} />
+      <PageTitle title={t(part === 'files' ? 'adminHome.export' : 'adminHome.shippingList')} />
       <ErrorBanner message={error} />
       {message && (
         <Section>
@@ -292,55 +301,59 @@ function AdminExport(): React.JSX.Element {
         </div>
       </Section>
 
-      <Section
-        header={t(isWebMode() ? 'export.toChatWeb' : 'export.toChat')}
-        footer={t(isWebMode() ? 'export.toChatFooterWeb' : 'export.toChatFooter')}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
-          <Button stretched loading={busy === 'xlsx'} onClick={() => void send('xlsx')}>
-            {t('export.excel')}
-          </Button>
-          <Button
-            stretched
-            mode="bezeled"
-            loading={busy === 'csv-orders'}
-            onClick={() => void send('csv-orders')}
-          >
-            {t('export.csvOrders')}
-          </Button>
-          <Button
-            stretched
-            mode="bezeled"
-            loading={busy === 'csv-lines'}
-            onClick={() => void send('csv-lines')}
-          >
-            {t('export.csvLines')}
-          </Button>
-        </div>
-      </Section>
+      {part === 'files' && (
+        <Section
+          header={t(isWebMode() ? 'export.toChatWeb' : 'export.toChat')}
+          footer={t(isWebMode() ? 'export.toChatFooterWeb' : 'export.toChatFooter')}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
+            <Button stretched loading={busy === 'xlsx'} onClick={() => void send('xlsx')}>
+              {t('export.excel')}
+            </Button>
+            <Button
+              stretched
+              mode="bezeled"
+              loading={busy === 'csv-orders'}
+              onClick={() => void send('csv-orders')}
+            >
+              {t('export.csvOrders')}
+            </Button>
+            <Button
+              stretched
+              mode="bezeled"
+              loading={busy === 'csv-lines'}
+              onClick={() => void send('csv-lines')}
+            >
+              {t('export.csvLines')}
+            </Button>
+          </div>
+        </Section>
+      )}
 
-      <Section
-        header={t('export.shippingList')}
-        footer={t('export.shippingListFooter')}
-      >
-        <div style={{ padding: 16 }}>
-          <Button
-            stretched
-            mode="bezeled"
-            loading={busy === 'shipping'}
-            onClick={() => void shippingList()}
-          >
-            {t('export.shippingButton')}
-          </Button>
-        </div>
-        {listError && (
-          <Cell multiline style={{ color: 'var(--tgui--destructive_text_color)' }}>
-            {listError}
-          </Cell>
-        )}
-      </Section>
+      {part === 'shipping' && (
+        <Section
+          header={t('export.shippingList')}
+          footer={t('export.shippingListFooter')}
+        >
+          <div style={{ padding: 16 }}>
+            <Button
+              stretched
+              mode="bezeled"
+              loading={busy === 'shipping'}
+              onClick={() => void shippingList()}
+            >
+              {t('export.shippingButton')}
+            </Button>
+          </div>
+          {listError && (
+            <Cell multiline style={{ color: 'var(--tgui--destructive_text_color)' }}>
+              {listError}
+            </Cell>
+          )}
+        </Section>
+      )}
 
-      {list && (
+      {part === 'shipping' && list && (
         <>
           <Section footer={list.failed > 0 ? t('export.needOtherKey', { count: list.failed }) : undefined}>
             <Cell multiline>

@@ -49,7 +49,7 @@ function ProfileForm({
   view: ShopAdminView;
   onSaved: () => void;
 }): React.JSX.Element {
-  const { reload } = useShop();
+  const { reload, shop } = useShop();
   const actions = useAdminActions(() => {
     onSaved();
     reload();
@@ -140,41 +140,44 @@ function ProfileForm({
         </div>
       </Section>
 
-      <Section
-        header={t('settings.access')}
-        footer={t('settings.accessFooter')}
-      >
-        <Cell after={`/${view.slug}`}>{t('settings.linkName')}</Cell>
-        <Cell
-          after={
-            !view.isVisible
-              ? t('shops.hidden')
-              : view.vipOnly
-                ? t('platformShop.vipOnly')
-                : t('settings.visible')
-          }
+      {/* Read only, for managers: administrators change it in their own section. */}
+      {!shop.canOwn && (
+        <Section
+          header={t('settings.access')}
+          footer={t('settings.accessFooter')}
         >
-          {t('settings.visibility')}
-        </Cell>
-        <Cell
-          after={
-            [...view.ownerIds.map(String), ...view.ownerUsernames.map((u) => `@${u} ⏳`)].join(', ') ||
-            '—'
-          }
-          multiline
-        >
-          {t('platformShop.owner')}
-        </Cell>
-        <Cell
-          after={
-            [...view.adminIds.map(String), ...view.adminUsernames.map((u) => `@${u} ⏳`)].join(', ') ||
-            '—'
-          }
-          multiline
-        >
-          {t('platformShop.admins')}
-        </Cell>
-      </Section>
+          <Cell after={`/${view.slug}`}>{t('settings.linkName')}</Cell>
+          <Cell
+            after={
+              !view.isVisible
+                ? t('shops.hidden')
+                : view.vipOnly
+                  ? t('platformShop.vipOnly')
+                  : t('settings.visible')
+            }
+          >
+            {t('settings.visibility')}
+          </Cell>
+          <Cell
+            after={
+              [...view.ownerIds.map(String), ...view.ownerUsernames.map((u) => `@${u} ⏳`)].join(', ') ||
+              '—'
+            }
+            multiline
+          >
+            {t('platformShop.owner')}
+          </Cell>
+          <Cell
+            after={
+              [...view.adminIds.map(String), ...view.adminUsernames.map((u) => `@${u} ⏳`)].join(', ') ||
+              '—'
+            }
+            multiline
+          >
+            {t('platformShop.admins')}
+          </Cell>
+        </Section>
+      )}
     </>
   );
 }

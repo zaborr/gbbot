@@ -53,7 +53,11 @@ function AdminHome(): React.JSX.Element {
     <List>
       {/* State at a glance, and what needs doing first. */}
       <Section>
-        <Cell onClick={go('/admin/close')} subtitle={visibility} multiline>
+        <Cell
+          onClick={config.canOwn ? go('/admin/owner?section=team') : go('/admin/close')}
+          subtitle={visibility}
+          multiline
+        >
           <strong>{config.name}</strong> · {openState}
         </Cell>
         {toReview > 0 && (
@@ -133,10 +137,6 @@ function AdminHome(): React.JSX.Element {
           {t('adminHome.catalog')}
         </Cell>
         <Cell onClick={go('/admin/products/new')}>{t('adminHome.newProduct')}</Cell>
-        <Cell onClick={go('/admin/clone')}>{t('adminHome.clone')}</Cell>
-        <Cell onClick={go('/admin/products-csv')} subtitle={t('csv.hint')}>
-          {t('csv.title')}
-        </Cell>
       </Section>
 
       <Section header={t('adminHome.payments')}>
@@ -197,6 +197,11 @@ function AdminHome(): React.JSX.Element {
         >
           {t('adminHome.addressKey')}
         </Cell>
+        {activeZones > 0 && (
+          <Cell onClick={go('/admin/shipping-list')} subtitle={t('adminHome.shippingListHint')}>
+            {t('adminHome.shippingList')}
+          </Cell>
+        )}
       </Section>
 
       <Section header={t('adminHome.gb')}>
@@ -206,6 +211,16 @@ function AdminHome(): React.JSX.Element {
         <Cell onClick={go('/admin/close')} subtitle={openState}>
           {t('adminHome.close')}
         </Cell>
+        <Cell
+          onClick={go('/admin/goal')}
+          subtitle={
+            config.goal
+              ? t('adminHome.goalOn', { percent: config.goal.paidPercent })
+              : t('common.off')
+          }
+        >
+          {t('adminHome.goal')}
+        </Cell>
       </Section>
 
       {config.canOwn && (
@@ -213,8 +228,12 @@ function AdminHome(): React.JSX.Element {
           <Cell onClick={go('/admin/owner?section=team')} subtitle={visibility}>
             {t('adminHome.ownerTeam')}
           </Cell>
-          <Cell onClick={go('/admin/owner?section=duplicate')}>{t('duplicate.title')}</Cell>
-          <Cell onClick={go('/admin/owner?section=backup')}>{t('backup.title')}</Cell>
+          <Cell onClick={go('/admin/owner?section=duplicate')} subtitle={t('adminHome.duplicateHint')}>
+            {t('adminHome.duplicate')}
+          </Cell>
+          <Cell onClick={go('/admin/owner?section=backup')} subtitle={t('adminHome.backupHint')}>
+            {t('adminHome.backup')}
+          </Cell>
           <Cell onClick={go('/admin/owner?section=delete')}>
             <span style={warning}>{t('adminHome.ownerDelete')}</span>
           </Cell>

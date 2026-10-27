@@ -14,7 +14,6 @@ import { ProductCard } from '../components/ProductCard.js';
 import { ProductImage } from '../components/ProductImage.js';
 import { useShop, useShopPath } from '../providers/ShopProvider.js';
 import { t } from '../i18n/index.js';
-import { LanguagePicker } from '../components/LanguagePicker.js';
 import { shopDescription, shopName } from '../lib/localize.js';
 import { OrganizedBy } from '../components/OrganizedBy.js';
 import { GoalBar } from '../components/GoalBar.js';
@@ -210,8 +209,6 @@ export function CatalogPage(): React.JSX.Element {
           )}
         </Section>
       )}
-
-      <LanguagePicker />
     </List>
   );
 }

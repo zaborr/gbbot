@@ -5,7 +5,6 @@ import { useAsync } from '../../hooks/useAsync.js';
 import { Input } from '../../components/Field.js';
 import { closingDate } from '../../components/ClosingNotice.js';
 import { useShop } from '../../providers/ShopProvider.js';
-import { GoalSection } from './GoalSection.js';
 import { AdminOnly, ErrorBanner, useAdminActions } from './common.js';
 import { PageTitle } from '../../components/PageTitle.js';
 import { t } from '../../i18n/index.js';
@@ -45,7 +44,7 @@ function AdminClose(): React.JSX.Element {
   if (shop.isClosed) {
     return (
       <List>
-      <PageTitle title={t('adminHome.close')} />
+        <PageTitle title={t('adminHome.close')} />
         <ErrorBanner message={actions.error} />
         <Section header={t('close.title')} footer={t('close.closedFooter')}>
           <Cell multiline before={<span style={{ fontSize: 22 }}>🔒</span>}>
@@ -63,7 +62,6 @@ function AdminClose(): React.JSX.Element {
             </Button>
           </div>
         </Section>
-        <GoalSection />
       </List>
     );
   }
@@ -73,8 +71,6 @@ function AdminClose(): React.JSX.Element {
     <List>
       <PageTitle title={t('adminHome.close')} />
       <ErrorBanner message={actions.error} />
-
-      <GoalSection />
 
       <Section header={t('close.scheduleTitle')} footer={t('close.scheduleFooter')}>
         {shop.closesAt && (

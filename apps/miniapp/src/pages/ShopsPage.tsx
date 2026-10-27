@@ -123,7 +123,6 @@ export function ShopsPage(): React.JSX.Element {
         </Section>
       )}
 
-      <LanguagePicker />
 
       {isOrganizer && !isSuperAdmin && (
         <Section header={t('shops.organizer')} footer={t('shops.organizerFooter')}>
@@ -153,6 +152,7 @@ export function ShopsPage(): React.JSX.Element {
           </Cell>
         </Section>
       )}
+      <LanguagePicker />
     </List>
   );
 }

@@ -75,7 +75,7 @@ function Platform(): React.JSX.Element {
           {list.map((shop, index) => (
             <Cell
               key={shop.id}
-              onClick={() => navigate(`/platform/shops/${shop.id}`)}
+              onClick={() => navigate(shopPath(shop.slug, '/admin'))}
               before={<ProductImage url={shop.imageUrl} alt={shop.name} size={48} />}
               subtitle={[
                 `/${shop.slug}`,

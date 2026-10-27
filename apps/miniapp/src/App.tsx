@@ -24,7 +24,8 @@ import { AdminSettingsPage } from './pages/admin/AdminSettingsPage.js';
 import { AdminWalletsPage } from './pages/admin/AdminWalletsPage.js';
 import { AdminShippingPage } from './pages/admin/AdminShippingPage.js';
 import { AdminAddressKeyPage } from './pages/admin/AdminAddressKeyPage.js';
-import { AdminExportPage } from './pages/admin/AdminExportPage.js';
+import { AdminExportPage, AdminShippingListPage } from './pages/admin/AdminExportPage.js';
+import { AdminGoalPage } from './pages/admin/AdminGoalPage.js';
 import { AdminVipPage } from './pages/admin/AdminVipPage.js';
 import { AdminClonePage } from './pages/admin/AdminClonePage.js';
 import { AdminClosePage } from './pages/admin/AdminClosePage.js';
@@ -124,6 +125,8 @@ function Shell(): React.JSX.Element {
         <Route path="admin/orders/:id" element={<AdminOrderPage />} />
         <Route path="admin/summary" element={<AdminSummaryPage />} />
         <Route path="admin/export" element={<AdminExportPage />} />
+        <Route path="admin/shipping-list" element={<AdminShippingListPage />} />
+        <Route path="admin/goal" element={<AdminGoalPage />} />
         <Route path="admin/vip" element={<AdminVipPage />} />
         <Route path="admin/clone" element={<AdminClonePage />} />
         <Route path="admin/close" element={<AdminClosePage />} />
