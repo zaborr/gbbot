@@ -77,31 +77,40 @@ function Platform(): React.JSX.Element {
               key={shop.id}
               onClick={() => navigate(shopPath(shop.slug, '/admin'))}
               before={shop.imageUrl ? <ProductImage url={shop.imageUrl} alt={shop.name} size={48} /> : undefined}
-              subtitle={[
-                `/${shop.slug}`,
-                !shop.isVisible
-                  ? t('platform.hidden')
-                  : shop.vipOnly
-                    ? t('platform.vipOnly')
-                    : t('platform.visible'),
-                tn(
-                  shop.ownerIds.length + shop.ownerUsernames.length,
-                  'count.owners.one',
-                  'count.owners.other',
-                ),
-                tn(
-                  shop.adminIds.length + shop.adminUsernames.length,
-                  'count.admins.one',
-                  'count.admins.other',
-                ),
-                tn(
-                  shop.paymentMethods.length + shop.manualMethods.length,
-                  'count.paymentOptions.one',
-                  'count.paymentOptions.other',
-                ),
-              ]
-                .filter(Boolean)
-                .join(' · ')}
+              subtitle={`/${shop.slug}`}
+              description={
+                <span className="gb-chips" style={{ marginTop: 4 }}>
+                  <span
+                    className={
+                      !shop.isVisible
+                        ? 'gb-chip'
+                        : shop.vipOnly
+                          ? 'gb-chip gb-chip--vip'
+                          : 'gb-chip gb-chip--ok'
+                    }
+                  >
+                    {!shop.isVisible
+                      ? t('platform.hidden')
+                      : shop.vipOnly
+                        ? t('platform.vipOnly')
+                        : t('platform.visible')}
+                  </span>
+                  {shop.paymentMethods.length + shop.manualMethods.length === 0 ? (
+                    <span className="gb-chip gb-chip--warn">{t('platform.noPayment')}</span>
+                  ) : null}
+                  {shop.ownerIds.length + shop.ownerUsernames.length === 0 ? (
+                    <span className="gb-chip gb-chip--warn">{t('platform.noOwner')}</span>
+                  ) : (
+                    <span className="gb-chip">
+                      {tn(
+                        shop.ownerIds.length + shop.ownerUsernames.length,
+                        'count.owners.one',
+                        'count.owners.other',
+                      )}
+                    </span>
+                  )}
+                </span>
+              }
               after={
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <button

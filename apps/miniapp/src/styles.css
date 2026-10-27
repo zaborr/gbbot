@@ -491,3 +491,63 @@ label.tma-field.tma-field:focus-within {
 .tma-ios .gb-note {
   padding-inline: 4px;
 }
+
+/* Errors: the same box as the notes, in red. */
+.gb-notice--error {
+  background: rgba(229, 57, 53, 0.12);
+}
+.gb-notice--error,
+.gb-notice--error * {
+  color: #b3261e;
+}
+.tma-dark .gb-notice--error {
+  background: rgba(255, 120, 110, 0.14);
+}
+.tma-dark .gb-notice--error,
+.tma-dark .gb-notice--error * {
+  color: #ff9a90;
+}
+
+/* Key figures (sales summary): three boxes with a big number. */
+.gb-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 12px 12px;
+}
+.tma-ios .gb-stats {
+  margin-inline: 0;
+}
+.gb-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--tma-card);
+  color: var(--tgui--text_color);
+  min-width: 0;
+}
+.gb-stat-value {
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.gb-stat-label {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--tgui--hint_color);
+}
+
+/* A banner that leads somewhere (a button inside a list). */
+button.gb-banner {
+  width: calc(100% - 24px);
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tma-ios button.gb-banner {
+  width: 100%;
+}

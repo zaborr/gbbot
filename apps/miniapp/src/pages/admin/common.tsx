@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Cell, Section } from '@telegram-apps/telegram-ui';
+import { Cell } from '@telegram-apps/telegram-ui';
 import { isSaleStatus, type Order, type OrderStatus, type Product, type ProductInput } from '@tma-shop/shared';
 import { ApiClientError } from '../../api/client.js';
 import { useShop } from '../../providers/ShopProvider.js';
@@ -148,12 +148,26 @@ export function useAdminActions(onDone: () => void): AdminActions {
 export function ErrorBanner({ message }: { message: string | null }): React.JSX.Element | null {
   if (!message) return null;
   return (
-    <Section>
-      <Cell multiline style={{ color: 'var(--tgui--destructive_text_color)' }}>
-        {message}
-      </Cell>
-    </Section>
+    <div className="gb-notice gb-notice--error" role="alert">
+      <Cell multiline>{message}</Cell>
+    </div>
   );
+}
+
+/**
+ * The order's status as a coloured label for the team: orange = the team's
+ * turn (payment to check, change requested, refund owed), green = paid or
+ * delivered, blue = shipped, grey = waiting for the customer or cancelled.
+ */
+export function AdminStatusChip({ order }: { order: Order }): React.JSX.Element {
+  const kind = needsAttention(order)
+    ? 'gb-chip gb-chip--warn'
+    : order.status === 'paid' || order.status === 'fulfilled'
+      ? 'gb-chip gb-chip--ok'
+      : order.status === 'shipped'
+        ? 'gb-chip gb-chip--info'
+        : 'gb-chip';
+  return <span className={kind}>{statusLabel(order)}</span>;
 }
 
 /** Renders its children only for this shop's admins (and platform super-admins). */

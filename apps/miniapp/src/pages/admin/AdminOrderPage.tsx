@@ -11,6 +11,7 @@ import { itemKey, itemName } from '../../lib/variants.js';
 import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import {
+  AdminStatusChip,
   AdminOnly,
   ErrorBanner,
   formatDate,
@@ -22,6 +23,7 @@ import { useShopPath } from '../../providers/ShopProvider.js';
 import { AddressSection } from './AddressSection.js';
 import { TrackingText } from '../../components/TrackingText.js';
 import { t, type MessageKey } from '../../i18n/index.js';
+import { OrderTracker } from '../../components/OrderStatus.js';
 
 const breakAll: React.CSSProperties = { wordBreak: 'break-all', whiteSpace: 'normal' };
 
@@ -58,7 +60,16 @@ function AdminOrder(): React.JSX.Element {
     <List>
       <ErrorBanner message={actions.error} />
 
-      <Section header={t('orders.orderNumber', { id: o.id.slice(0, 8) })}>
+      {/* The same tracker the customer sees. */}
+      <OrderTracker order={o} />
+      <Section
+        header={
+          <span className="gb-section-head">
+            {t('orders.orderNumber', { id: o.id.slice(0, 8) })}
+            <AdminStatusChip order={o} />
+          </span>
+        }
+      >
         {o.customerBlocked && <Cell multiline>{t('blacklist.orderNote')}</Cell>}
         <Cell after={statusLabel(o)}>{t('adminOrder.status')}</Cell>
         <Cell after={formatDate(o.createdAt)}>{t('adminOrder.created')}</Cell>

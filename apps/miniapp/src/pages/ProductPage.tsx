@@ -272,11 +272,11 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
       )}
 
       {addError && (
-        <Section>
-          <Cell multiline style={{ color: 'var(--tgui--destructive_text_color)' }}>
+        <div className="gb-notice gb-notice--error" role="alert">
+          <Cell multiline>
             {addError}
           </Cell>
-        </Section>
+        </div>
       )}
       <Section>
         <Cell

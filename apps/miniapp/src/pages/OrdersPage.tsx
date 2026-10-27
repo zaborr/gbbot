@@ -57,11 +57,11 @@ export function OrdersPage(): React.JSX.Element {
   return (
     <List>
       {deleteError && (
-        <Section>
-          <Cell multiline style={{ color: 'var(--tgui--destructive_text_color)' }}>
+        <div className="gb-notice gb-notice--error" role="alert">
+          <Cell multiline>
             {deleteError}
           </Cell>
-        </Section>
+        </div>
       )}
       <Section header={t('orders.title')}>
         {orders.map((order) => (
