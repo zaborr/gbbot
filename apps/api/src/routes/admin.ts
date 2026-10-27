@@ -28,7 +28,11 @@ import {
   sendBroadcastRequest,
   updateDisclaimerRequest,
   type WebFile,
+  type Order,
+  addToBlacklistRequest,
+  blacklistWho,
 } from '@tma-shop/shared';
+import type { Context } from 'hono';
 import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth, requireOwner } from '../auth/middleware.js';
 import {
@@ -76,6 +80,14 @@ import { TelegramApi } from '../telegram/api.js';
 import { isWebSession, webMark } from '../services/webAdmins.js';
 import type { SessionClaims } from '../auth/jwt.js';
 import { notifyShopTeam } from '../services/webNotices.js';
+import {
+  addToShopBlacklist,
+  blockedAmong,
+  checkBlacklist,
+  removeFromShopBlacklist,
+  shopBlacklistView,
+  withoutBlocked,
+} from '../services/blacklist.js';
 import { tr } from '../i18n/messages.js';
 import { describeCustomer } from '../services/customers.js';
 import { shopVipClubView, updateShopVipClub } from '../services/vip.js';
@@ -116,7 +128,6 @@ export function manualMethodChanges(
   return changes;
 }
 
-/** The customer's chat, or none once the order is anonymized. */
 /**
  * Hands a generated file to the admin: the bot sends it to their chat, or for
  * a web administrator it comes back in the response.
@@ -154,8 +165,13 @@ async function deliverFile(
   return {};
 }
 
-function customerChat(order: { userId: number | null }): number[] {
-  return order.userId === null ? [] : [order.userId];
+/** The customer's chat: none once the order is anonymized, or if they are blacklisted. */
+async function customerChat(
+  c: Context<AppBindings>,
+  order: { userId: number | null },
+): Promise<number[]> {
+  if (order.userId === null) return [];
+  return withoutBlocked(c.get('db'), c.get('env'), c.get('shop'), [order.userId]);
 }
 const categoryInput = z.object({
   slug,
@@ -256,7 +272,9 @@ export function adminRoutes(): Hono<AppBindings> {
     zValidator('query', z.object({ audience: broadcastAudience })),
     async (c) =>
       c.json({
-        count: (await audienceIds(c.get('db'), c.get('shopId'), c.req.valid('query').audience)).length,
+        count: (
+          await audienceIds(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('query').audience)
+        ).length,
       }),
   );
   app.get('/broadcasts', async (c) => c.json(await listBroadcasts(c.get('db'), c.get('shopId'))));
@@ -568,12 +586,38 @@ export function adminRoutes(): Hono<AppBindings> {
   });
 
   // Orders
-  app.get('/orders', async (c) => c.json(await listAllOrders(c.get('db'), c.get('shopId'))));
+  // Orders of blacklisted customers are marked for the team.
+  const markBlocked = async (c: Context<AppBindings>, list: Order[]): Promise<Order[]> => {
+    const ids = list.flatMap((o) => (o.userId === null ? [] : [o.userId]));
+    const blocked = await blockedAmong(c.get('db'), c.get('env'), c.get('shop'), ids);
+    return list.map((o) =>
+      o.userId !== null && blocked.has(o.userId) ? { ...o, customerBlocked: true } : o,
+    );
+  };
+  app.get('/orders', async (c) =>
+    c.json(await markBlocked(c, await listAllOrders(c.get('db'), c.get('shopId')))),
+  );
   app.get('/orders/:id', zValidator('param', idParam), async (c) => {
     const order = await getOrder(c.get('db'), c.get('shopId'), c.req.valid('param').id);
     if (!order) throw ApiError.notFound('Order not found');
-    return c.json(order);
+    const [marked] = await markBlocked(c, [order]);
+    return c.json(marked ?? order);
   });
+
+  // Blacklist of the GB (administrators): for those in it the GB does not exist.
+  app.get('/blacklist', requireOwner, async (c) =>
+    c.json(await shopBlacklistView(c.get('db'), c.get('shop'))),
+  );
+  app.post('/blacklist/check', requireOwner, zValidator('json', blacklistWho), async (c) =>
+    c.json(await checkBlacklist(c.get('db'), c.req.valid('json').who, c.get('shopId'))),
+  );
+  app.post('/blacklist', requireOwner, zValidator('json', addToBlacklistRequest), async (c) => {
+    const { who, removeData } = c.req.valid('json');
+    return c.json(await addToShopBlacklist(c.get('db'), c.get('env'), c.get('shop'), who, removeData));
+  });
+  app.post('/blacklist/remove', requireOwner, zValidator('json', blacklistWho), async (c) =>
+    c.json(await removeFromShopBlacklist(c.get('db'), c.get('shop'), c.req.valid('json').who)),
+  );
   app.patch(
     '/orders/:id',
     zValidator('param', idParam),
@@ -588,7 +632,7 @@ export function adminRoutes(): Hono<AppBindings> {
       );
       // The customer hears about it from the bot (best effort).
       if (order.status !== previous) {
-        await notifyUsers(c.get('db'), c.get('env').BOT_TOKEN, customerChat(order), (lang) =>
+        await notifyUsers(c.get('db'), c.get('env').BOT_TOKEN, await customerChat(c, order), (lang) =>
           buildStatusMessage(lang, shop.name, order, previous),
         );
         // A confirmed payment may pass a milestone of the GB's minimum.
@@ -644,14 +688,14 @@ export function adminRoutes(): Hono<AppBindings> {
   // Customer change requests: approve (apply + tell them what to pay) or reject.
   app.post('/orders/:id/change/approve', zValidator('param', idParam), async (c) => {
     const order = await approveOrderChange(c.get('db'), c.get('shopId'), c.req.valid('param').id);
-    await notifyUsers(c.get('db'), c.get('env').BOT_TOKEN, customerChat(order), (lang) =>
+    await notifyUsers(c.get('db'), c.get('env').BOT_TOKEN, await customerChat(c, order), (lang) =>
       buildChangeDecisionMessage(lang, order, true),
     );
     return c.json(order);
   });
   app.post('/orders/:id/change/reject', zValidator('param', idParam), async (c) => {
     const order = await clearOrderChange(c.get('db'), c.get('shopId'), c.req.valid('param').id);
-    await notifyUsers(c.get('db'), c.get('env').BOT_TOKEN, customerChat(order), (lang) =>
+    await notifyUsers(c.get('db'), c.get('env').BOT_TOKEN, await customerChat(c, order), (lang) =>
       buildChangeDecisionMessage(lang, order, false),
     );
     return c.json(order);

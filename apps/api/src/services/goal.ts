@@ -6,6 +6,7 @@ import { orderItems, orders, shops } from '../db/schema.js';
 import { tr } from '../i18n/messages.js';
 import { notifyUsers } from './notifications.js';
 import type { ShopRow } from './shop.js';
+import { withoutBlocked } from './blacklist.js';
 
 /**
  * A GB's minimum: what its orders add up to (products only, cancelled ones
@@ -127,7 +128,12 @@ export async function announceGoalMilestones(db: Database, env: Env, shopId: str
     .selectDistinct({ userId: orders.userId })
     .from(orders)
     .where(and(eq(orders.shopId, shop.id), ne(orders.status, 'cancelled')));
-  const ids = buyers.flatMap((b) => (b.userId === null ? [] : [b.userId]));
+  const ids = await withoutBlocked(
+    db,
+    env,
+    shop,
+    buyers.flatMap((b) => (b.userId === null ? [] : [b.userId])),
+  );
   const vars = {
     shop: shop.name,
     percent: reachedPercent,

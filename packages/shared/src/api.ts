@@ -241,3 +241,41 @@ export const apiError = z.object({
   }),
 });
 export type ApiError = z.infer<typeof apiError>;
+
+/**
+ * Blacklist of a GB or of the whole platform: people (by Telegram id, or by
+ * @username until they open the app) for whom the GBs do not exist.
+ */
+export const blacklist = z.object({
+  userIds: z.array(z.number().int()),
+  /** Lowercase, without "@". */
+  usernames: z.array(z.string()),
+});
+export type Blacklist = z.infer<typeof blacklist>;
+
+export interface BlacklistView {
+  people: { telegramId: number; username: string | null; firstName: string | null }[];
+  /** Added by @username, not seen in the app yet. */
+  pendingUsernames: string[];
+}
+
+/** "@ana", "ana" or a Telegram id. */
+export const blacklistWho = z.object({ who: z.string().trim().min(1).max(64) });
+export const addToBlacklistRequest = blacklistWho.extend({
+  /** Also delete their cart and orders without payment (paid ones always stay). */
+  removeData: z.boolean(),
+});
+
+/** What someone has before being blocked: shown so the admin decides. */
+export interface BlacklistCheck {
+  /** How they are named ("@ana", "Ana (123)" or "@ana (not seen yet)"). */
+  label: string;
+  telegramId: number | null;
+  /** Their cart items, and orders with no payment (deleted if the admin chooses). */
+  cartItems: number;
+  unpaidOrders: number;
+  /** Orders with a payment (paid, under review or partly paid): never deleted. */
+  paidOrders: number;
+  /** Platform blacklist: how many GBs they have something in. */
+  shops: number;
+}

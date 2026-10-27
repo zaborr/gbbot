@@ -6,6 +6,7 @@ import type { Database } from '../db/client.js';
 import { ApiError } from '../lib/errors.js';
 import { canManageShop, resolveShop } from '../services/shop.js';
 import { isVipOf } from '../services/vip.js';
+import { isBlocked } from '../services/blacklist.js';
 import { canOwnShop } from '../services/team.js';
 import { disclaimerPending } from '../services/disclaimer.js';
 import { and, eq } from 'drizzle-orm';
@@ -38,6 +39,10 @@ export const withShop = createMiddleware<AppBindings>(async (c, next) => {
   const userId = await peekUserId(c.req.header('Authorization'), env, c.get('db'));
   const canManage = canManageShop(env, shop, userId);
   if (!shop.isVisible && !canManage) throw ApiError.notFound('Shop not found');
+  // Blacklisted: for them the GB does not exist (same answer as a missing one).
+  if (userId !== undefined && (await isBlocked(c.get('db'), env, shop, userId))) {
+    throw ApiError.notFound('Shop not found');
+  }
   // VIPs matter everywhere now (VIP prices, no fee), not only in VIP-only GBs.
   const isVip = userId !== undefined ? await isVipOf(c.get('db'), env, shop, userId) : false;
   if (shop.vipOnly && !canManage && !isVip) throw ApiError.notFound('Shop not found');

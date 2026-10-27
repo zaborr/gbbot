@@ -33,6 +33,8 @@ import { AdminProductsCsvPage } from './pages/admin/AdminProductsCsvPage.js';
 import { AdminBroadcastPage } from './pages/admin/AdminBroadcastPage.js';
 import { AdminDisclaimerPage } from './pages/admin/AdminDisclaimerPage.js';
 import { AdminUnpaidPage } from './pages/admin/AdminUnpaidPage.js';
+import { AdminBlacklistPage } from './pages/admin/AdminBlacklistPage.js';
+import { PlatformBlacklistPage } from './pages/platform/PlatformBlacklistPage.js';
 import { NewShopPage } from './pages/NewShopPage.js';
 import { ImportShopPage } from './pages/ImportShopPage.js';
 import { UploadPage } from './pages/UploadPage.js';
@@ -95,6 +97,7 @@ function Shell(): React.JSX.Element {
       <Route path="/platform/vip" element={<PlatformVipPage />} />
       <Route path="/platform/organizers" element={<PlatformOrganizersPage />} />
       <Route path="/platform/notices" element={<PlatformNoticesPage />} />
+      <Route path="/platform/blacklist" element={<PlatformBlacklistPage />} />
       <Route path="/web-access" element={<WebAccessPage />} />
       <Route path="/web-password" element={<WebPasswordPage />} />
       <Route path="/platform/web-accounts" element={<PlatformWebAccountsPage />} />
@@ -129,6 +132,7 @@ function Shell(): React.JSX.Element {
         <Route path="admin/broadcast" element={<AdminBroadcastPage />} />
         <Route path="admin/disclaimer" element={<AdminDisclaimerPage />} />
         <Route path="admin/unpaid" element={<AdminUnpaidPage />} />
+        <Route path="admin/blacklist" element={<AdminBlacklistPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

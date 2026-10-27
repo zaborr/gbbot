@@ -86,6 +86,8 @@ export type PaymentCheck = z.infer<typeof paymentCheck>;
 export const order = z.object({
   id,
   shopId: id,
+  /** Team views: the customer is blacklisted (the GB does not exist for them). */
+  customerBlocked: z.boolean().optional(),
   /** Customer; null once the order is anonymized (data retention). */
   userId: telegramUserId.nullable(),
   status: orderStatus,

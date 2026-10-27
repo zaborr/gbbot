@@ -59,6 +59,7 @@ function AdminOrder(): React.JSX.Element {
       <ErrorBanner message={actions.error} />
 
       <Section header={t('orders.orderNumber', { id: o.id.slice(0, 8) })}>
+        {o.customerBlocked && <Cell multiline>{t('blacklist.orderNote')}</Cell>}
         <Cell after={statusLabel(o)}>{t('adminOrder.status')}</Cell>
         <Cell after={formatDate(o.createdAt)}>{t('adminOrder.created')}</Cell>
         {o.updatedAt !== o.createdAt && (

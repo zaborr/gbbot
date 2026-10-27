@@ -17,6 +17,7 @@ import type { Env } from '../config/env.js';
 import { cartItems, carts, categories, orders, products, shops } from '../db/schema.js';
 import { toShopAdminDTO, toShopConfigDTO, toShopSummaryDTO } from '../db/mappers.js';
 import { ApiError } from '../lib/errors.js';
+import { getPlatformBlacklist } from './blacklist.js';
 import { createVipChecker } from './vip.js';
 import { loadPeople, organizerTags, resolvePeople } from './team.js';
 import { goalProgressOf, goalTotals } from './goal.js';
@@ -68,6 +69,8 @@ export async function listShops(db: Database, env: Env, userId: number): Promise
     .from(shops)
     .orderBy(asc(shops.sortOrder), asc(shops.createdAt));
   const isVip = createVipChecker(db, env, userId);
+  const blacklist = await getPlatformBlacklist(db);
+  const globallyBlocked = blacklist.userIds.includes(userId);
   const [activity, people] = await Promise.all([
     userActivity(db, userId),
     loadPeople(
@@ -83,6 +86,8 @@ export async function listShops(db: Database, env: Env, userId: number): Promise
   const result: ShopSummary[] = [];
   for (const row of rows) {
     const canManage = canManageShop(env, row, userId);
+    // Blacklisted (here or on the whole platform): the GB does not exist for them.
+    if (!canManage && (globallyBlocked || (row.blacklist?.userIds ?? []).includes(userId))) continue;
     const vip = row.isVisible && row.vipOnly ? await isVip(row) : false;
     const mine = activity.get(row.id);
     // A closed GB stays listed only for those who have orders in it.

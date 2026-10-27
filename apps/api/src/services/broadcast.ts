@@ -10,6 +10,7 @@ import { languagesOf } from './notifications.js';
 import { shopLink } from './reminders.js';
 import type { ShopRow } from './shop.js';
 import { describeUser } from './team.js';
+import { withoutBlocked } from './blacklist.js';
 
 /** Pause between messages: Telegram allows about 30 per second. */
 const SEND_GAP_MS = 40;
@@ -21,16 +22,19 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 /** Telegram ids of the GB's buyers in `audience` (anonymised orders have none). */
 export async function audienceIds(
   db: Database,
-  shopId: string,
+  env: Env,
+  shop: ShopRow,
   audience: BroadcastAudience,
 ): Promise<number[]> {
+  const shopId = shop.id;
+  // The blacklisted never hear from the GB.
   if (audience === 'cart') {
     const rows = await db
       .selectDistinct({ id: carts.userId })
       .from(carts)
       .innerJoin(cartItems, eq(cartItems.cartId, carts.id))
       .where(eq(carts.shopId, shopId));
-    return rows.map((r) => r.id);
+    return withoutBlocked(db, env, shop, rows.map((r) => r.id));
   }
   const filters = [eq(orders.shopId, shopId), isNotNull(orders.userId), ne(orders.status, 'cancelled')];
   if (audience === 'paid') {
@@ -39,7 +43,7 @@ export async function audienceIds(
     filters.push(eq(orders.status, 'pending'), gt(sql`${orders.total} - ${orders.amountPaid}`, 0));
   }
   const rows = await db.selectDistinct({ id: orders.userId }).from(orders).where(and(...filters));
-  return rows.flatMap((r) => (r.id === null ? [] : [r.id]));
+  return withoutBlocked(db, env, shop, rows.flatMap((r) => (r.id === null ? [] : [r.id])));
 }
 
 async function toView(db: Database, row: BroadcastRow): Promise<BroadcastView> {
@@ -142,7 +146,7 @@ export async function startBroadcast(
   text: string,
   options: { telegram?: TelegramApi; gapMs?: number; wait?: boolean } = {},
 ): Promise<BroadcastView> {
-  const ids = await audienceIds(db, shop.id, audience);
+  const ids = await audienceIds(db, env, shop, audience);
   const [row] = await db
     .insert(broadcasts)
     .values({ shopId: shop.id, senderId, audience, text, recipients: ids.length })

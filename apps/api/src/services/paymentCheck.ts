@@ -29,6 +29,7 @@ import {
   notifyUsers,
 } from './notifications.js';
 import { notifyShopTeam } from './webNotices.js';
+import { withoutBlocked } from './blacklist.js';
 import { announceGoalMilestones } from './goal.js';
 
 /** Orders store minor units (cents); USDC/EURC have 6 decimals on-chain. */
@@ -237,7 +238,8 @@ export async function runPaymentCheck(
       const customer = order.userId === null ? '—' : await describeCustomer(db, order.userId);
       await notifyShopTeam(db, env, shop, (lang) => autoConfirmedMessage(lang, order, customer));
       if (order.userId !== null) {
-        await notifyUsers(db, env.BOT_TOKEN, [order.userId], (lang) =>
+        const chat = await withoutBlocked(db, env, shop, [order.userId]);
+        await notifyUsers(db, env.BOT_TOKEN, chat, (lang) =>
           buildStatusMessage(lang, shop.name, order, 'awaiting_payment'),
         );
       }

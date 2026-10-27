@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import {
+  addToBlacklistRequest,
+  blacklistWho,
   langFrom,
   platformShopInput,
   retentionSettings,
@@ -36,6 +38,12 @@ import {
   unreadWebNotices,
 } from '../services/webNotices.js';
 import { describeWebAdmin, webAccountId } from '../services/webAdmins.js';
+import {
+  addToPlatformBlacklist,
+  checkBlacklist,
+  platformBlacklistView,
+  removeFromPlatformBlacklist,
+} from '../services/blacklist.js';
 import { tr } from '../i18n/messages.js';
 
 const idParam = z.object({ id: z.uuid() });
@@ -46,6 +54,19 @@ export function platformRoutes(): Hono<AppBindings> {
   app.use('*', requireAuth, requireSuperAdmin);
 
   app.get('/shops', async (c) => c.json(await listAllShops(c.get('db'))));
+
+  // Platform blacklist: for those in it no GB exists.
+  app.get('/blacklist', async (c) => c.json(await platformBlacklistView(c.get('db'))));
+  app.post('/blacklist/check', zValidator('json', blacklistWho), async (c) =>
+    c.json(await checkBlacklist(c.get('db'), c.req.valid('json').who, null)),
+  );
+  app.post('/blacklist', zValidator('json', addToBlacklistRequest), async (c) => {
+    const { who, removeData } = c.req.valid('json');
+    return c.json(await addToPlatformBlacklist(c.get('db'), c.get('env'), who, removeData));
+  });
+  app.post('/blacklist/remove', zValidator('json', blacklistWho), async (c) =>
+    c.json(await removeFromPlatformBlacklist(c.get('db'), c.req.valid('json').who)),
+  );
 
   // Inbox of the web administrators (in Telegram the bot sends these messages).
   const webAdminId = (claims: SessionClaims): number => {

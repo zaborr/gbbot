@@ -7,6 +7,7 @@ import { toOrderDTO } from '../db/mappers.js';
 import { ApiError } from '../lib/errors.js';
 import { buildChangeDecisionMessage, notifyUsers } from './notifications.js';
 import type { ShopRow } from './shop.js';
+import { withoutBlocked } from './blacklist.js';
 import { notifyShopTeam } from './webNotices.js';
 import { goalTotals, missedGoalText } from './goal.js';
 
@@ -66,7 +67,8 @@ async function cleanUpClosed(db: Database, env: Env, shop: ShopRow): Promise<voi
   for (const row of rejected) {
     if (row.userId === null) continue;
     const order = toOrderDTO(row, []);
-    await notifyUsers(db, env.BOT_TOKEN, [row.userId], (lang) =>
+    const chat = await withoutBlocked(db, env, shop, [row.userId]);
+    await notifyUsers(db, env.BOT_TOKEN, chat, (lang) =>
       buildChangeDecisionMessage(lang, order, false),
     );
   }
