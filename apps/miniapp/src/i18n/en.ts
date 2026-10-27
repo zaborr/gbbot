@@ -700,7 +700,6 @@ export const en = {
   'platform.moveDown': 'Move down',
   'platform.moveUp': 'Move up',
   'platform.newShop': '➕ New GB',
-  'platform.noOwner': '⚠️ no administrator',
   'platform.noPayment': '⚠️ no way to pay',
   'platform.only': 'Platform admins only',
   'platform.open': 'Catalog',

@@ -702,7 +702,6 @@ export const es: Record<MessageKey, string> = {
   'platform.moveDown': 'Bajar',
   'platform.moveUp': 'Subir',
   'platform.newShop': '➕ Nuevo GB',
-  'platform.noOwner': '⚠️ sin administrador',
   'platform.noPayment': '⚠️ sin métodos de pago',
   'platform.only': 'Solo para administradores de la plataforma',
   'platform.open': 'Catálogo',
