@@ -98,17 +98,20 @@ function Platform(): React.JSX.Element {
                   {shop.paymentMethods.length + shop.manualMethods.length === 0 ? (
                     <span className="gb-chip gb-chip--warn">{t('platform.noPayment')}</span>
                   ) : null}
-                  {shop.ownerIds.length + shop.ownerUsernames.length === 0 ? (
-                    <span className="gb-chip gb-chip--warn">{t('platform.noOwner')}</span>
-                  ) : (
-                    <span className="gb-chip">
-                      {tn(
-                        shop.ownerIds.length + shop.ownerUsernames.length,
-                        'count.owners.one',
-                        'count.owners.other',
-                      )}
-                    </span>
-                  )}
+                  {/* No administrator: worth a look (soft orange), not an error. */}
+                  <span
+                    className={
+                      shop.ownerIds.length + shop.ownerUsernames.length === 0
+                        ? 'gb-chip gb-chip--soft'
+                        : 'gb-chip'
+                    }
+                  >
+                    {tn(
+                      shop.ownerIds.length + shop.ownerUsernames.length,
+                      'count.owners.one',
+                      'count.owners.other',
+                    )}
+                  </span>
                 </span>
               }
               after={

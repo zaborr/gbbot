@@ -251,6 +251,11 @@ div[style*='padding:'] > .tma-field-wrap {
   background: rgba(230, 170, 0, 0.18);
   color: #7a5a00;
 }
+/* Worth a look, not a problem. */
+.gb-chip--soft {
+  background: rgba(240, 140, 30, 0.14);
+  color: #8a4b00;
+}
 
 /* Something to do (an order to pay): stands out, in both themes. */
 .gb-banner {
@@ -462,6 +467,10 @@ div[style*='padding:'] > .tma-field-wrap {
 .tma-dark .gb-chip--info {
   background: rgba(100, 170, 240, 0.18);
   color: #9cccf5;
+}
+.tma-dark .gb-chip--soft {
+  background: rgba(255, 160, 60, 0.14);
+  color: #ffbe7a;
 }
 .tma-dark .gb-chip--vip {
   background: rgba(255, 200, 60, 0.16);
