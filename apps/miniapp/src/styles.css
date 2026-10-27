@@ -143,12 +143,21 @@ label.tma-field.tma-field:focus-within {
   color: var(--tgui--section_header_text_color, var(--tgui--hint_color));
 }
 
-/* Quiet note at the top of the catalog (orders still to pay). */
-.tma-notice.tma-notice {
-  border-radius: 12px;
-  margin: 0 12px;
-  width: auto;
-  background: var(--tgui--secondary_fill);
+/*
+ * Notes at the top of the catalog (closed or closing GB, orders still to
+ * pay): a tinted box of their own, lined up like the cards.
+ */
+.gb-notice {
+  margin: 0 12px 12px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--tgui--secondary_fill, rgba(36, 129, 204, 0.12));
+}
+.gb-notice > * {
+  background: transparent !important;
+}
+.tma-ios .gb-notice {
+  margin-inline: 0;
 }
 
 /* "Organised by @ana, @luis" under a GB's name. */
@@ -270,6 +279,11 @@ label.tma-field.tma-field:focus-within {
   font-weight: 600;
   text-align: left;
   cursor: pointer;
+}
+
+/* Alone (a closed GB has no cart): the whole width. */
+.gb-tile:only-child {
+  grid-column: 1 / -1;
 }
 
 /* Cart steps: 1 Review → 2 Shipping → 3 Contact. */
