@@ -101,7 +101,15 @@ export function ShopsPage(): React.JSX.Element {
               </div>
             ))}
           {shops.map((shop) => (
-            <ShopCard key={shop.id} shop={shop} onOpen={() => navigate(shopPath(shop.slug))} />
+            <ShopCard
+              key={shop.id}
+              shop={shop}
+              onOpen={() =>
+                navigate(
+                  shopPath(shop.slug, shop.isClosed && !shop.canManage ? '/orders' : '/'),
+                )
+              }
+            />
           ))}
           <div className="gb-hint" style={{ padding: '0 20px 12px', fontSize: 14 }}>
             {t('shops.footer')}

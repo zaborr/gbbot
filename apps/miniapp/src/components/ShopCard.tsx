@@ -10,7 +10,7 @@ import { t, tn } from '../i18n/index.js';
 /**
  * One GB on the start screen: a card with its picture, name, who runs it, its
  * state as labels, the minimum's progress and a clear "See products" button
- * (the whole card opens it too).
+ * (the whole card opens it too). A closed GB leads its customers to their orders.
  */
 export function ShopCard({
   shop,
@@ -73,7 +73,7 @@ export function ShopCard({
               onOpen();
             }}
           >
-            {t('shops.seeProducts')}
+            {shop.isClosed && !shop.canManage ? t('shops.seeOrders') : t('shops.seeProducts')}
           </Button>
         </div>
       </div>

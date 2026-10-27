@@ -851,6 +851,7 @@ export const pt: Record<MessageKey, string> = {
   'shops.platform': 'Plataforma',
   'shops.platformAdmin': '🛰️ Administração da plataforma',
   'shops.platformHint': 'Criar GB, ocultá-los e escolher os seus administradores e os organizadores',
+  'shops.seeOrders': 'Ver os meus pedidos',
   'shops.seeProducts': 'Ver produtos',
   'shops.title': 'GB · compras em grupo',
   'shops.toPay.one': 'Tem {count} pedido por pagar',

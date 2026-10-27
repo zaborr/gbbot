@@ -849,6 +849,7 @@ export const en = {
   'shops.platform': 'Platform',
   'shops.platformAdmin': '🛰️ Platform admin',
   'shops.platformHint': 'Create GBs, hide them, choose their admins and organisers',
+  'shops.seeOrders': 'See my orders',
   'shops.seeProducts': 'See products',
   'shops.title': 'GBs · group buys',
   'shops.toPay.one': 'You have {count} order to pay',
