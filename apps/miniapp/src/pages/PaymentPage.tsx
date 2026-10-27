@@ -28,6 +28,7 @@ import { ErrorView } from '../components/ErrorView.js';
 import { useShopPath } from '../providers/ShopProvider.js';
 import { TrackingText } from '../components/TrackingText.js';
 import { locale, t } from '../i18n/index.js';
+import { OrderStatusChip, OrderTracker } from '../components/OrderStatus.js';
 
 const breakAll: React.CSSProperties = { wordBreak: 'break-all', whiteSpace: 'normal' };
 const errorStyle: React.CSSProperties = { color: 'var(--tgui--destructive_text_color)' };
@@ -98,7 +99,16 @@ export function PaymentPage(): React.JSX.Element {
     <List>
       {done && <DoneSection kind={done} onShop={() => navigate(to('/'))} onOrders={() => navigate(to('/orders'))} />}
 
-      <Section header={t('orders.orderNumber', { id: current.id.slice(0, 8) })}>
+      {/* Where the order is, at a glance. */}
+      <OrderTracker order={current} />
+      <Section
+        header={
+          <span className="gb-section-head">
+            {t('orders.orderNumber', { id: current.id.slice(0, 8) })}
+            <OrderStatusChip order={current} />
+          </span>
+        }
+      >
         {current.items.map((item) => (
           <Cell
             key={itemKey(item)}
@@ -234,18 +244,16 @@ function StatusSection({
     <>
       <StatusDetail order={order} />
       {deadline && (
-        <Section>
-          <Cell multiline>
-            {t('order.payBefore', {
-              date: deadline.toLocaleString(locale(), {
-                day: 'numeric',
-                month: 'short',
-                hour: '2-digit',
-                minute: '2-digit',
-              }),
-            })}
-          </Cell>
-        </Section>
+        <div className="gb-banner">
+          {t('order.payBefore', {
+            date: deadline.toLocaleString(locale(), {
+              day: 'numeric',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+          })}
+        </div>
       )}
       {order.statusNote && (
         <Section header={t('order.shopMessage')}>
@@ -385,7 +393,7 @@ function PaymentForm({
 
   return (
     <>
-      <Section header={resubmit ? t('order.resubmitAny') : t('order.step1')}>
+      <Section header={<StepHeader text={resubmit ? t('order.resubmitAny') : t('order.step1')} />}>
         {choices.map((c) => (
           <Cell key={c.key} onClick={() => setChoice(c.key)} after={c.key === selected ? '✓' : ''}>
             {c.label}
@@ -491,7 +499,7 @@ function CryptoSteps({
   return (
     <>
       <Section
-        header={t('order.step2')}
+        header={<StepHeader text={t('order.step2')} />}
         footer={t('order.step2Warning', { token: method.token, network: method.network })}
       >
         <CopyCell
@@ -516,7 +524,7 @@ function CryptoSteps({
         />
       </Section>
 
-      <Section header={t('order.step3')} footer={t('order.step3Hint')}>
+      <Section header={<StepHeader text={t('order.step3')} />} footer={t('order.step3Hint')}>
         <Input
           header={t('order.txHash')}
           placeholder={t('order.txHashPlaceholder')}
@@ -555,7 +563,7 @@ function ManualSteps({
 
   return (
     <>
-      <Section header={t('order.manualStep2', { method: method.name })}>
+      <Section header={<StepHeader text={t('order.manualStep2', { method: method.name })} />}>
         <Cell multiline>
           <span style={{ whiteSpace: 'pre-wrap' }}>{method.instructions}</span>
         </Cell>
@@ -575,7 +583,10 @@ function ManualSteps({
         />
       </Section>
 
-      <Section header={t('order.manualStep3')} footer={t('order.manualStep3Hint')}>
+      <Section
+        header={<StepHeader text={t('order.manualStep3')} />}
+        footer={t('order.manualStep3Hint')}
+      >
         <Input
           header={t('order.manualReference')}
           placeholder={t('order.manualReferencePlaceholder')}
@@ -905,5 +916,17 @@ function ChangeEditor({
         </div>
       </Section>
     </>
+  );
+}
+
+/** "2. Send exactly this amount" → a numbered dot and the text (as in the cart). */
+function StepHeader({ text }: { text: string }): React.JSX.Element {
+  const match = /^(\d+)\.\s*(.*)$/.exec(text);
+  if (!match) return <>{text}</>;
+  return (
+    <span className="gb-section-head">
+      <span className="gb-step-dot gb-step-dot--now">{match[1]}</span>
+      {match[2]}
+    </span>
   );
 }

@@ -39,7 +39,7 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
   const navigate = useNavigate();
   const to = useShopPath();
   const { shop } = useShop();
-  const { add, itemCount } = useCart();
+  const { add, itemCount, cart } = useCart();
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   // What was just added: shown here, so the customer can go on (another colour…).
@@ -135,6 +135,10 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
   const tiers = tierTable(product, variant, vip);
   const vipShown = variant ? vipPriceFor(product, variant, vip) !== null : hasVipPrice(product, vip);
 
+  const inCart = (cart?.lines ?? [])
+    .filter((line) => line.product.id === product.id)
+    .reduce((sum, line) => sum + line.quantity, 0);
+
   const choose = (index: number, value: string): void =>
     setSelected((prev) => prev.map((v, i) => (i === index ? (v === value ? null : value) : v)));
 
@@ -149,15 +153,23 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
           <Title level="3" weight="1" style={{ marginTop: 8 }}>
             {priceText}
           </Title>
-          {product.minQuantity > 1 && (
-            <Text style={{ display: 'block', marginTop: 4, fontWeight: 600 }}>
-              {withVariants
-                ? t('product.minimumMixed', { count: product.minQuantity })
-                : t('product.minimum', { count: product.minQuantity })}
-            </Text>
-          )}
-          {vipShown && (
-            <Text style={{ display: 'block', marginTop: 4 }}>{t('product.vipPrice')}</Text>
+          {/* What matters before adding it, as labels. */}
+          {(outOfStock || product.vipOnly || vipShown || product.minQuantity > 1 || inCart > 0) && (
+            <div className="gb-chips" style={{ marginTop: 10 }}>
+              {outOfStock && <span className="gb-chip gb-chip--warn">{t('product.outOfStock')}</span>}
+              {product.vipOnly && <span className="gb-chip gb-chip--vip">{t('product.vipOnly')}</span>}
+              {vipShown && <span className="gb-chip gb-chip--vip">{t('product.vipPrice')}</span>}
+              {product.minQuantity > 1 && (
+                <span className="gb-chip">
+                  {withVariants
+                    ? t('product.minimumMixed', { count: product.minQuantity })
+                    : t('product.minimum', { count: product.minQuantity })}
+                </span>
+              )}
+              {inCart > 0 && (
+                <span className="gb-chip gb-chip--info">{t('catalog.inCart', { count: inCart })}</span>
+              )}
+            </div>
           )}
           {other && otherText && (
             <Text style={{ display: 'block', marginTop: 4, opacity: 0.7 }}>

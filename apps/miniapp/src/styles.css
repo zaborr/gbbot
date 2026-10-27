@@ -338,6 +338,71 @@ label.tma-field.tma-field:focus-within {
   background: #31b545;
 }
 
+/* A section title with something beside it (a step number, a status label). */
+.gb-section-head {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.gb-section-head .gb-chip {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* Where an order is: five steps, each a dot over its name, joined by lines. */
+.gb-track {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 4px 8px 12px;
+}
+
+.gb-track-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--tgui--hint_color);
+}
+
+.gb-track-step::before {
+  content: '';
+  position: absolute;
+  top: 11px;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--tgui--secondary_fill, rgba(127, 127, 127, 0.3));
+}
+
+.gb-track-step:first-child::before {
+  display: none;
+}
+
+.gb-track-step--done::before,
+.gb-track-step--now::before {
+  background: #31b545;
+}
+
+.gb-track-step .gb-step-dot {
+  position: relative;
+}
+
+/* Steps still ahead: an empty ring, solid so the line does not show through. */
+.gb-track-step .gb-step-dot:not(.gb-step-dot--done):not(.gb-step-dot--now) {
+  background: var(--tma-surface);
+  box-shadow: inset 0 0 0 2px rgba(127, 127, 127, 0.35);
+}
+
+.gb-track-step--now {
+  color: var(--tgui--text_color);
+}
+
 /* "How it works" sheet, shown once. */
 .gb-sheet-backdrop {
   position: fixed;
@@ -422,6 +487,7 @@ label.tma-field.tma-field:focus-within {
 }
 .tma-ios .gb-intro,
 .tma-ios .gb-steps,
+.tma-ios .gb-track,
 .tma-ios .gb-note {
   padding-inline: 4px;
 }
