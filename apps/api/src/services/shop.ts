@@ -186,6 +186,14 @@ export async function updateOrderFee(
 }
 
 /** Hours without activity before an unpaid order is cancelled (0 = never). */
+export async function updateShopCurrency(
+  db: Database,
+  shopId: string,
+  currency: string,
+): Promise<ShopAdminView> {
+  return toShopAdminDTO(await updateShop(db, shopId, { currency }));
+}
+
 export async function updateOverpayMargin(
   db: Database,
   shopId: string,

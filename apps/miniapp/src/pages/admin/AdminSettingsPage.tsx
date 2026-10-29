@@ -38,7 +38,50 @@ function AdminSettings(): React.JSX.Element {
         view={view.data}
         onSaved={() => setReloadKey((k) => k + 1)}
       />
+      <CurrencySection />
     </List>
+  );
+}
+
+/**
+ * The GB's currency: the minimum and the overpayment margin are in it, and new
+ * products start in it. Warns when products are priced in the other one.
+ */
+function CurrencySection(): React.JSX.Element {
+  const { shop, reload } = useShop();
+  const products = useAsync(() => api.adminGetProducts(), []);
+  const actions = useAdminActions(reload);
+  const [busy, setBusy] = useState<string | null>(null);
+  const others = (products.data ?? []).filter((p) => p.currency !== shop.currency).length;
+
+  return (
+    <Section header={t('currency.title')} footer={t('currency.footer')}>
+      <ErrorBanner message={actions.error} />
+      <div style={{ display: 'flex', gap: 8, padding: 16 }}>
+        {(['EURC', 'USDC'] as const).map((code) => (
+          <Button
+            key={code}
+            size="s"
+            mode={shop.currency === code ? 'filled' : 'bezeled'}
+            loading={busy === code}
+            disabled={!shop.canOwn || shop.currency === code}
+            onClick={() => {
+              setBusy(code);
+              void actions
+                .run(() => api.adminUpdateShopCurrency(code))
+                .finally(() => setBusy(null));
+            }}
+          >
+            {code}
+          </Button>
+        ))}
+      </div>
+      {others > 0 && (
+        <div className="gb-notice gb-notice--error" role="alert">
+          <Cell multiline>{t('currency.mixed', { count: others, currency: shop.currency })}</Cell>
+        </div>
+      )}
+    </Section>
   );
 }
 
