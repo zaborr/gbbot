@@ -839,6 +839,24 @@ describeDb('API integration', () => {
     expect(await sees()).toBe(true);
   });
 
+  it('lets administrators set the GB currency', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const set = async (currency: string): Promise<Response> =>
+      request('/api/admin/shop/currency', {
+        method: 'PUT',
+        headers: admin,
+        body: JSON.stringify({ currency }),
+      });
+    const eur = await set('EURC');
+    expect(eur.status).toBe(200);
+    expect(((await eur.json()) as { currency: string }).currency).toBe('EURC');
+    expect((await set('BTC')).status).toBe(400);
+    expect((await set('USDC')).status).toBe(200);
+  });
+
   it('counts a little overpayment, within the GB margin, as the exact price', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,

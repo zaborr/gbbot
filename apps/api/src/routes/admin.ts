@@ -16,6 +16,7 @@ import {
   updateAddressKeyRequest,
   updateAutoCancelRequest,
   updateOverpayMarginRequest,
+  updateShopCurrencyRequest,
   updateOrderFeeRequest,
   updateOrderStatusRequest,
   updateShippingRequest,
@@ -69,6 +70,7 @@ import {
   updateAddressKey,
   updateAutoCancel,
   updateOverpayMargin,
+  updateShopCurrency,
   updateOrderFee,
   updateShippingZones,
   updateShopProfile,
@@ -506,6 +508,10 @@ export function adminRoutes(): Hono<AppBindings> {
   // Unpaid orders are cancelled after this many hours (0 = never).
   app.put('/shop/auto-cancel', zValidator('json', updateAutoCancelRequest), async (c) =>
     c.json(await updateAutoCancel(c.get('db'), c.get('shopId'), c.req.valid('json').hours)),
+  );
+  // The GB's currency (administrators): the minimum, the margin and new products use it.
+  app.put('/shop/currency', requireOwner, zValidator('json', updateShopCurrencyRequest), async (c) =>
+    c.json(await updateShopCurrency(c.get('db'), c.get('shopId'), c.req.valid('json').currency)),
   );
   // Overpayment margin (administrators): a little too much counts as the price.
   app.put(

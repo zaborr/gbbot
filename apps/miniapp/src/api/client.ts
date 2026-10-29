@@ -718,6 +718,14 @@ export class ApiClient {
   }
 
   /** Hours without activity before an unpaid order is cancelled (0 = never). */
+  /** Administrators: the GB's currency (minimum, margin, new products). */
+  adminUpdateShopCurrency(currency: 'USDC' | 'EURC'): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/admin/shop/currency', {
+      method: 'PUT',
+      body: JSON.stringify({ currency }),
+    });
+  }
+
   /** Administrators: paying up to this much too much counts as the price (minor units). */
   adminUpdateOverpayMargin(amount: number): Promise<ShopAdminView> {
     return this.request<ShopAdminView>('/admin/shop/overpay-margin', {

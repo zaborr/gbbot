@@ -290,6 +290,9 @@ export const updateAutoCancelRequest = z.object({
 });
 export type UpdateAutoCancelRequest = z.infer<typeof updateAutoCancelRequest>;
 
+/** The GB's currency (the minimum, the margin and new products use it). */
+export const updateShopCurrencyRequest = z.object({ currency: z.enum(['USDC', 'EURC']) });
+
 /** The GB's overpayment margin, in minor units (up to 100.00). */
 export const updateOverpayMarginRequest = z.object({
   amount: z.number().int().min(0).max(10_000),
