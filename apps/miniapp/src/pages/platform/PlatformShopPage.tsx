@@ -71,8 +71,8 @@ function ShopForm({
   const [descriptionEn, setDescriptionEn] = useState(shop?.descriptionEn ?? '');
   const [textLang, setTextLang] = useState<TextLang>('es');
   const [imageUrl, setImageUrl] = useState(shop?.imageUrl ?? '');
-  const [visibility, setVisibility] = useState<'visible' | 'vip' | 'hidden'>(
-    !shop || !shop.isVisible ? 'hidden' : shop.vipOnly ? 'vip' : 'visible',
+  const [visibility, setVisibility] = useState<'visible' | 'vip' | 'guests' | 'hidden'>(
+    !shop || !shop.isVisible ? 'hidden' : shop.vipOnly ? (shop.allowGuests ? 'guests' : 'vip') : 'visible',
   );
   // Order is changed with the arrows in Platform; kept as it is here.
   const sortOrder = String(shop?.sortOrder ?? 0);
@@ -101,7 +101,8 @@ function ShopForm({
       descriptionEn: descriptionEn.trim() || null,
       imageUrl: image === '' ? null : image,
       isVisible: visibility !== 'hidden',
-      vipOnly: visibility === 'vip',
+      vipOnly: visibility === 'vip' || visibility === 'guests',
+      allowGuests: visibility === 'guests',
       sortOrder: order,
       admins: adminRefs,
       owners: ownerRefs,
@@ -181,6 +182,7 @@ function ShopForm({
             [
               ['visible', t('settings.visible')],
               ['vip', t('platformShop.vipOnly')],
+              ['guests', t('platformShop.vipGuests')],
               ['hidden', t('platformShop.hidden')],
             ] as const
           ).map(([value, label]) => (
@@ -199,7 +201,9 @@ function ShopForm({
             ? t('platformShop.customersSee')
             : visibility === 'vip'
               ? t('platformShop.onlyVip')
-              : t('platformShop.onlyAdmins')}
+              : visibility === 'guests'
+                ? t('platformShop.onlyVipGuests')
+                : t('platformShop.onlyAdmins')}
         </Cell>
       </Section>
 

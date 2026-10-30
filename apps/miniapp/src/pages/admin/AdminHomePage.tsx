@@ -47,7 +47,7 @@ function AdminHome(): React.JSX.Element {
   const visibility = !config.isVisible
     ? t('adminHome.stateHidden')
     : config.vipOnly
-      ? t('adminHome.stateVip')
+      ? t(config.allowGuests ? 'adminHome.stateVipGuests' : 'adminHome.stateVip')
       : t('adminHome.stateVisible');
 
   return (
@@ -144,6 +144,14 @@ function AdminHome(): React.JSX.Element {
           subtitle={config.vipOnly ? t('adminHome.vipOnlyShop') : t('adminHome.vipHint')}
         >
           {t('adminHome.vip')}
+        </Cell>
+        <Cell
+          onClick={go('/admin/guests')}
+          subtitle={
+            config.vipOnly && config.allowGuests ? t('adminHome.guestsOn') : t('adminHome.guestsHint')
+          }
+        >
+          {t('adminHome.guests')}
         </Cell>
         {config.canOwn && (
           <Cell onClick={go('/admin/blacklist')} subtitle={t('blacklist.hint')}>

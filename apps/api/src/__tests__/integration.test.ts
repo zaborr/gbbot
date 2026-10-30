@@ -1101,6 +1101,78 @@ describeDb('API integration', () => {
     await db.delete(shops).where(eq(shops.id, shopRef));
   });
 
+  it('lets guests into "VIP and guests" shops without making them VIPs', async () => {
+    const DAN_ID = 555000333;
+    const alice = await authToken(CUSTOMER_ID, 'Alice');
+    const dan = await authToken(DAN_ID, 'Dan');
+    const admin = await authToken(ADMIN_ID, 'Ivan');
+    await db.update(users).set({ username: 'Dan_Guest' }).where(eq(users.telegramId, DAN_ID));
+
+    const [shop] = await db
+      .insert(shops)
+      .values({
+        slug: `guests-${Date.now()}`,
+        name: 'Guest Shop',
+        description: '',
+        currency: 'USDC',
+        vipOnly: true,
+        allowGuests: true,
+        useGlobalVipClub: false,
+        useGlobalGuests: false,
+        guestList: { groups: [], userIds: [], usernames: ['dan_guest'] },
+      })
+      .returning();
+    const shopRef = shop!.id;
+    const listed = async (token: string): Promise<Array<{ id: string; isVip: boolean }>> => {
+      const res = await request('/api/shops', { headers: { Authorization: `Bearer ${token}` } });
+      return ((await res.json()) as { shops: Array<{ id: string; isVip: boolean }> }).shops;
+    };
+    const open = (token: string): Promise<Response> =>
+      Promise.resolve(
+        request('/api/shop', { headers: { Authorization: `Bearer ${token}`, 'X-Shop': shopRef } }),
+      );
+
+    // A guest sees it, but is not a VIP; the @username becomes the id.
+    expect((await listed(dan)).find((s) => s.id === shopRef)?.isVip).toBe(false);
+    const danOpens = await open(dan);
+    expect(danOpens.status).toBe(200);
+    expect(((await danOpens.json()) as { isVip: boolean }).isVip).toBe(false);
+    const [row] = await db.select().from(shops).where(eq(shops.id, shopRef));
+    expect(row?.guestList).toEqual({ groups: [], userIds: [DAN_ID], usernames: [] });
+    expect((await open(alice)).status).toBe(404);
+
+    // "Only VIP" again: guests no longer get in.
+    await db.update(shops).set({ allowGuests: false }).where(eq(shops.id, shopRef));
+    expect((await listed(dan)).some((s) => s.id === shopRef)).toBe(false);
+    expect((await open(dan)).status).toBe(404);
+    await db.update(shops).set({ allowGuests: true }).where(eq(shops.id, shopRef));
+
+    // The general guests count once the shop accepts them.
+    const adminAuth = { Authorization: `Bearer ${admin}`, 'content-type': 'application/json' };
+    const general = await request('/api/platform/guests', {
+      method: 'PUT',
+      headers: adminAuth,
+      body: JSON.stringify({ groups: [], userIds: [CUSTOMER_ID], usernames: [] }),
+    });
+    expect(general.status).toBe(200);
+    expect((await listed(alice)).some((s) => s.id === shopRef)).toBe(false);
+    const own = await request('/api/admin/shop/guests', {
+      method: 'PUT',
+      headers: { ...adminAuth, 'X-Shop': shopRef },
+      body: JSON.stringify({ groups: [], userIds: [], usernames: [], useGlobalClub: true }),
+    });
+    expect(await own.json()).toEqual({ groups: [], userIds: [], usernames: [], useGlobalClub: true });
+    expect((await listed(alice)).some((s) => s.id === shopRef)).toBe(true);
+    expect((await listed(dan)).some((s) => s.id === shopRef)).toBe(false);
+
+    await request('/api/platform/guests', {
+      method: 'PUT',
+      headers: adminAuth,
+      body: JSON.stringify({ groups: [], userIds: [], usernames: [] }),
+    });
+    await db.delete(shops).where(eq(shops.id, shopRef));
+  });
+
   it('copies products with variants and categories from another shop', async () => {
     const admin = await authToken(ADMIN_ID, 'Ivan');
     const auth = { Authorization: `Bearer ${admin}`, 'content-type': 'application/json' };

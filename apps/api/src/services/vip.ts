@@ -94,30 +94,61 @@ function normalizeClub(club: VipClub | null | undefined): VipClub {
   };
 }
 
-export async function getPlatformVipClub(db: Database): Promise<VipClub> {
-  const row = await db.query.platformSettings.findFirst({ where: eq(platformSettings.id, 1) });
-  return normalizeClub(row?.vipClub ?? EMPTY_VIP_CLUB);
+/**
+ * The two lists built the same way: VIPs (VIP prices, VIP-only products and
+ * GBs) and guests (only let in to "VIP and guests" GBs, at normal prices).
+ */
+export type ClubKind = 'vip' | 'guest';
+
+function ownClub(shop: ShopRow, kind: ClubKind): VipClub {
+  return normalizeClub(kind === 'vip' ? shop.vipClub : shop.guestList);
 }
 
-async function savePlatformClub(db: Database, club: VipClub): Promise<void> {
+function usesPlatformClub(shop: ShopRow, kind: ClubKind): boolean {
+  return kind === 'vip' ? shop.useGlobalVipClub : shop.useGlobalGuests;
+}
+
+async function saveShopClub(db: Database, shopId: string, kind: ClubKind, club: VipClub): Promise<void> {
+  await db
+    .update(shops)
+    .set(kind === 'vip' ? { vipClub: club } : { guestList: club })
+    .where(eq(shops.id, shopId));
+}
+
+export async function getPlatformClub(db: Database, kind: ClubKind): Promise<VipClub> {
+  const row = await db.query.platformSettings.findFirst({ where: eq(platformSettings.id, 1) });
+  return normalizeClub((kind === 'vip' ? row?.vipClub : row?.guestList) ?? EMPTY_VIP_CLUB);
+}
+
+export function getPlatformVipClub(db: Database): Promise<VipClub> {
+  return getPlatformClub(db, 'vip');
+}
+
+async function savePlatformClub(db: Database, club: VipClub, kind: ClubKind = 'vip'): Promise<void> {
+  const set = kind === 'vip' ? { vipClub: club } : { guestList: club };
   await db
     .insert(platformSettings)
-    .values({ id: 1, vipClub: club, updatedAt: new Date() })
-    .onConflictDoUpdate({ target: platformSettings.id, set: { vipClub: club, updatedAt: new Date() } });
+    .values({ id: 1, ...set, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: platformSettings.id, set: { ...set, updatedAt: new Date() } });
+}
+
+export function shopClubView(shop: ShopRow, kind: ClubKind): ShopVipClub {
+  return { ...ownClub(shop, kind), useGlobalClub: usesPlatformClub(shop, kind) };
 }
 
 export function shopVipClubView(shop: ShopRow): ShopVipClub {
-  return { ...normalizeClub(shop.vipClub), useGlobalClub: shop.useGlobalVipClub };
+  return shopClubView(shop, 'vip');
 }
 
 /**
- * Checks, for one user, whether they are a VIP of given shops. Loads the user
- * and the platform club once, however many shops are checked.
+ * Checks, for one user, whether they are in a list (VIPs or guests) of given
+ * shops. Loads the user and the platform list once, however many shops are checked.
  */
-export function createVipChecker(
+export function createClubChecker(
   db: Database,
   env: Env,
   userId: number,
+  kind: ClubKind,
   telegram = new TelegramApi(env.BOT_TOKEN),
 ): (shop: ShopRow) => Promise<boolean> {
   let context: Promise<{ username: string | null; platform: VipClub }> | null = null;
@@ -125,7 +156,7 @@ export function createVipChecker(
     context ??= (async () => {
       const [user, platform] = await Promise.all([
         db.query.users.findFirst({ where: eq(users.telegramId, userId) }),
-        getPlatformVipClub(db),
+        getPlatformClub(db, kind),
       ]);
       return { username: user?.username ?? null, platform };
     })();
@@ -134,22 +165,19 @@ export function createVipChecker(
 
   return async (shop) => {
     const { username, platform } = await load();
-    const own = normalizeClub(shop.vipClub);
-    const usesPlatform = shop.useGlobalVipClub;
+    const own = ownClub(shop, kind);
+    const usesPlatform = usesPlatformClub(shop, kind);
 
     // 1. Hand-made lists. A match by @username is turned into the id for good.
     const ownMatch = listMatch(own, userId, username);
     if (ownMatch === 'username' && username) {
-      await db
-        .update(shops)
-        .set({ vipClub: claimUsername(own, username, userId) })
-        .where(eq(shops.id, shop.id));
+      await saveShopClub(db, shop.id, kind, claimUsername(own, username, userId));
     }
     if (ownMatch) return true;
     if (usesPlatform) {
       const platformMatch = listMatch(platform, userId, username);
       if (platformMatch === 'username' && username) {
-        await savePlatformClub(db, claimUsername(platform, username, userId));
+        await savePlatformClub(db, claimUsername(platform, username, userId), kind);
       }
       if (platformMatch) return true;
     }
@@ -164,9 +192,23 @@ export function createVipChecker(
   };
 }
 
+export function createVipChecker(
+  db: Database,
+  env: Env,
+  userId: number,
+  telegram = new TelegramApi(env.BOT_TOKEN),
+): (shop: ShopRow) => Promise<boolean> {
+  return createClubChecker(db, env, userId, 'vip', telegram);
+}
+
 /** One-off check (e.g. when opening a single shop). */
 export function isVipOf(db: Database, env: Env, shop: ShopRow, userId: number): Promise<boolean> {
   return createVipChecker(db, env, userId)(shop);
+}
+
+/** Whether a "VIP and guests" GB lets this guest in (VIPs are checked apart). */
+export function isGuestOf(db: Database, env: Env, shop: ShopRow, userId: number): Promise<boolean> {
+  return createClubChecker(db, env, userId, 'guest')(shop);
 }
 
 /**
@@ -235,30 +277,52 @@ async function clubFromRequest(
   };
 }
 
-export async function updatePlatformVipClub(
+export async function updatePlatformClub(
+  db: Database,
+  env: Env,
+  input: UpdateVipClubRequest,
+  kind: ClubKind,
+  telegram = new TelegramApi(env.BOT_TOKEN),
+): Promise<VipClub> {
+  const club = await clubFromRequest(env, input, await getPlatformClub(db, kind), telegram);
+  await savePlatformClub(db, club, kind);
+  return club;
+}
+
+export function updatePlatformVipClub(
   db: Database,
   env: Env,
   input: UpdateVipClubRequest,
   telegram = new TelegramApi(env.BOT_TOKEN),
 ): Promise<VipClub> {
-  const club = await clubFromRequest(env, input, await getPlatformVipClub(db), telegram);
-  await savePlatformClub(db, club);
-  return club;
+  return updatePlatformClub(db, env, input, 'vip', telegram);
 }
 
-export async function updateShopVipClub(
+export async function updateShopClub(
+  db: Database,
+  env: Env,
+  shop: ShopRow,
+  input: UpdateVipClubRequest,
+  kind: ClubKind,
+  telegram = new TelegramApi(env.BOT_TOKEN),
+): Promise<ShopVipClub> {
+  const club = await clubFromRequest(env, input, ownClub(shop, kind), telegram);
+  const useGlobal = input.useGlobalClub ?? usesPlatformClub(shop, kind);
+  const [row] = await db
+    .update(shops)
+    .set(kind === 'vip' ? { vipClub: club, useGlobalVipClub: useGlobal } : { guestList: club, useGlobalGuests: useGlobal })
+    .where(eq(shops.id, shop.id))
+    .returning();
+  if (!row) throw ApiError.notFound('Shop not found');
+  return shopClubView(row, kind);
+}
+
+export function updateShopVipClub(
   db: Database,
   env: Env,
   shop: ShopRow,
   input: UpdateVipClubRequest,
   telegram = new TelegramApi(env.BOT_TOKEN),
 ): Promise<ShopVipClub> {
-  const club = await clubFromRequest(env, input, normalizeClub(shop.vipClub), telegram);
-  const [row] = await db
-    .update(shops)
-    .set({ vipClub: club, useGlobalVipClub: input.useGlobalClub ?? shop.useGlobalVipClub })
-    .where(eq(shops.id, shop.id))
-    .returning();
-  if (!row) throw ApiError.notFound('Shop not found');
-  return shopVipClubView(row);
+  return updateShopClub(db, env, shop, input, 'vip', telegram);
 }

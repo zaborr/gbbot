@@ -36,6 +36,8 @@ export const shop = z.object({
   isVisible: z.boolean(),
   /** Visible only to VIP club members (and admins). Only matters while visible. */
   vipOnly: z.boolean(),
+  /** With `vipOnly`: its guests see it too, at normal prices. */
+  allowGuests: z.boolean(),
   /** When the GB was closed (no new orders), or null while open. */
   closedAt: isoDateTime.nullable(),
   /** Scheduled closing, or null. */
@@ -116,6 +118,7 @@ export const shopConfig = shop
     imageUrl: true,
     isVisible: true,
     vipOnly: true,
+    allowGuests: true,
     closedAt: true,
     closesAt: true,
     closingWarnHours: true,
@@ -171,6 +174,7 @@ export const shopSummary = shop
     imageUrl: true,
     isVisible: true,
     vipOnly: true,
+    allowGuests: true,
     closesAt: true,
   })
   .extend({
@@ -221,6 +225,7 @@ export const platformShopInput = shopProfileInput.extend({
   slug,
   isVisible: z.boolean(),
   vipOnly: z.boolean(),
+  allowGuests: z.boolean().default(false),
   sortOrder: z.number().int().min(-1000).max(1000),
   /** Managers: ids and @usernames; unknown @usernames wait until they open the app. */
   admins: z.array(personRef).max(50),
@@ -237,6 +242,8 @@ export type OrganizerShopInput = z.infer<typeof organizerShopInput>;
 export const ownerSettingsInput = z.object({
   isVisible: z.boolean(),
   vipOnly: z.boolean(),
+  /** With `vipOnly`: the guests see it too. */
+  allowGuests: z.boolean().default(false),
   /** Administrators: at least one, unless a super-admin leaves the GB to the platform. */
   owners: z.array(personRef).max(20),
   /** Managers. */

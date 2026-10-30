@@ -52,6 +52,8 @@ export const shops = pgTable('shops', {
   isVisible: boolean('is_visible').notNull().default(true),
   /** Visible shops only show to VIP club members (and admins). */
   vipOnly: boolean('vip_only').notNull().default(false),
+  /** With `vipOnly`: the guests see it too (at normal prices). */
+  allowGuests: boolean('allow_guests').notNull().default(false),
   /** Closed: no new orders; existing ones can still be looked at and managed. */
   closedAt: timestamp('closed_at', { withTimezone: true }),
   /** Scheduled closing: from this moment the GB is closed. */
@@ -68,6 +70,10 @@ export const shops = pgTable('shops', {
   vipClub: jsonb('vip_club').$type<VipClub>().notNull().default({ groups: [], userIds: [], usernames: [] }),
   /** Whether members of the platform's VIP club count as VIPs here too. */
   useGlobalVipClub: boolean('use_global_vip_club').notNull().default(true),
+  /** Guests: may see the GB when it is "VIP and guests only", without VIP prices. */
+  guestList: jsonb('guest_list').$type<VipClub>().notNull().default({ groups: [], userIds: [], usernames: [] }),
+  /** Whether the platform's guests count as guests here too. */
+  useGlobalGuests: boolean('use_global_guests').notNull().default(true),
   /** People who must not see this GB (ids, and @usernames not seen yet). */
   blacklist: jsonb('blacklist').$type<Blacklist>().notNull().default({ userIds: [], usernames: [] }),
   sortOrder: integer('sort_order').notNull().default(0),
@@ -296,6 +302,8 @@ export const platformSettings = pgTable('platform_settings', {
   lastRetentionRunAt: timestamp('last_retention_run_at', { withTimezone: true }),
   /** The platform-wide VIP club (shops can count its members as their VIPs). */
   vipClub: jsonb('vip_club').$type<VipClub>().notNull().default({ groups: [], userIds: [], usernames: [] }),
+  /** The platform-wide guests (shops can count them as their guests). */
+  guestList: jsonb('guest_list').$type<VipClub>().notNull().default({ groups: [], userIds: [], usernames: [] }),
   /** Organisers: may create GBs and run the ones they own. */
   organizerIds: jsonb('organizer_ids').$type<number[]>().notNull().default([]),
   /** Organisers added by @username not seen yet (lowercase, no "@"). */

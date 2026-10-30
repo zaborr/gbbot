@@ -38,8 +38,8 @@ function OwnerForm({ team, onSaved }: { team: ShopTeam; onSaved: () => void }): 
   const navigate = useNavigate();
   const { shop, reload } = useShop();
   const actions = useAdminActions(() => undefined);
-  const [visibility, setVisibility] = useState<'visible' | 'vip' | 'hidden'>(
-    !shop.isVisible ? 'hidden' : shop.vipOnly ? 'vip' : 'visible',
+  const [visibility, setVisibility] = useState<'visible' | 'vip' | 'guests' | 'hidden'>(
+    !shop.isVisible ? 'hidden' : shop.vipOnly ? (shop.allowGuests ? 'guests' : 'vip') : 'visible',
   );
   const [owners, setOwners] = useState(peopleText(team.owners, team.pendingOwnerUsernames));
   const [admins, setAdmins] = useState(peopleText(team.admins, team.pendingUsernames));
@@ -68,7 +68,8 @@ function OwnerForm({ team, onSaved }: { team: ShopTeam; onSaved: () => void }): 
     await actions.run(async () => {
       await api.adminUpdateOwnerSettings({
         isVisible: visibility !== 'hidden',
-        vipOnly: visibility === 'vip',
+        vipOnly: visibility === 'vip' || visibility === 'guests',
+        allowGuests: visibility === 'guests',
         owners: ownerRefs,
         admins: refs,
       });
@@ -92,6 +93,7 @@ function OwnerForm({ team, onSaved }: { team: ShopTeam; onSaved: () => void }): 
             [
               ['visible', t('settings.visible')],
               ['vip', t('platformShop.vipOnly')],
+              ['guests', t('platformShop.vipGuests')],
               ['hidden', t('platformShop.hidden')],
             ] as const
           ).map(([value, label]) => (
@@ -110,7 +112,9 @@ function OwnerForm({ team, onSaved }: { team: ShopTeam; onSaved: () => void }): 
             ? t('platformShop.customersSee')
             : visibility === 'vip'
               ? t('platformShop.onlyVip')
-              : t('platformShop.onlyAdmins')}
+              : visibility === 'guests'
+                ? t('platformShop.onlyVipGuests')
+                : t('platformShop.onlyAdmins')}
         </Cell>
       </Section>
 

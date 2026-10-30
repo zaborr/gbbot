@@ -387,6 +387,18 @@ export class ApiClient {
     });
   }
 
+  /** The platform-wide guests. */
+  platformGetGuests(): Promise<VipClub> {
+    return this.request<VipClub>('/platform/guests');
+  }
+
+  platformUpdateGuests(input: UpdateVipClubRequest): Promise<VipClub> {
+    return this.request<VipClub>('/platform/guests', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
+  }
+
   /** The platform-wide VIP club. */
   platformGetVipClub(): Promise<VipClub> {
     return this.request<VipClub>('/platform/vip-club');
@@ -668,6 +680,18 @@ export class ApiClient {
   adminCloneProducts(input: CloneProductsRequest): Promise<CloneProductsResult> {
     return this.request<CloneProductsResult>('/admin/clone', {
       method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  /** The shop's guests (same shape as a VIP club). */
+  adminGetGuests(): Promise<ShopVipClub> {
+    return this.request<ShopVipClub>('/admin/shop/guests');
+  }
+
+  adminUpdateGuests(input: UpdateVipClubRequest): Promise<ShopVipClub> {
+    return this.request<ShopVipClub>('/admin/shop/guests', {
+      method: 'PUT',
       body: JSON.stringify(input),
     });
   }

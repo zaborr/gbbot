@@ -195,7 +195,7 @@ function ProfileForm({
               !view.isVisible
                 ? t('shops.hidden')
                 : view.vipOnly
-                  ? t('platformShop.vipOnly')
+                  ? t(view.allowGuests ? 'platformShop.vipGuests' : 'platformShop.vipOnly')
                   : t('settings.visible')
             }
           >

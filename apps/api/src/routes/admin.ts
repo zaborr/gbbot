@@ -94,7 +94,7 @@ import {
 } from '../services/blacklist.js';
 import { tr } from '../i18n/messages.js';
 import { describeCustomer } from '../services/customers.js';
-import { shopVipClubView, updateShopVipClub } from '../services/vip.js';
+import { shopClubView, shopVipClubView, updateShopClub, updateShopVipClub } from '../services/vip.js';
 import { cloneProducts, listCloneSources } from '../services/clone.js';
 import { closePreview, closeShop, reopenShop, scheduleClosing } from '../services/closing.js';
 import { announceGoalMilestones, updateGoal } from '../services/goal.js';
@@ -408,6 +408,13 @@ export function adminRoutes(): Hono<AppBindings> {
   app.put('/shop/vip-club', zValidator('json', updateVipClubRequest), async (c) =>
     c.json(
       await updateShopVipClub(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('json')),
+    ),
+  );
+  // The shop's guests: they see it when it is "VIP and guests only".
+  app.get('/shop/guests', (c) => c.json(shopClubView(c.get('shop'), 'guest')));
+  app.put('/shop/guests', zValidator('json', updateVipClubRequest), async (c) =>
+    c.json(
+      await updateShopClub(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('json'), 'guest'),
     ),
   );
   app.put('/shop/profile', zValidator('json', shopProfileInput), async (c) =>
