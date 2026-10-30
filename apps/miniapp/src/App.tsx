@@ -27,6 +27,7 @@ import { AdminAddressKeyPage } from './pages/admin/AdminAddressKeyPage.js';
 import { AdminExportPage, AdminShippingListPage } from './pages/admin/AdminExportPage.js';
 import { AdminGoalPage } from './pages/admin/AdminGoalPage.js';
 import { AdminVipPage } from './pages/admin/AdminVipPage.js';
+import { AdminGuestsPage } from './pages/admin/AdminGuestsPage.js';
 import { AdminClonePage } from './pages/admin/AdminClonePage.js';
 import { AdminClosePage } from './pages/admin/AdminClosePage.js';
 import { AdminOwnerPage } from './pages/admin/AdminOwnerPage.js';
@@ -44,6 +45,7 @@ import { PlatformPage } from './pages/platform/PlatformPage.js';
 import { PlatformShopPage } from './pages/platform/PlatformShopPage.js';
 import { PlatformRetentionPage } from './pages/platform/PlatformRetentionPage.js';
 import { PlatformVipPage } from './pages/platform/PlatformVipPage.js';
+import { PlatformGuestsPage } from './pages/platform/PlatformGuestsPage.js';
 import { PlatformOrganizersPage } from './pages/platform/PlatformOrganizersPage.js';
 import { PlatformNoticesPage } from './pages/platform/PlatformNoticesPage.js';
 import { WebAccessPage } from './pages/WebAccessPage.js';
@@ -96,6 +98,7 @@ function Shell(): React.JSX.Element {
       <Route path="/platform/shops/:id" element={<PlatformShopPage />} />
       <Route path="/platform/retention" element={<PlatformRetentionPage />} />
       <Route path="/platform/vip" element={<PlatformVipPage />} />
+      <Route path="/platform/guests" element={<PlatformGuestsPage />} />
       <Route path="/platform/organizers" element={<PlatformOrganizersPage />} />
       <Route path="/platform/notices" element={<PlatformNoticesPage />} />
       <Route path="/platform/blacklist" element={<PlatformBlacklistPage />} />
@@ -128,6 +131,7 @@ function Shell(): React.JSX.Element {
         <Route path="admin/shipping-list" element={<AdminShippingListPage />} />
         <Route path="admin/goal" element={<AdminGoalPage />} />
         <Route path="admin/vip" element={<AdminVipPage />} />
+        <Route path="admin/guests" element={<AdminGuestsPage />} />
         <Route path="admin/clone" element={<AdminClonePage />} />
         <Route path="admin/close" element={<AdminClosePage />} />
         <Route path="admin/owner" element={<AdminOwnerPage />} />

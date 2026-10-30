@@ -116,7 +116,7 @@ export function CatalogPage(): React.JSX.Element {
   });
 
   const headerLine = [
-    !shop.isVisible ? t('catalog.hiddenShop') : shop.vipOnly ? t('catalog.vipShop') : null,
+    !shop.isVisible ? t('catalog.hiddenShop') : shop.vipOnly ? t(shop.allowGuests ? 'catalog.guestShop' : 'catalog.vipShop') : null,
     // Far from the closing: just a short line here (the big notice comes later).
     !shop.isClosed && shop.closesAt && !closingSoon(shop)
       ? t('shops.closes', { date: closingDate(shop.closesAt) })

@@ -32,7 +32,13 @@ export function ShopCard({
         ? { text: t('shops.closes', { date: closingDate(shop.closesAt) }), kind: 'warn' }
         : null,
     shop.isVisible ? null : { text: t('shops.hidden'), kind: '' },
-    shop.isVisible && shop.vipOnly ? { text: t('shops.vip'), kind: 'vip' } : null,
+    shop.isVisible && shop.vipOnly
+      ? {
+          // A guest is let in, but is not a VIP.
+          text: shop.isVip || !shop.allowGuests ? t('shops.vip') : t(shop.canManage ? 'shops.vipGuests' : 'shops.guest'),
+          kind: 'vip',
+        }
+      : null,
     shop.canManage ? { text: t('shops.youManage'), kind: 'info' } : null,
   ].filter((c): c is { text: string; kind: string } => c !== null);
 

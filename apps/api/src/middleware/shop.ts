@@ -5,7 +5,7 @@ import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { ApiError } from '../lib/errors.js';
 import { canManageShop, resolveShop } from '../services/shop.js';
-import { isVipOf } from '../services/vip.js';
+import { isGuestOf, isVipOf } from '../services/vip.js';
 import { isBlocked } from '../services/blacklist.js';
 import { canOwnShop } from '../services/team.js';
 import { disclaimerPending } from '../services/disclaimer.js';
@@ -31,7 +31,8 @@ export async function peekUserId(
 /**
  * Resolves the shop named by the `X-Shop` header (id or slug) and whether the
  * caller can manage it. Hidden shops behave as missing for everyone else, and
- * VIP-only shops for anyone who is not in their VIP club.
+ * VIP-only shops for anyone who is not in their VIP club (or, when the GB
+ * lets them in, in its guest list).
  */
 export const withShop = createMiddleware<AppBindings>(async (c, next) => {
   const env = c.get('env');
@@ -45,7 +46,10 @@ export const withShop = createMiddleware<AppBindings>(async (c, next) => {
   }
   // VIPs matter everywhere now (VIP prices, no fee), not only in VIP-only GBs.
   const isVip = userId !== undefined ? await isVipOf(c.get('db'), env, shop, userId) : false;
-  if (shop.vipOnly && !canManage && !isVip) throw ApiError.notFound('Shop not found');
+  if (shop.vipOnly && !canManage && !isVip) {
+    const guest = userId !== undefined && shop.allowGuests && (await isGuestOf(c.get('db'), env, shop, userId));
+    if (!guest) throw ApiError.notFound('Shop not found');
+  }
   // A closed GB is still open for consultation to those who ordered in it.
   if (isClosedAt(shop) && !canManage) {
     const ordered =

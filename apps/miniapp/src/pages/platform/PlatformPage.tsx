@@ -56,6 +56,7 @@ function Platform(): React.JSX.Element {
         <Cell onClick={() => navigate('/import-gb')}>{t('shops.importGb')}</Cell>
         <Cell onClick={() => navigate('/platform/organizers')}>{t('platform.organizers')}</Cell>
         <Cell onClick={() => navigate('/platform/vip')}>{t('platform.vipClub')}</Cell>
+        <Cell onClick={() => navigate('/platform/guests')}>{t('platform.guests')}</Cell>
         <Cell onClick={() => navigate('/platform/blacklist')}>{t('platform.blacklist')}</Cell>
         <Cell onClick={() => navigate('/platform/retention')}>{t('platform.retention')}</Cell>
         {webRole === 'platform' && (
@@ -92,7 +93,7 @@ function Platform(): React.JSX.Element {
                     {!shop.isVisible
                       ? t('platform.hidden')
                       : shop.vipOnly
-                        ? t('platform.vipOnly')
+                        ? t(shop.allowGuests ? 'platform.vipGuests' : 'platform.vipOnly')
                         : t('platform.visible')}
                   </span>
                   {shop.paymentMethods.length + shop.manualMethods.length === 0 ? (

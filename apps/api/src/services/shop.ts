@@ -18,7 +18,7 @@ import { cartItems, carts, categories, orders, products, shops } from '../db/sch
 import { toShopAdminDTO, toShopConfigDTO, toShopSummaryDTO } from '../db/mappers.js';
 import { ApiError } from '../lib/errors.js';
 import { getPlatformBlacklist } from './blacklist.js';
-import { createVipChecker } from './vip.js';
+import { createClubChecker, createVipChecker } from './vip.js';
 import { loadPeople, organizerTags, resolvePeople } from './team.js';
 import { goalProgressOf, goalTotals } from './goal.js';
 
@@ -61,7 +61,7 @@ export async function resolveShop(db: Database, ref: string | undefined): Promis
 
 /**
  * Shops shown on the start screen: visible ones (VIP-only ones just for their
- * VIPs), plus any the user manages.
+ * VIPs, and their guests when the GB lets them in), plus any the user manages.
  */
 export async function listShops(db: Database, env: Env, userId: number): Promise<ShopSummary[]> {
   const rows = await db
@@ -69,6 +69,7 @@ export async function listShops(db: Database, env: Env, userId: number): Promise
     .from(shops)
     .orderBy(asc(shops.sortOrder), asc(shops.createdAt));
   const isVip = createVipChecker(db, env, userId);
+  const isGuest = createClubChecker(db, env, userId, 'guest');
   const blacklist = await getPlatformBlacklist(db);
   const globallyBlocked = blacklist.userIds.includes(userId);
   const [activity, people] = await Promise.all([
@@ -89,10 +90,11 @@ export async function listShops(db: Database, env: Env, userId: number): Promise
     // Blacklisted (here or on the whole platform): the GB does not exist for them.
     if (!canManage && (globallyBlocked || (row.blacklist?.userIds ?? []).includes(userId))) continue;
     const vip = row.isVisible && row.vipOnly ? await isVip(row) : false;
+    const admitted = !row.vipOnly || vip || (row.allowGuests && !canManage && (await isGuest(row)));
     const mine = activity.get(row.id);
     // A closed GB stays listed only for those who have orders in it.
     const closedForThem = isClosedAt(row) && (mine?.orders ?? 0) === 0;
-    if (canManage || (row.isVisible && (!row.vipOnly || vip) && !closedForThem)) {
+    if (canManage || (row.isVisible && admitted && !closedForThem)) {
       result.push(
         toShopSummaryDTO(
           row,
@@ -495,6 +497,7 @@ export async function updateOwnerSettings(
   const after = await updateShop(db, shopId, {
     isVisible: input.isVisible,
     vipOnly: input.vipOnly,
+    allowGuests: input.vipOnly && input.allowGuests,
     ...team,
   });
   return { before, after };

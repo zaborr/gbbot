@@ -21,8 +21,11 @@ export function VipClubEditor({
   useGlobalClub,
   onSave,
   title,
+  kind = 'vip',
 }: {
   club: VipClub;
+  /** VIP club, or guest list (same shape, other texts). */
+  kind?: 'vip' | 'guest';
   /** Screen title (the admin menu's words). */
   title?: string;
   /** Shops only: whether the platform's members also count. */
@@ -72,7 +75,7 @@ export function VipClubEditor({
       <ErrorBanner message={actions.error} />
 
       <Section>
-        <Cell multiline>{t('vip.intro')}</Cell>
+        <Cell multiline>{t(kind === 'guest' ? 'guests.intro' : 'vip.intro')}</Cell>
       </Section>
 
       <Section header={t('vip.groups')} footer={t('vip.groupsFooter')}>
@@ -132,7 +135,7 @@ export function VipClubEditor({
       </Section>
 
       {useGlobalClub !== undefined && (
-        <Section footer={t('vip.globalFooter')}>
+        <Section footer={t(kind === 'guest' ? 'guests.globalFooter' : 'vip.globalFooter')}>
           <Cell
             Component="label"
             after={
@@ -146,7 +149,7 @@ export function VipClubEditor({
             }
             multiline
           >
-            {t('vip.useGlobal')}
+            {t(kind === 'guest' ? 'guests.useGlobal' : 'vip.useGlobal')}
           </Cell>
         </Section>
       )}
