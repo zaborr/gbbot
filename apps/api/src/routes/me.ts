@@ -12,6 +12,8 @@ import type { Env } from '../config/env.js';
 import { requireAuth, requireTelegramUser } from '../auth/middleware.js';
 import { setPreferredLanguage } from '../services/users.js';
 import { toSessionUserDTO } from '../db/mappers.js';
+import { eq } from 'drizzle-orm';
+import { users } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 import { tr, type BotMessageKey } from '../i18n/messages.js';
 import { describeUser, managesSomething } from '../services/team.js';
@@ -33,6 +35,16 @@ export function meRoutes(): Hono<AppBindings> {
     const { sub, role } = c.get('claims');
     const row = await setPreferredLanguage(c.get('db'), sub, c.req.valid('json').language);
     return c.json(toSessionUserDTO(row, role));
+  });
+
+  // Closed "how it works": not shown again on any device.
+  app.post('/how-to-seen', async (c) => {
+    await c
+      .get('db')
+      .update(users)
+      .set({ howToSeen: true })
+      .where(eq(users.telegramId, c.get('claims').sub));
+    return c.json({ ok: true });
   });
 
   /*
