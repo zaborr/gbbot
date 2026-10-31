@@ -101,7 +101,8 @@ export async function listShops(db: Database, env: Env, userId: number): Promise
           canManage,
           vip,
           mine,
-          organizerTags(row, people),
+          // Hidden by the GB: customers do not even receive the names.
+          canManage || row.showOrganizers ? organizerTags(row, people) : [],
           goalProgressOf(row, totals.get(row.id), canManage),
         ),
       );
@@ -498,6 +499,7 @@ export async function updateOwnerSettings(
     isVisible: input.isVisible,
     vipOnly: input.vipOnly,
     allowGuests: input.vipOnly && input.allowGuests,
+    ...(input.showOrganizers === undefined ? {} : { showOrganizers: input.showOrganizers }),
     ...team,
   });
   return { before, after };

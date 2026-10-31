@@ -38,6 +38,8 @@ export const shop = z.object({
   vipOnly: z.boolean(),
   /** With `vipOnly`: its guests see it too, at normal prices. */
   allowGuests: z.boolean(),
+  /** Customers see "Organised by" with the team's names (the team always does). */
+  showOrganizers: z.boolean(),
   /** When the GB was closed (no new orders), or null while open. */
   closedAt: isoDateTime.nullable(),
   /** Scheduled closing, or null. */
@@ -119,6 +121,7 @@ export const shopConfig = shop
     isVisible: true,
     vipOnly: true,
     allowGuests: true,
+    showOrganizers: true,
     closedAt: true,
     closesAt: true,
     closingWarnHours: true,
@@ -175,6 +178,7 @@ export const shopSummary = shop
     isVisible: true,
     vipOnly: true,
     allowGuests: true,
+    showOrganizers: true,
     closesAt: true,
   })
   .extend({
@@ -244,6 +248,8 @@ export const ownerSettingsInput = z.object({
   vipOnly: z.boolean(),
   /** With `vipOnly`: the guests see it too. */
   allowGuests: z.boolean().default(false),
+  /** Customers see "Organised by"; unchanged when left out. */
+  showOrganizers: z.boolean().optional(),
   /** Administrators: at least one, unless a super-admin leaves the GB to the platform. */
   owners: z.array(personRef).max(20),
   /** Managers. */

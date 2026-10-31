@@ -38,6 +38,7 @@ export const gbSnapshot = z.object({
     allowGuests: z.boolean().default(false),
     guestList: vipClub.default({ groups: [], userIds: [], usernames: [] }),
     useGlobalGuests: z.boolean().default(true),
+    showOrganizers: z.boolean().default(true),
     /** Text to accept before entering, or null. */
     disclaimer: z.string().max(4000).nullable(),
     goalAmount: z.number().int().positive().nullable().default(null),

@@ -57,7 +57,7 @@ export function ShopCard({
         <div style={{ fontSize: 19, fontWeight: 700, lineHeight: '24px' }}>{shopName(shop)}</div>
         {shop.organizers.length > 0 && (
           <div className="gb-hint" style={{ fontSize: 14 }}>
-            <OrganizedBy organizers={shop.organizers} />
+            <OrganizedBy organizers={shop.organizers} hidden={shop.canManage && !shop.showOrganizers} />
           </div>
         )}
         {description && <div className="gb-hint">{description}</div>}

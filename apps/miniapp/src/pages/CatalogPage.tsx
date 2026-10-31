@@ -135,7 +135,7 @@ export function CatalogPage(): React.JSX.Element {
             headerLine || shop.organizers.length > 0 ? (
               <>
                 {headerLine}
-                <OrganizedBy organizers={shop.organizers} />
+                <OrganizedBy organizers={shop.organizers} hidden={shop.canManage && !shop.showOrganizers} />
               </>
             ) : undefined
           }

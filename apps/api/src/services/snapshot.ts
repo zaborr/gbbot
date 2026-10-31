@@ -60,6 +60,7 @@ export async function takeSnapshot(db: Database, shop: ShopRow): Promise<GbSnaps
       allowGuests: shop.allowGuests,
       guestList: shop.guestList ?? EMPTY_VIP_CLUB,
       useGlobalGuests: shop.useGlobalGuests,
+      showOrganizers: shop.showOrganizers,
       disclaimer: shop.disclaimerVersion > 0 ? shop.disclaimer : null,
       goalAmount: shop.goalAmount,
       goalShowAmount: shop.goalShowAmount,
@@ -129,6 +130,7 @@ export async function restoreSnapshot(
         allowGuests: s.vipOnly && s.allowGuests,
         guestList: s.guestList,
         useGlobalGuests: s.useGlobalGuests,
+        showOrganizers: s.showOrganizers,
         // A web administrator manages every GB already; it is not listed as its administrator.
         ownerIds: target.ownerId < 0 ? [] : [target.ownerId],
         paymentSetup: s.paymentSetup,
