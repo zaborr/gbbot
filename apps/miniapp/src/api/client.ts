@@ -58,6 +58,8 @@ export interface ShopsResponse {
   isOrganizer: boolean;
   /** Manages something, so may activate web access. */
   canUseWeb?: boolean;
+  /** Show "how it works" (first visit only). */
+  showHowTo?: boolean;
 }
 
 export interface ShopContents {
@@ -226,6 +228,11 @@ export class ApiClient {
       method: 'PUT',
       body: JSON.stringify({ language }),
     });
+  }
+
+  /** Closed "how it works": not shown again on any device. */
+  markHowToSeen(): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>('/me/how-to-seen', { method: 'POST' });
   }
 
   // --- shops & platform ---

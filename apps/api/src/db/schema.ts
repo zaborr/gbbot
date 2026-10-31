@@ -193,6 +193,8 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   /** Last time they opened the Mini App; inactive users are deleted (retention). */
   lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+  /** Closed the "how it works" sheet (kept here so it shows once on every device). */
+  howToSeen: boolean('how_to_seen').notNull().default(false),
 });
 
 export const carts = pgTable(

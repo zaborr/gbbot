@@ -147,7 +147,7 @@ export function ShopsPage(): React.JSX.Element {
         </Section>
       )}
       <LanguagePicker />
-      {!isWebMode() && shops.length > 0 && <HowItWorks />}
+      {!isWebMode() && shops.length > 0 && result.data?.showHowTo && <HowItWorks />}
     </List>
   );
 }

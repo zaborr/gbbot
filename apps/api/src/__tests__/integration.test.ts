@@ -1173,6 +1173,21 @@ describeDb('API integration', () => {
     await db.delete(shops).where(eq(shops.id, shopRef));
   });
 
+  it('shows "how it works" once per account, and not to customers', async () => {
+    const newcomer = await authToken(555000444, 'Nina');
+    const auth = { Authorization: `Bearer ${newcomer}` };
+    const showHowTo = async (token: string): Promise<boolean | undefined> => {
+      const res = await request('/api/shops', { headers: { Authorization: `Bearer ${token}` } });
+      return ((await res.json()) as { showHowTo?: boolean }).showHowTo;
+    };
+    expect(await showHowTo(newcomer)).toBe(true);
+    const seen = await request('/api/me/how-to-seen', { method: 'POST', headers: auth });
+    expect(seen.status).toBe(200);
+    expect(await showHowTo(newcomer)).toBe(false);
+    // The team never gets it.
+    expect(await showHowTo(await authToken(ADMIN_ID, 'Ivan'))).toBe(false);
+  });
+
   it('copies products with variants and categories from another shop', async () => {
     const admin = await authToken(ADMIN_ID, 'Ivan');
     const auth = { Authorization: `Bearer ${admin}`, 'content-type': 'application/json' };
