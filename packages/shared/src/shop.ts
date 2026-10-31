@@ -20,6 +20,36 @@ export const shippingZone = z.object({
 });
 export type ShippingZone = z.infer<typeof shippingZone>;
 
+/** How checkout treats one piece of the customer's data. */
+export const fieldMode = z.enum(['off', 'optional', 'required']);
+export type FieldMode = z.infer<typeof fieldMode>;
+
+/**
+ * What checkout asks for. The Telegram @ is kept on the order as it is; the
+ * rest goes in the block encrypted on the customer's device (with the postal
+ * address, asked whenever the GB ships), so it needs the GB's address key.
+ */
+export const checkoutFields = z.object({
+  contact: z.enum(['optional', 'required']),
+  name: fieldMode,
+  email: fieldMode,
+  phone: fieldMode,
+  notes: fieldMode,
+});
+export type CheckoutFields = z.infer<typeof checkoutFields>;
+
+/** Only the Telegram @ (a GB that ships always asks for the name too). */
+export const DEFAULT_CHECKOUT_FIELDS: CheckoutFields = {
+  contact: 'required',
+  name: 'off',
+  email: 'off',
+  phone: 'off',
+  notes: 'off',
+};
+
+/** The fields kept in the encrypted block (all but the Telegram @). */
+export const ENCRYPTED_FIELDS = ['name', 'email', 'phone', 'notes'] as const;
+
 export const shop = z.object({
   id,
   /** URL-friendly unique name, e.g. `tea-shop`. */
@@ -66,6 +96,8 @@ export const shop = z.object({
   overpayMargin: z.number().int().nonnegative(),
   /** Shipping zones; with active ones, checkout asks for a zone and an address. */
   shippingZones: z.array(shippingZone),
+  /** What checkout asks for. */
+  checkoutFields,
   /**
    * Public key (RSA-OAEP, base64 SPKI) the customer's device encrypts the
    * address with. Only the shop admin, holding the private key, can read it.
@@ -133,6 +165,7 @@ export const shopConfig = shop
     autoCancelHours: true,
     overpayMargin: true,
     shippingZones: true,
+    checkoutFields: true,
     addressPublicKey: true,
     addressKeyFingerprint: true,
   })
@@ -283,6 +316,9 @@ export const updateOrganizersRequest = z.object({
 });
 export type UpdateOrganizersRequest = z.infer<typeof updateOrganizersRequest>;
 
+/** Saving what checkout asks for. */
+export const updateCheckoutFieldsRequest = checkoutFields;
+
 export const updateShippingRequest = z.object({
   zones: z
     .array(shippingZone.extend({ id: z.string().min(1).max(64).optional() }))
@@ -327,9 +363,13 @@ export const updatePaymentSetupRequest = paymentSetup.refine(
   { message: 'Each accepted network needs its receiving address' },
 );
 
-/** What the customer types; encrypted on their device before it is sent. */
+/**
+ * What the customer types (postal address and other details); encrypted on
+ * their device before it is sent. Orders from before `email` existed lack it.
+ */
 export interface DeliveryAddress {
   name: string;
+  email?: string;
   line1: string;
   line2: string;
   postalCode: string;

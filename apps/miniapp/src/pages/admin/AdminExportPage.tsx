@@ -186,6 +186,7 @@ function AdminExport({ part }: { part: 'files' | 'shipping' }): React.JSX.Elemen
           t('csv.username'),
           t('csv.zone'),
           t('csv.name'),
+          t('csv.email'),
           t('csv.address'),
           t('csv.address2'),
           t('csv.postalCode'),
@@ -211,6 +212,7 @@ function AdminExport({ part }: { part: 'files' | 'shipping' }): React.JSX.Elemen
               a.line2,
               [a.postalCode, a.city].filter(Boolean).join(' '),
               [a.region, a.country].filter(Boolean).join(', '),
+              a.email,
               a.phone,
               a.notes,
             ]
@@ -224,6 +226,7 @@ function AdminExport({ part }: { part: 'files' | 'shipping' }): React.JSX.Elemen
             o.contactUsername ? `@${o.contactUsername}` : '',
             o.shippingZoneName ?? '',
             a.name,
+            a.email ?? '',
             a.line1,
             a.line2,
             a.postalCode,

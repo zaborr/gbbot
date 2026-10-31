@@ -21,6 +21,7 @@ import type {
   users,
 } from './schema.js';
 import {
+  DEFAULT_CHECKOUT_FIELDS,
   EMPTY_PAYMENT_SETUP,
   MANUAL_METHOD_PREFIX,
   isClosedAt,
@@ -138,6 +139,7 @@ export function toShopConfigDTO(
     autoCancelHours: row.autoCancelHours,
     overpayMargin: row.overpayMargin,
     shippingZones: row.shippingZones,
+    checkoutFields: { ...DEFAULT_CHECKOUT_FIELDS, ...row.checkoutFields },
     addressPublicKey: row.addressPublicKey,
     addressKeyFingerprint: row.addressKeyFingerprint,
     paymentMethods: paymentMethodsOf(row.paymentSetup),

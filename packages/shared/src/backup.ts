@@ -3,7 +3,7 @@ import { currencyCode, isoDateTime, moneyAmount, slug } from './common.js';
 import { productOption } from './catalog.js';
 import { priceTier } from './pricing.js';
 import { paymentSetup } from './payments.js';
-import { shippingZone } from './shop.js';
+import { DEFAULT_CHECKOUT_FIELDS, checkoutFields, shippingZone } from './shop.js';
 import { vipClub } from './vip.js';
 
 /**
@@ -39,6 +39,7 @@ export const gbSnapshot = z.object({
     guestList: vipClub.default({ groups: [], userIds: [], usernames: [] }),
     useGlobalGuests: z.boolean().default(true),
     showOrganizers: z.boolean().default(true),
+    checkoutFields: checkoutFields.default(DEFAULT_CHECKOUT_FIELDS),
     /** Text to accept before entering, or null. */
     disclaimer: z.string().max(4000).nullable(),
     goalAmount: z.number().int().positive().nullable().default(null),

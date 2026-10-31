@@ -857,6 +857,52 @@ describeDb('API integration', () => {
     expect((await set('USDC')).status).toBe(200);
   });
 
+  it('asks only for what the GB says: the Telegram @ can be optional', async () => {
+    const auth = {
+      Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}`,
+      'content-type': 'application/json',
+    };
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const fields = (contact: 'optional' | 'required', email: 'off' | 'optional') =>
+      request('/api/admin/shop/checkout-fields', {
+        method: 'PUT',
+        headers: admin,
+        body: JSON.stringify({ contact, name: 'off', email, phone: 'off', notes: 'off' }),
+      });
+    await request('/api/cart/items', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ productId, quantity: 1 }),
+    });
+    const order = (body: object): Promise<Response> =>
+      Promise.resolve(request('/api/orders', { method: 'POST', headers: auth, body: JSON.stringify(body) }));
+
+    // Required by default.
+    const without = await order({});
+    expect(without.status).toBe(400);
+    expect(((await without.json()) as { error: { code: string } }).error.code).toBe('contact_required');
+
+    // Encrypted details need the GB's key, also without shipping.
+    const saved = await fields('optional', 'optional');
+    expect(((await saved.json()) as { checkoutFields: { email: string } }).checkoutFields.email).toBe('optional');
+    const noKey = await order({ encryptedAddress: '{"v":1}' });
+    expect(noKey.status).toBe(409);
+
+    // Optional: the order goes through without it.
+    const placed = await order({});
+    expect(placed.status).toBe(201);
+    const { orderId } = (await placed.json()) as { orderId: string };
+    const [row] = await db.select().from(orders).where(eq(orders.id, orderId));
+    expect(row?.contactUsername).toBeNull();
+
+    await fields('required', 'off');
+    await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
+    await db.delete(orders).where(eq(orders.id, orderId));
+  });
+
   it('counts a little overpayment, within the GB margin, as the exact price', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,

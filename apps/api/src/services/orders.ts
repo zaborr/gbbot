@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, ne, or, sql, type SQL } from 'drizzle-orm';
 import {
   ADMIN_STATUS_CHANGES,
+  DEFAULT_CHECKOUT_FIELDS,
   convertAmount,
   editableDirectly,
   exchangeRateFor,
@@ -205,15 +206,22 @@ export async function createOrderFromCart(
     }));
     const draft = buildOrderDraft(draftLines);
 
+    // The Telegram @ is the one detail the server can check (the rest is encrypted).
+    const fields = { ...DEFAULT_CHECKOUT_FIELDS, ...shop.checkoutFields };
+    if (!contactUsername && fields.contact === 'required') {
+      throw ApiError.badRequest('contact_required', 'Enter your Telegram username');
+    }
+
     // Shipped shops: a zone and an address encrypted with the shop's current key.
+    // Other GBs may get the customer's details encrypted the same way.
     const zones = shop.shippingZones.filter((z) => z.isActive);
     let shipping = 0;
     let shippingZoneName: string | null = null;
     let encryptedAddress: string | null = null;
     let addressKeyFingerprint: string | null = null;
-    if (zones.length > 0) {
-      const zone = zones.find((z) => z.id === checkout.shippingZoneId);
-      if (!zone) throw ApiError.badRequest('shipping_required', 'Choose a shipping zone');
+    const zone = zones.find((z) => z.id === checkout.shippingZoneId);
+    if (zones.length > 0 && !zone) throw ApiError.badRequest('shipping_required', 'Choose a shipping zone');
+    if (zones.length > 0 || checkout.encryptedAddress) {
       if (!shop.addressPublicKey || !shop.addressKeyFingerprint) {
         throw ApiError.conflict(
           'shop_not_ready',
@@ -228,10 +236,12 @@ export async function createOrderFromCart(
           'The shop updated its security key. Please reopen the shop and try again.',
         );
       }
-      shipping = shippingCost(zone, draft.total, isVip && shop.vipNoShipping);
-      shippingZoneName = zone.name;
       encryptedAddress = checkout.encryptedAddress ?? null;
       addressKeyFingerprint = envelope.kid;
+    }
+    if (zone) {
+      shipping = shippingCost(zone, draft.total, isVip && shop.vipNoShipping);
+      shippingZoneName = zone.name;
     }
 
     // The shop's per-order fee is frozen on the order and charged once (VIPs

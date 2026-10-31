@@ -20,6 +20,7 @@ import {
   updateOrderFeeRequest,
   updateOrderStatusRequest,
   updateShippingRequest,
+  updateCheckoutFieldsRequest,
   updatePaymentSetupRequest,
   updateVipClubRequest,
   updateClosingRequest,
@@ -73,6 +74,7 @@ import {
   updateShopCurrency,
   updateOrderFee,
   updateShippingZones,
+  updateCheckoutFields,
   updateShopProfile,
   updatePaymentSetup,
 } from '../services/shop.js';
@@ -484,6 +486,12 @@ export function adminRoutes(): Hono<AppBindings> {
     const { zones, vipNoShipping } = c.req.valid('json');
     return c.json(await updateShippingZones(c.get('db'), c.get('shopId'), zones, vipNoShipping));
   });
+  // What checkout asks for (the details themselves arrive encrypted).
+  app.put('/shop/checkout-fields', zValidator('json', updateCheckoutFieldsRequest), async (c) =>
+    c.json(
+      await updateCheckoutFields(c.get('db'), c.get('shopId'), c.req.valid('json')),
+    ),
+  );
   app.put('/shop/address-key', requireOwner, zValidator('json', updateAddressKeyRequest), async (c) => {
     const db = c.get('db');
     const env = c.get('env');
