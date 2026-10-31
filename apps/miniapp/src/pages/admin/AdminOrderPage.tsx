@@ -21,6 +21,7 @@ import {
 } from './common.js';
 import { useShopPath } from '../../providers/ShopProvider.js';
 import { AddressSection } from './AddressSection.js';
+import { CopyOrders } from '../../components/CopyOrders.js';
 import { TrackingText } from '../../components/TrackingText.js';
 import { t, type MessageKey } from '../../i18n/index.js';
 import { OrderTracker } from '../../components/OrderStatus.js';
@@ -165,6 +166,8 @@ function AdminOrder(): React.JSX.Element {
       </Section>
 
       <AddressSection order={o} />
+
+      <CopyOrders orders={[o]} several={false} />
 
       {o.changeRequest && <ChangeRequestSection order={o} actions={actions} />}
 

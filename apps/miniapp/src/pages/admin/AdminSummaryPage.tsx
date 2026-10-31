@@ -4,7 +4,6 @@ import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import { isSaleStatus, type Order } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
-import { copyText } from '../../lib/clipboard.js';
 import { formatPrice } from '../../lib/format.js';
 import { itemKey, itemName } from '../../lib/variants.js';
 import { Loader } from '../../components/Loader.js';
@@ -12,6 +11,8 @@ import { ErrorView } from '../../components/ErrorView.js';
 import { AdminOnly, formatDate, itemsSummary, statusLabel } from './common.js';
 import { useShopPath } from '../../providers/ShopProvider.js';
 import { PageTitle } from '../../components/PageTitle.js';
+import { CopyOrders } from '../../components/CopyOrders.js';
+import type { CellValue } from '../../lib/orderSheet.js';
 import { t, tn, type MessageKey } from '../../i18n/index.js';
 
 type Scope = 'all' | 'toFulfil' | 'shipped' | 'fulfilled';
@@ -87,36 +88,12 @@ function summarize(orders: Order[]): { products: ProductTotal[]; currencies: Cur
   };
 }
 
-/** Plain-text version of the summary, to paste anywhere. */
-function summaryText(
-  label: string,
-  products: ProductTotal[],
-  currencies: CurrencyTotal[],
-  orders: Order[],
-): string {
-  const lines = [t('summary.textTitle', { label }), ''];
-  for (const c of currencies) {
-    lines.push(
-      `${c.currency}: ${tn(c.orders, 'count.orders.one', 'count.orders.other')}, ` +
-        `${tn(c.items, 'items.one', 'items.other')}, ${formatPrice(c.revenue, c.currency)}` +
-        (c.fees > 0 ? ` (${t('summary.fees', { amount: formatPrice(c.fees, c.currency) })})` : '') +
-        (c.shipping > 0
-          ? ` (${t('summary.shipping', { amount: formatPrice(c.shipping, c.currency) })})`
-          : ''),
-    );
-  }
-  lines.push('', t('summary.productsColon'));
-  for (const p of products) {
-    lines.push(`• ${p.quantity}× ${p.title} — ${formatPrice(p.revenue, p.currency)}`);
-  }
-  lines.push('', t('summary.ordersColon'));
-  for (const o of orders) {
-    lines.push(
-      `• #${o.id.slice(0, 8)}${o.contactUsername ? ` @${o.contactUsername}` : ''} — ` +
-        `${formatPrice(o.total, o.currency)} — ${itemsSummary(o)}`,
-    );
-  }
-  return lines.join('\n');
+/** The totals per product, above the orders when copying for Excel. */
+function productRows(products: ProductTotal[]): CellValue[][] {
+  return [
+    [t('sheet.product'), t('sheet.currency'), t('sheet.quantity'), t('sheet.orders'), t('sheet.subtotal')],
+    ...products.map((p) => [p.title, p.currency, p.quantity, p.orders, Number((p.revenue / 100).toFixed(2))]),
+  ];
 }
 
 /** Sales summary: what was sold across all paid orders, plus the list of those orders. */
@@ -132,7 +109,6 @@ function AdminSummary(): React.JSX.Element {
   const navigate = useNavigate();
   const to = useShopPath();
   const [scope, setScope] = useState<Scope>('all');
-  const [copied, setCopied] = useState(false);
   const orders = useAsync(() => api.adminGetOrders(), []);
 
   if (orders.loading) return <Loader />;
@@ -140,12 +116,6 @@ function AdminSummary(): React.JSX.Element {
 
   const selected = (orders.data ?? []).filter(SCOPES[scope].match);
   const { products, currencies } = summarize(selected);
-
-  const copy = async (): Promise<void> => {
-    setCopied(
-      await copyText(summaryText(t(SCOPES[scope].label), products, currencies, selected)),
-    );
-  };
 
   return (
     <List>
@@ -157,10 +127,7 @@ function AdminSummary(): React.JSX.Element {
               key={key}
               size="s"
               mode={key === scope ? 'filled' : 'bezeled'}
-              onClick={() => {
-                setScope(key);
-                setCopied(false);
-              }}
+              onClick={() => setScope(key)}
             >
               {t(SCOPES[key].label)}
             </Button>
@@ -241,15 +208,7 @@ function AdminSummary(): React.JSX.Element {
         </Section>
       )}
 
-      {selected.length > 0 && (
-        <Section footer={t('summary.copyFooter')}>
-          <div style={{ padding: 16 }}>
-            <Button stretched mode="bezeled" onClick={() => void copy()}>
-              {copied ? t('key.copied') : t('summary.copy')}
-            </Button>
-          </div>
-        </Section>
-      )}
+      <CopyOrders key={scope} orders={selected} several before={productRows(products)} />
     </List>
   );
 }

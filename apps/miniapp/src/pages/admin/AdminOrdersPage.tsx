@@ -12,6 +12,7 @@ import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { AdminOnly, AdminStatusChip, formatDate, itemsSummary, needsAttention } from './common.js';
 import { useShopPath } from '../../providers/ShopProvider.js';
+import { CopyOrders } from '../../components/CopyOrders.js';
 import { t, tn, type MessageKey } from '../../i18n/index.js';
 
 type FilterKey = 'all' | 'attention' | 'unpaid' | 'paid' | 'shipped' | 'fulfilled' | 'cancelled';
@@ -120,6 +121,9 @@ function AdminOrders(): React.JSX.Element {
           </Cell>
         ))}
       </Section>
+
+      {/* What is shown (filter and search), as a table for Excel. */}
+      <CopyOrders key={`${filter}|${query}`} orders={visible} several />
     </List>
   );
 }
