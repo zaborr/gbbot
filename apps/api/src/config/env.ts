@@ -60,6 +60,8 @@ const envSchema = z.object({
    * access in the app. Unset = they ask the platform admin for it.
    */
   WEB_ONION_URL: optional(z.url()),
+  /** Folder shared with the server for /update (see deploy/auto-update). */
+  UPDATE_DIR: optional(z.string()),
 });
 
 export type Env = z.infer<typeof envSchema>;

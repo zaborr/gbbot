@@ -6,6 +6,8 @@ import { tr } from '../i18n/messages.js';
 import { TelegramApi, type InlineKeyboard } from '../telegram/api.js';
 import type { TelegramUpdate } from '../telegram/types.js';
 import { handleUploadChoice, handleUploadedFile } from './uploads.js';
+import { handleUpdateButton, isUpdateCommand, updateReply } from './serverUpdate.js';
+import { isSuperAdmin } from './shop.js';
 
 const MENU_CACHE_MS = 60 * 60 * 1000;
 
@@ -74,6 +76,11 @@ export async function handleBotMessage(
   }
   // Buttons under the bot's messages (choosing a GB for an uploaded CSV).
   if (update.callback_query) {
+    const query = update.callback_query;
+    const queryLang =
+      (db ? (await languagesOf(db, [query.from.id])).get(query.from.id) : undefined) ??
+      langFrom(query.from.language_code);
+    if (await handleUpdateButton(env, telegram, query, queryLang)) return;
     if (db) {
       await handleUploadChoice(db, env, telegram, update.callback_query, await miniAppUrl(telegram));
     }
@@ -89,11 +96,14 @@ export async function handleBotMessage(
   // The language chosen in the app wins over Telegram's.
   const fromId = message.from?.id;
   const known = db && fromId !== undefined ? (await languagesOf(db, [fromId])).get(fromId) : undefined;
-  const reply = buildStartReply(
-    await miniAppUrl(telegram),
-    message.from?.first_name,
-    known ?? langFrom(message.from?.language_code),
-  );
+  const lang = known ?? langFrom(message.from?.language_code);
+  // Updating the server: platform administrators only (anyone else gets the greeting).
+  if (fromId !== undefined && isUpdateCommand(message.text) && isSuperAdmin(env, fromId)) {
+    const answer = await updateReply(env, lang);
+    await telegram.sendMessage(message.chat.id, answer.text, answer.keyboard);
+    return;
+  }
+  const reply = buildStartReply(await miniAppUrl(telegram), message.from?.first_name, lang);
   await telegram.sendMessage(message.chat.id, reply.text, reply.keyboard);
 }
 

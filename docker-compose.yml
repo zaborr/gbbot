@@ -58,6 +58,9 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+    volumes:
+      # /update in the bot leaves its request here (see deploy/auto-update).
+      - ./deploy/runtime:/run/gb-update
 
   miniapp:
     build:

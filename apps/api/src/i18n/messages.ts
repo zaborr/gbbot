@@ -138,6 +138,20 @@ const en = {
   'web.role.linked': 'linked to Telegram',
   'web.noticeDeleted': '🧹 {who} deleted a notice from the inbox.',
   'web.noticesDeleted': '🧹 {who} deleted {count} notices from the inbox.',
+  'update.notConfigured': '⚙️ /update is not set up on this server. Install it there once with: sudo ./deploy/auto-update/install.sh',
+  'update.checkFailed': '⚠️ Could not ask GitHub for updates ({error}). Try again in a while.',
+  'update.upToDate': '✅ Already up to date ({version}).',
+  'update.ciRunning': '⏳ There are changes ({version}), but the checks on GitHub are still running. Try /update again in a few minutes.',
+  'update.ciFailed': '❌ There are changes ({version}), but the checks on GitHub failed: they are not installed.',
+  'update.available': '🆕 New version ready ({version}):',
+  'update.migrations': 'Includes database changes (a backup is made first).',
+  'update.install': 'Update',
+  'update.cancel': 'Cancel',
+  'update.cancelled': 'Update cancelled.',
+  'update.busy': '⏳ An update is already under way.',
+  'update.running': '⏳ Updating to {version}… (backup, build and restart: a few minutes). This message will change when it is done.',
+  'update.done': '✅ Updated to {version}.',
+  'update.failed': '❌ The update to {version} failed. Last lines:',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -268,6 +282,20 @@ const es: Record<BotMessageKey, string> = {
   'web.role.linked': 'vinculada a Telegram',
   'web.noticeDeleted': '🧹 {who} ha borrado un aviso del buzón.',
   'web.noticesDeleted': '🧹 {who} ha borrado {count} avisos del buzón.',
+  'update.notConfigured': '⚙️ /update no está instalado en este servidor. Instálalo allí una vez con: sudo ./deploy/auto-update/install.sh',
+  'update.checkFailed': '⚠️ No se ha podido consultar GitHub ({error}). Prueba de nuevo en un rato.',
+  'update.upToDate': '✅ Ya está al día ({version}).',
+  'update.ciRunning': '⏳ Hay cambios ({version}), pero las comprobaciones de GitHub aún no han terminado. Vuelve a probar /update en unos minutos.',
+  'update.ciFailed': '❌ Hay cambios ({version}), pero las comprobaciones de GitHub han fallado: no se instalan.',
+  'update.available': '🆕 Hay una versión nueva ({version}):',
+  'update.migrations': 'Incluye cambios en la base de datos (antes se hace una copia).',
+  'update.install': 'Actualizar',
+  'update.cancel': 'Cancelar',
+  'update.cancelled': 'Actualización cancelada.',
+  'update.busy': '⏳ Ya hay una actualización en marcha.',
+  'update.running': '⏳ Actualizando a {version}… (copia, build y reinicio: unos minutos). Este mensaje cambiará al terminar.',
+  'update.done': '✅ Actualizado a {version}.',
+  'update.failed': '❌ Ha fallado la actualización a {version}. Últimas líneas:',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -396,6 +424,20 @@ const it: Record<BotMessageKey, string> = {
   'web.role.linked': 'collegato a Telegram',
   'web.noticeDeleted': '🧹 {who} ha eliminato un avviso dalla casella.',
   'web.noticesDeleted': '🧹 {who} ha eliminato {count} avvisi dalla casella.',
+  'update.notConfigured': '⚙️ /update non è installato su questo server. Installalo lì una volta con: sudo ./deploy/auto-update/install.sh',
+  'update.checkFailed': '⚠️ Non è stato possibile consultare GitHub ({error}). Riprova tra un po\'.',
+  'update.upToDate': '✅ È già aggiornato ({version}).',
+  'update.ciRunning': '⏳ Ci sono modifiche ({version}), ma i controlli su GitHub non sono ancora finiti. Riprova /update tra qualche minuto.',
+  'update.ciFailed': '❌ Ci sono modifiche ({version}), ma i controlli su GitHub sono falliti: non vengono installate.',
+  'update.available': '🆕 C\'è una nuova versione ({version}):',
+  'update.migrations': 'Include modifiche al database (prima si fa una copia).',
+  'update.install': 'Aggiorna',
+  'update.cancel': 'Annulla',
+  'update.cancelled': 'Aggiornamento annullato.',
+  'update.busy': '⏳ C\'è già un aggiornamento in corso.',
+  'update.running': '⏳ Aggiornamento a {version}… (copia, build e riavvio: qualche minuto). Questo messaggio cambierà alla fine.',
+  'update.done': '✅ Aggiornato a {version}.',
+  'update.failed': '❌ L\'aggiornamento a {version} è fallito. Ultime righe:',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -524,6 +566,20 @@ const pt: Record<BotMessageKey, string> = {
   'web.role.linked': 'ligada ao Telegram',
   'web.noticeDeleted': '🧹 {who} apagou um aviso da caixa.',
   'web.noticesDeleted': '🧹 {who} apagou {count} avisos da caixa.',
+  'update.notConfigured': '⚙️ O /update não está instalado neste servidor. Instale-o lá uma vez com: sudo ./deploy/auto-update/install.sh',
+  'update.checkFailed': '⚠️ Não foi possível consultar o GitHub ({error}). Tente de novo daqui a pouco.',
+  'update.upToDate': '✅ Já está atualizado ({version}).',
+  'update.ciRunning': '⏳ Há alterações ({version}), mas as verificações no GitHub ainda não terminaram. Tente /update de novo daqui a uns minutos.',
+  'update.ciFailed': '❌ Há alterações ({version}), mas as verificações no GitHub falharam: não são instaladas.',
+  'update.available': '🆕 Há uma versão nova ({version}):',
+  'update.migrations': 'Inclui alterações na base de dados (antes é feita uma cópia).',
+  'update.install': 'Atualizar',
+  'update.cancel': 'Cancelar',
+  'update.cancelled': 'Atualização cancelada.',
+  'update.busy': '⏳ Já há uma atualização em curso.',
+  'update.running': '⏳ A atualizar para {version}… (cópia, build e reinício: uns minutos). Esta mensagem muda quando terminar.',
+  'update.done': '✅ Atualizado para {version}.',
+  'update.failed': '❌ A atualização para {version} falhou. Últimas linhas:',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };
