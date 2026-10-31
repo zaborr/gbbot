@@ -309,6 +309,13 @@
       "when": 1793452800000,
       "tag": "0043_how_to_seen",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1793539200000,
+      "tag": "0044_how_to_reset",
+      "breakpoints": true
     }
   ]
 }
