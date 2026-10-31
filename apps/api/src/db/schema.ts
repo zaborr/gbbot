@@ -54,6 +54,8 @@ export const shops = pgTable('shops', {
   vipOnly: boolean('vip_only').notNull().default(false),
   /** With `vipOnly`: the guests see it too (at normal prices). */
   allowGuests: boolean('allow_guests').notNull().default(false),
+  /** Customers see "Organised by" with the team's names. */
+  showOrganizers: boolean('show_organizers').notNull().default(true),
   /** Closed: no new orders; existing ones can still be looked at and managed. */
   closedAt: timestamp('closed_at', { withTimezone: true }),
   /** Scheduled closing: from this moment the GB is closed. */

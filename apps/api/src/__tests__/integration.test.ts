@@ -1494,6 +1494,25 @@ describeDb('API integration', () => {
       { username: 'Later_Admin', name: 'Leo' },
     ]);
 
+    // Hidden by the administrators: customers no longer receive the names; the team still does.
+    const hidden = await request('/api/admin/shop/owner', {
+      method: 'PUT',
+      headers: json(org, slugName),
+      body: JSON.stringify({
+        isVisible: true,
+        vipOnly: false,
+        showOrganizers: false,
+        owners: [String(ORG_ID), '@Later_Admin'],
+        admins: [],
+      }),
+    });
+    expect(await hidden.json()).toMatchObject({ showOrganizers: false });
+    const customer = await authToken(CUSTOMER_ID, 'Alice');
+    const seen = await request('/api/shop', { headers: json(customer, slugName) });
+    expect(((await seen.json()) as { organizers: unknown[] }).organizers).toEqual([]);
+    const forTeam = await request('/api/shop', { headers: json(later, slugName) });
+    expect(((await forTeam.json()) as { organizers: unknown[] }).organizers).toHaveLength(2);
+
     // Nothing of anyone else's: other GBs, the platform.
     expect([403, 404]).toContain((await request('/api/admin/shop', { headers: json(org) })).status);
     expect((await request('/api/platform/shops', { headers: json(org) })).status).toBe(403);

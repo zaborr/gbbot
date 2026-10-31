@@ -8,8 +8,11 @@ import { t } from '../i18n/index.js';
  */
 export function OrganizedBy({
   organizers,
+  hidden = false,
 }: {
   organizers: readonly OrganizerTag[];
+  /** The team sees it, customers do not: say so. */
+  hidden?: boolean;
 }): React.JSX.Element | null {
   if (organizers.length === 0) return null;
   return (
@@ -33,6 +36,7 @@ export function OrganizedBy({
           )}
         </Fragment>
       ))}
+      {hidden && ` · ${t('shops.organizersHidden')}`}
     </span>
   );
 }

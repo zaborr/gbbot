@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageTitle } from '../../components/PageTitle.js';
-import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
+import { Button, Cell, List, Section, Switch } from '@telegram-apps/telegram-ui';
 import type { ShopTeam } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
@@ -41,6 +41,7 @@ function OwnerForm({ team, onSaved }: { team: ShopTeam; onSaved: () => void }): 
   const [visibility, setVisibility] = useState<'visible' | 'vip' | 'guests' | 'hidden'>(
     !shop.isVisible ? 'hidden' : shop.vipOnly ? (shop.allowGuests ? 'guests' : 'vip') : 'visible',
   );
+  const [showOrganizers, setShowOrganizers] = useState(shop.showOrganizers);
   const [owners, setOwners] = useState(peopleText(team.owners, team.pendingOwnerUsernames));
   const [admins, setAdmins] = useState(peopleText(team.admins, team.pendingUsernames));
   const [busy, setBusy] = useState(false);
@@ -70,6 +71,7 @@ function OwnerForm({ team, onSaved }: { team: ShopTeam; onSaved: () => void }): 
         isVisible: visibility !== 'hidden',
         vipOnly: visibility === 'vip' || visibility === 'guests',
         allowGuests: visibility === 'guests',
+        showOrganizers,
         owners: ownerRefs,
         admins: refs,
       });
@@ -136,6 +138,16 @@ function OwnerForm({ team, onSaved }: { team: ShopTeam; onSaved: () => void }): 
           people={team.admins}
           pending={team.pendingUsernames}
         />
+      </Section>
+
+      <Section footer={t('owner.showOrganizersFooter')}>
+        <Cell
+          Component="label"
+          after={<Switch checked={showOrganizers} onChange={(e) => setShowOrganizers(e.target.checked)} />}
+          multiline
+        >
+          {t('owner.showOrganizers')}
+        </Cell>
       </Section>
 
       <Section>

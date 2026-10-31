@@ -25,7 +25,8 @@ export function catalogRoutes(): Hono<AppBindings> {
     return c.json(
       getShopConfig(shop, c.get('canManage'), c.get('isVip'), {
         canOwn: c.get('canOwn'),
-        organizers: organizerTags(shop, people),
+        // Hidden by the GB: customers do not even receive the names.
+        organizers: c.get('canManage') || shop.showOrganizers ? organizerTags(shop, people) : [],
         disclaimerAccepted: !c.get('disclaimerPending'),
         goal,
       }),
