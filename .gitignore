@@ -36,3 +36,7 @@ backups/
 
 # Shared with the API for /update (deploy/auto-update)
 deploy/runtime/
+
+# Off-site backups: B2 key and settings (deploy/offsite)
+deploy/offsite/config
+deploy/offsite/rclone.conf
