@@ -4,10 +4,15 @@
 # Example cron (crontab -e):  15 4 * * * /path/to/repo/deploy/backup.sh
 set -eu
 cd "$(dirname "$0")/.."
+# Only root can read the backups (the database is in them).
+umask 077
 mkdir -p backups
+chmod 700 backups
 file="backups/gb-$(date +%Y%m%d-%H%M).sql.gz"
 docker compose exec -T postgres pg_dump -U gb -d gb | gzip > "$file"
 find backups -name 'gb-*.sql.gz' -mtime +14 -delete
+# Copies made before this rule existed, too.
+find backups -name 'gb-*.sql.gz' -exec chmod 600 {} +
 echo "Backup written to $file"
 
 # Off-site copy: a failure is reported but never stops an update.
