@@ -86,6 +86,7 @@ export function ShopsPage(): React.JSX.Element {
             </Title>
             <span className="gb-hint">{t('shops.pickHint')}</span>
           </div>
+          {!isWebMode() && result.data?.showHowTo && <HowItWorks />}
           {/* Something to do first: orders still to pay. */}
           {shops
             .filter((shop) => shop.unpaidOrders > 0)
@@ -147,7 +148,6 @@ export function ShopsPage(): React.JSX.Element {
         </Section>
       )}
       <LanguagePicker />
-      {!isWebMode() && shops.length > 0 && result.data?.showHowTo && <HowItWorks />}
     </List>
   );
 }
