@@ -52,11 +52,33 @@ La API no tiene ningún permiso sobre Docker: solo deja la petición en `deploy/
   ```
   15 4 * * * /ruta/a/tma-shop/deploy/backup.sh
   ```
-  Conviene copiar también `backups/` fuera del servidor de vez en cuando.
+  Fuera del servidor: ver **Copia cifrada en Backblaze B2** más abajo.
 - **Restaurar una copia**:
   ```bash
   gunzip -c backups/gb-AAAAMMDD-HHMM.sql.gz | docker compose exec -T postgres psql -U gb -d gb
   ```
+- **Copia cifrada en Backblaze B2** (fuera del servidor). Cada backup (el diario y el de antes de cada update) se cifra aquí con tu clave pública *age* y se sube a B2. Incluye la base de datos, el `.env` y, si Tor corre en este servidor, las claves del servicio .onion. Nadie sin tu clave privada puede leerlo: ni Backblaze, ni quien entre en el VPS. Si la subida falla, el bot avisa a los administradores de plataforma y la copia local sigue bien.
+
+  1. **Tu clave**, en tu ordenador (no en el servidor): `age-keygen -o gb-backup-key.txt`. Muestra la clave pública (`age1…`). Guarda el archivo en dos sitios seguros, por ejemplo tu gestor de contraseñas y un USB. **Sin él no se puede abrir ninguna copia.**
+  2. **En Backblaze** (cuenta gratuita, 10 GB, sin tarjeta):
+     - *Buckets → Create a Bucket*: un nombre único y *Private*.
+     - En el bucket, *Lifecycle Settings → Use custom lifecycle rules*: prefijo vacío, *Days till hide* **30** y *Days till delete* **1**. Así se borran solas las copias de más de 30 días.
+     - *Application Keys → Add a New Application Key*: acceso solo a ese bucket y tipo **Write Only**. Desde el servidor se podrá subir, pero no borrar ni leer. Apunta el *keyID* y el *applicationKey*, que solo se muestran una vez.
+  3. **En el servidor**:
+     ```bash
+     apt install rclone age curl
+     sudo ./deploy/offsite/install.sh
+     ```
+     Pide la clave de B2, el bucket y tu clave pública, y hace una copia de prueba. Si con *Write Only* la prueba falla, crea la clave como *Read and Write*.
+  4. **Restaurar desde B2**: descarga el archivo `gb-AAAAMMDD-HHMM.tar.age` desde la web de Backblaze y, en el servidor:
+     ```bash
+     mkdir restore && cd restore
+     age -d -i gb-backup-key.txt gb-AAAAMMDD-HHMM.tar.age | tar -xf -
+     # Base de datos:
+     gunzip -c backups/gb-*.sql.gz | docker compose -f ../docker-compose.yml exec -T postgres psql -U gb -d gb
+     # Si reconstruyes el servidor: el .env va a la carpeta del repo, y las claves de Tor (var/lib/tor/…)
+     # a /var/lib/tor/…, con: chown -R debian-tor:debian-tor /var/lib/tor/… && chmod 700 /var/lib/tor/…
+     ```
 - **Pasar los datos desde Neon**:
   ```bash
   pg_dump "URL_DE_NEON" --no-owner --no-acl | docker compose exec -T postgres psql -U gb -d gb
