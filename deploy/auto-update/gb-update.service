@@ -1,0 +1,8 @@
+[Unit]
+Description=GB: install the update asked for with /update in the bot
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=@DIR@/deploy/auto-update/run.sh
+TimeoutStartSec=1h

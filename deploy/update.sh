@@ -2,6 +2,7 @@
 # Updates the server to the latest version on GitHub and restarts what changed.
 #   ./deploy/update.sh            update if there is something new
 #   ./deploy/update.sh --force    rebuild and restart even without changes
+# GB_UPDATE_TO=<commit> installs that commit instead of the newest one (/update in the bot).
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -9,6 +10,13 @@ FORCE=0
 [ "${1:-}" = "--force" ] && FORCE=1
 
 say() { printf '\n==> %s\n' "$1"; }
+
+# What is running, for /update in the bot (folder shared with the API).
+mark_version() {
+  mkdir -p deploy/runtime
+  git rev-parse HEAD >deploy/runtime/current
+  git remote get-url origin | sed -E 's#\.git$##; s#^.*github\.com[:/]##' >deploy/runtime/repo
+}
 
 # Hand-made changes to versioned files would be lost or block the update.
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
@@ -21,19 +29,21 @@ fi
 say "Looking for updates"
 git fetch --quiet origin
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-NEW=$(git rev-list --count "HEAD..origin/$BRANCH")
+TARGET=${GB_UPDATE_TO:-origin/$BRANCH}
+NEW=$(git rev-list --count "HEAD..$TARGET")
 if [ "$NEW" -eq 0 ] && [ "$FORCE" -eq 0 ]; then
+  mark_version
   echo "Already up to date ($(git log -1 --format='%h %s'))."
   exit 0
 fi
-git log --oneline "HEAD..origin/$BRANCH"
+git log --oneline "HEAD..$TARGET"
 CADDY_BEFORE=$(git rev-parse HEAD:deploy/Caddyfile)
 
 say "Database backup before updating"
 ./deploy/backup.sh
 
 say "Downloading the new version"
-git merge --ff-only --quiet "origin/$BRANCH"
+git merge --ff-only --quiet "$TARGET"
 
 # One image at a time: building both at once can run a small server out of memory.
 say "Building the API"
@@ -42,6 +52,7 @@ say "Building the Mini App"
 docker compose build miniapp
 
 say "Restarting"
+mkdir -p deploy/runtime
 docker compose up -d
 if [ "$CADDY_BEFORE" != "$(git rev-parse HEAD:deploy/Caddyfile)" ]; then
   docker compose restart caddy
@@ -63,4 +74,5 @@ echo "API OK."
 # Old images pile up on every build.
 docker image prune -f >/dev/null
 
+mark_version
 say "Done: $(git log -1 --format='%h %s')"

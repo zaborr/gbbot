@@ -34,6 +34,18 @@ Después, en **@BotFather**: *Bot Settings → Menu Button* (y la Mini App, si l
 
 Busca cambios en GitHub y, si los hay: hace una copia de la base de datos, descarga la versión nueva, reconstruye las imágenes (de una en una, para no agotar la memoria), reinicia, comprueba que la API responde y borra las imágenes viejas. Con `--force` reconstruye aunque no haya cambios. La API aplica sola las migraciones nuevas al arrancar.
 
+### Desde el bot: /update
+
+Instálalo una vez en el servidor:
+
+```bash
+sudo ./deploy/auto-update/install.sh
+```
+
+Después, cualquier administrador de plataforma (`ADMIN_TELEGRAM_IDS`) puede escribir **/update** al bot. El bot contesta con lo que hay de nuevo en GitHub. Solo ofrece versiones cuyas comprobaciones (CI) han pasado y avisa si hay cambios en la base de datos. Con **Actualizar**, el servidor ejecuta `update.sh` y el mismo mensaje cambia al resultado, con las últimas líneas del registro si falla. El registro completo queda en `deploy/runtime/last-update.log`.
+
+La API no tiene ningún permiso sobre Docker: solo deja la petición en `deploy/runtime/`. Quien actualiza es la unidad de systemd `gb-update.path`. Para desactivarlo: `sudo systemctl disable --now gb-update.path`.
+
 ## Datos
 
 - **Copia de seguridad diaria**: `deploy/backup.sh` guarda un `pg_dump` comprimido en `backups/` y conserva 14 días. Añádelo a cron:

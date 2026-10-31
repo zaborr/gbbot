@@ -1,0 +1,9 @@
+[Unit]
+Description=GB: update asked for with /update in the bot
+
+[Path]
+PathExists=@DIR@/deploy/runtime/request
+Unit=gb-update.service
+
+[Install]
+WantedBy=multi-user.target

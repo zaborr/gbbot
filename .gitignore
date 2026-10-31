@@ -33,3 +33,6 @@ apps/miniapp/.vite/
 
 # Database backups (deploy/backup.sh)
 backups/
+
+# Shared with the API for /update (deploy/auto-update)
+deploy/runtime/
