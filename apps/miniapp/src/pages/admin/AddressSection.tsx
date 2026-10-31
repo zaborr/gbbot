@@ -21,6 +21,7 @@ function addressLines(a: DeliveryAddress): string[] {
     a.line2,
     [a.postalCode, a.city].filter(Boolean).join(' '),
     [a.region, a.country].filter(Boolean).join(', '),
+    a.email ? `✉ ${a.email}` : '',
     a.phone ? `☎ ${a.phone}` : '',
   ].filter((line) => line.trim() !== '');
 }
@@ -62,7 +63,7 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
 
   const header = order.shippingZoneName
     ? t('addressSection.headerZone', { zone: order.shippingZoneName })
-    : t('address.title');
+    : t('details.adminTitle');
   const keyButton = (
     <div style={{ padding: '0 16px 16px' }}>
       <Button size="s" mode="bezeled" onClick={() => navigate(to('/admin/address-key'))}>

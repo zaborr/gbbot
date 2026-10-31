@@ -6,6 +6,7 @@ import { AdminOnly, isSale, needsAttention, toMajor } from './common.js';
 import { useShop, useShopPath } from '../../providers/ShopProvider.js';
 import { closingDate } from '../../components/ClosingNotice.js';
 import { GoalBar } from '../../components/GoalBar.js';
+import { asksDetails } from '../../components/AddressForm.js';
 import { t, tn } from '../../i18n/index.js';
 
 /**
@@ -37,7 +38,8 @@ function AdminHome(): React.JSX.Element {
   const fee = config.orderFee;
   const activeZones = config.shippingZones.filter((z) => z.isActive).length;
   const payOptions = config.paymentMethods.length + config.manualMethods.length;
-  const missingKey = activeZones > 0 && !config.addressPublicKey;
+  // Addresses and the other customer details are encrypted with it.
+  const missingKey = (activeZones > 0 || asksDetails(config.checkoutFields)) && !config.addressPublicKey;
 
   const openState = config.isClosed
     ? t('closed.title')
@@ -209,6 +211,9 @@ function AdminHome(): React.JSX.Element {
       </Section>
 
       <Section header={t('adminHome.shippingSection')}>
+        <Cell onClick={go('/admin/checkout-fields')} subtitle={t('adminHome.checkoutFieldsHint')}>
+          {t('adminHome.checkoutFields')}
+        </Cell>
         <Cell
           onClick={go('/admin/shipping')}
           subtitle={

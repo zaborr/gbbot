@@ -24,6 +24,7 @@ import type {
   PaymentCheck,
   PaymentSetup,
   VipClub,
+  CheckoutFields,
   WebRole,
 } from '@tma-shop/shared';
 
@@ -110,6 +111,11 @@ export const shops = pgTable('shops', {
   autoCancelHours: integer('auto_cancel_hours').notNull().default(48),
   /** Shipping zones with a flat cost per order. */
   shippingZones: jsonb('shipping_zones').$type<ShippingZone[]>().notNull().default([]),
+  /** What checkout asks for (see CheckoutFields). */
+  checkoutFields: jsonb('checkout_fields')
+    .$type<CheckoutFields>()
+    .notNull()
+    .default({ contact: 'required', name: 'off', email: 'off', phone: 'off', notes: 'off' }),
   /** RSA-OAEP public key (base64 SPKI) used to encrypt delivery addresses. */
   addressPublicKey: text('address_public_key'),
   addressKeyFingerprint: text('address_key_fingerprint'),

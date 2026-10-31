@@ -48,6 +48,7 @@ import type {
   WebAccountView,
   WebCredentials,
   WebRole,
+  CheckoutFields,
 } from '@tma-shop/shared';
 import { lang } from '../i18n/index.js';
 
@@ -476,12 +477,12 @@ export class ApiClient {
    * Shops with shipping also need the zone and the encrypted address.
    */
   createOrder(
-    contactUsername: string,
-    shipping: { shippingZoneId: string; encryptedAddress: string } | null = null,
+    contactUsername: string | null,
+    details: { shippingZoneId?: string; encryptedAddress: string } | null = null,
   ): Promise<CreateOrderResponse> {
     return this.request<CreateOrderResponse>('/orders', {
       method: 'POST',
-      body: JSON.stringify({ contactUsername, ...(shipping ?? {}) }),
+      body: JSON.stringify({ ...(contactUsername ? { contactUsername } : {}), ...(details ?? {}) }),
     });
   }
 
@@ -727,6 +728,14 @@ export class ApiClient {
     return this.request<ShopAdminView>('/admin/shop/payments', {
       method: 'PUT',
       body: JSON.stringify(setup),
+    });
+  }
+
+  /** What checkout asks for. */
+  adminUpdateCheckoutFields(fields: CheckoutFields): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/admin/shop/checkout-fields', {
+      method: 'PUT',
+      body: JSON.stringify(fields),
     });
   }
 

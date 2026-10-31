@@ -37,8 +37,8 @@ function dateCell(iso: string): string {
 }
 
 function addressCells(a: DeliveryAddress | undefined): CellValue[] {
-  if (!a) return ['', '', '', '', '', '', '', '', ''];
-  return [a.name, a.line1, a.line2, a.postalCode, a.city, a.region, a.country, a.phone, a.notes];
+  if (!a) return ['', '', '', '', '', '', '', '', '', ''];
+  return [a.name, a.email ?? '', a.line1, a.line2, a.postalCode, a.city, a.region, a.country, a.phone, a.notes];
 }
 
 /** The orders' table. Address columns only when `addresses` is given. */
@@ -62,6 +62,7 @@ export function orderRows(
     header.push(
       t('csv.zone'),
       t('csv.name'),
+      t('csv.email'),
       t('csv.address'),
       t('csv.address2'),
       t('csv.postalCode'),

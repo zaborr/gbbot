@@ -109,10 +109,14 @@ export const telegramUsername = z
 
 /** Checkout details sent when creating an order. */
 export const createOrderRequest = z.object({
-  contactUsername: telegramUsername,
+  /** Optional when the GB says so. */
+  contactUsername: telegramUsername.optional(),
   /** Required when the shop has active shipping zones. */
   shippingZoneId: z.string().min(1).max(64).optional(),
-  /** Address encrypted with the shop's public key; required with a shipping zone. */
+  /**
+   * The customer's details encrypted with the shop's public key: required with
+   * a shipping zone, and sent without one when the GB asks for other details.
+   */
   encryptedAddress: z.string().min(1).max(16_000).optional(),
 });
 export type CreateOrderRequest = z.input<typeof createOrderRequest>;

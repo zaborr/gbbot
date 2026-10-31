@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useState } from 'react';
-import { awaitsPayment, shippingCost, type DeliveryAddress } from '@tma-shop/shared';
+import { DEFAULT_CHECKOUT_FIELDS, awaitsPayment, shippingCost, type DeliveryAddress } from '@tma-shop/shared';
 import { useNavigate } from 'react-router-dom';
 import { Button, Cell, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
 import { Input } from '../components/Field.js';
@@ -15,9 +15,13 @@ import { Loader } from '../components/Loader.js';
 import { useShop, useShopPath } from '../providers/ShopProvider.js';
 import {
   AddressForm,
+  DetailsFields,
   addressComplete,
+  asksDetails,
+  cleanDetails,
+  detailsProblem,
+  effectiveFields,
   EMPTY_ADDRESS,
-  trimAddress,
 } from '../components/AddressForm.js';
 import {
   cryptoAvailable,
@@ -40,7 +44,6 @@ export function CartPage(): React.JSX.Element {
   // Pre-filled with the customer's Telegram @username when they have one.
   const [contact, setContact] = useState(user?.username ? `@${user.username}` : '');
   const contactName = contact.trim().replace(/^@/, '');
-  const contactValid = /^[A-Za-z0-9_]{5,32}$/.test(contactName);
   const shop = useAsync(() => api.getShop(), []);
   // An order already waiting for payment: warn before placing a second one.
   const myOrders = useAsync(() => api.getOrders(), []);
@@ -53,6 +56,11 @@ export function CartPage(): React.JSX.Element {
   const needsShipping = zones.length > 0;
   const [zoneId, setZoneId] = useState<string | null>(null);
   const zone = zones.find((z) => z.id === zoneId) ?? (zones.length === 1 ? zones[0] : undefined);
+  // What the GB asks for. Details other than the @ are encrypted, so they need its key.
+  const fields = effectiveFields(shop.data?.checkoutFields ?? DEFAULT_CHECKOUT_FIELDS, needsShipping);
+  const contactOptional = fields.contact === 'optional';
+  const contactValid = /^[A-Za-z0-9_]{5,32}$/.test(contactName) || (contactOptional && contactName === '');
+  const askDetails = needsShipping || (asksDetails(fields) && Boolean(shop.data?.addressPublicKey));
   const [address, setAddress] = useState<DeliveryAddress>(() => {
     const saved = loadSavedAddress();
     if (saved) return { ...EMPTY_ADDRESS, ...saved };
@@ -122,9 +130,8 @@ export function CartPage(): React.JSX.Element {
         missing(t('cart.needUsername'));
         return;
       }
-      let shippingDetails: { shippingZoneId: string; encryptedAddress: string } | null = null;
+      let details: { shippingZoneId?: string; encryptedAddress: string } | null = null;
       if (needsShipping) {
-        const config = shop.data;
         if (!zone) {
           missing(t('cart.needZone'));
           return;
@@ -133,13 +140,21 @@ export function CartPage(): React.JSX.Element {
           missing(t('cart.needAddress'));
           return;
         }
+      }
+      if (askDetails) {
+        const config = shop.data;
+        const problem = detailsProblem(address, fields);
+        if (problem) {
+          missing(t(problem));
+          return;
+        }
         if (!config?.addressPublicKey || !config.addressKeyFingerprint || !cryptoAvailable()) {
           missing(t('cart.noDeliveryYet'));
           return;
         }
-        const clean = trimAddress(address);
-        shippingDetails = {
-          shippingZoneId: zone.id,
+        const clean = cleanDetails(address, fields, needsShipping);
+        details = {
+          ...(zone ? { shippingZoneId: zone.id } : {}),
           encryptedAddress: await encryptAddress(
             clean,
             config.addressPublicKey,
@@ -147,9 +162,9 @@ export function CartPage(): React.JSX.Element {
           ),
         };
         // Remembered only on this phone, to prefill the next order.
-        saveAddress(remember ? clean : null);
+        saveAddress(remember ? { ...address, ...clean } : null);
       }
-      const { orderId } = await api.createOrder(contactName, shippingDetails);
+      const { orderId } = await api.createOrder(contactName || null, details);
       // The server empties the cart when it creates the order.
       void refresh();
       // So the bot can tell the customer how the order goes.
@@ -168,6 +183,8 @@ export function CartPage(): React.JSX.Element {
     contactValid,
     contactName,
     needsShipping,
+    askDetails,
+    fields,
     shop.data,
     zone,
     address,
@@ -217,7 +234,10 @@ export function CartPage(): React.JSX.Element {
     ...(needsShipping
       ? [{ label: t('cart.stepShipping'), done: zone !== undefined && addressComplete(address) }]
       : []),
-    { label: t('cart.stepContact'), done: contactValid },
+    {
+      label: t('cart.stepContact'),
+      done: contactValid && (!askDetails || detailsProblem(address, fields) === null),
+    },
   ];
 
   return (
@@ -355,32 +375,36 @@ export function CartPage(): React.JSX.Element {
           })}
         </Section>
       )}
-      {needsShipping && (
-        <>
-          <AddressForm value={address} onChange={setAddress} />
-          <Section>
-            <Cell
-              onClick={() => setRemember((r) => !r)}
-              after={remember ? '✓' : ''}
-              multiline
-            >
-              {t('cart.rememberAddress')}
-            </Cell>
-          </Section>
-        </>
-      )}
+      {needsShipping && <AddressForm value={address} onChange={setAddress} />}
       <Section
-        header={`${needsShipping ? 3 : 2} · ${t('cart.usernameSection')}`}
-        footer={contactValid ? t('cart.usernameOk') : t('cart.usernameRule')}
+        header={`${needsShipping ? 3 : 2} · ${t(askDetails ? 'details.title' : 'cart.usernameSection')}`}
+        footer={[
+          contactValid && contactName !== ''
+            ? t('cart.usernameOk')
+            : contactOptional
+              ? t('cart.usernameOptional')
+              : t('cart.usernameRule'),
+          askDetails ? t('details.footer') : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
       >
+        {askDetails && <DetailsFields value={address} onChange={setAddress} fields={fields} />}
         <Input
-          header={t('cart.usernameField')}
+          header={contactOptional ? `${t('cart.usernameField')} (${t('details.optional')})` : `${t('cart.usernameField')} *`}
           placeholder={t('cart.usernamePlaceholder')}
           status={contact.trim() === '' || contactValid ? 'default' : 'error'}
           value={contact}
           onChange={(e) => setContact(e.target.value)}
         />
       </Section>
+      {askDetails && (
+        <Section>
+          <Cell onClick={() => setRemember((r) => !r)} after={remember ? '✓' : ''} multiline>
+            {t('cart.rememberAddress')}
+          </Cell>
+        </Section>
+      )}
     </List>
   );
 }

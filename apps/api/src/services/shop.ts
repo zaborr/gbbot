@@ -1,6 +1,7 @@
 import { asc, eq, or, sql } from 'drizzle-orm';
 import { createHash, createPublicKey, randomUUID } from 'node:crypto';
 import type {
+  CheckoutFields,
   OrganizerShopInput,
   OwnerSettingsInput,
   PlatformShopInput,
@@ -268,6 +269,15 @@ export async function updatePaymentSetup(
 }
 
 /** Replaces the shop's shipping zones; zones keep their id, new ones get one. */
+/** What checkout asks for. */
+export async function updateCheckoutFields(
+  db: Database,
+  shopId: string,
+  checkoutFields: CheckoutFields,
+): Promise<ShopAdminView> {
+  return toShopAdminDTO(await updateShop(db, shopId, { checkoutFields }));
+}
+
 export async function updateShippingZones(
   db: Database,
   shopId: string,

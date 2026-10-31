@@ -47,7 +47,7 @@ export function orderRoutes(): Hono<AppBindings> {
       c.get('db'),
       c.get('shopId'),
       sub,
-      contactUsername,
+      contactUsername ?? null,
       { shippingZoneId, encryptedAddress },
       c.get('isVip'),
     );
