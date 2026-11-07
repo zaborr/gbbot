@@ -174,6 +174,11 @@ function AdminHome(): React.JSX.Element {
           {t('adminHome.catalog')}
         </Cell>
         <Cell onClick={go('/admin/products/new')}>{t('adminHome.newProduct')}</Cell>
+        {config.testingEnabled && (
+          <Cell onClick={go('/admin/testings')} subtitle={t('testing.menuHint')}>
+            {t('testing.title')}
+          </Cell>
+        )}
       </Section>
 
       <Section header={t('adminHome.payments')}>

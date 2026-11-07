@@ -16,6 +16,8 @@ import { PaymentPage } from './pages/PaymentPage.js';
 import { AdminHomePage } from './pages/admin/AdminHomePage.js';
 import { AdminCatalogPage } from './pages/admin/AdminCatalogPage.js';
 import { AdminProductPage } from './pages/admin/AdminProductPage.js';
+import { AdminTestingsPage } from './pages/admin/AdminTestingsPage.js';
+import { AdminTestingPage } from './pages/admin/AdminTestingPage.js';
 import { AdminFeePage } from './pages/admin/AdminFeePage.js';
 import { AdminOrdersPage } from './pages/admin/AdminOrdersPage.js';
 import { AdminOrderPage } from './pages/admin/AdminOrderPage.js';
@@ -120,6 +122,8 @@ function Shell(): React.JSX.Element {
         <Route path="admin" element={<AdminHomePage />} />
         <Route path="admin/catalog" element={<AdminCatalogPage />} />
         <Route path="admin/products/:id" element={<AdminProductPage />} />
+        <Route path="admin/testings" element={<AdminTestingsPage />} />
+        <Route path="admin/testings/:id" element={<AdminTestingPage />} />
         <Route path="admin/fee" element={<AdminFeePage />} />
         <Route path="admin/settings" element={<AdminSettingsPage />} />
         <Route path="admin/wallets" element={<AdminWalletsPage />} />

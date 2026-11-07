@@ -3,6 +3,7 @@ import { unitPriceFor, type ProductOption, type VariantInput } from '@tma-shop/s
 import type { Database } from '../db/client.js';
 import { productVariants, type products } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
+import { assertVariantsFreeOfTestings } from './testing.js';
 
 export type VariantRow = typeof productVariants.$inferSelect;
 type ProductRow = typeof products.$inferSelect;
@@ -178,6 +179,7 @@ export async function syncVariants(
   }
 
   const stale = existing.filter((row) => !keep.has(row.id)).map((row) => row.id);
+  await assertVariantsFreeOfTestings(db, stale);
   if (stale.length > 0) {
     await db.delete(productVariants).where(inArray(productVariants.id, stale));
   }

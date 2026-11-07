@@ -140,6 +140,7 @@ export function toShopConfigDTO(
     overpayMargin: row.overpayMargin,
     shippingZones: row.shippingZones,
     checkoutFields: { ...DEFAULT_CHECKOUT_FIELDS, ...row.checkoutFields },
+    testingEnabled: row.testingEnabled,
     addressPublicKey: row.addressPublicKey,
     addressKeyFingerprint: row.addressKeyFingerprint,
     paymentMethods: paymentMethodsOf(row.paymentSetup),

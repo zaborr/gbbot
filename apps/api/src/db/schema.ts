@@ -25,6 +25,7 @@ import type {
   PaymentSetup,
   VipClub,
   CheckoutFields,
+  TestingTier,
   WebRole,
 } from '@tma-shop/shared';
 
@@ -111,6 +112,8 @@ export const shops = pgTable('shops', {
   autoCancelHours: integer('auto_cancel_hours').notNull().default(48),
   /** Shipping zones with a flat cost per order. */
   shippingZones: jsonb('shipping_zones').$type<ShippingZone[]>().notNull().default([]),
+  /** Collective lab testing of products is turned on (administrators). */
+  testingEnabled: boolean('testing_enabled').notNull().default(false),
   /** What checkout asks for (see CheckoutFields). */
   checkoutFields: jsonb('checkout_fields')
     .$type<CheckoutFields>()
@@ -341,6 +344,41 @@ export const orderItems = pgTable('order_items', {
   quantity: integer('quantity').notNull(),
   subtotal: integer('subtotal').notNull(),
 });
+
+/**
+ * Collective lab testing of one product, or of one of its variants: buyers add
+ * a contribution to their order and each tier (lab test) is ordered once the
+ * money raised covers it. See packages/shared/src/testing.ts.
+ */
+export const testings = pgTable(
+  'testings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: uuid('shop_id')
+      .notNull()
+      .references(() => shops.id, { onDelete: 'cascade' }),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    /** The variant tested (products with variants); its buyers take part. */
+    variantId: uuid('variant_id').references(() => productVariants.id, { onDelete: 'restrict' }),
+    /** The product's token when it was created: contributions are paid in it. */
+    currency: text('currency').notNull(),
+    lab: text('lab').notNull(),
+    /** The most each participant pays (minor units). */
+    contribution: integer('contribution').notNull(),
+    /** Leftovers below this per person are not sent back. */
+    refundThreshold: integer('refund_threshold').notNull().default(200),
+    tiers: jsonb('tiers').$type<TestingTier[]>().notNull(),
+    status: text('status').notNull().default('open'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('testings_product_variant_unique').on(table.productId, table.variantId).nullsNotDistinct(),
+    index('testings_shop_idx').on(table.shopId),
+  ],
+);
 
 // --- relations (used by Drizzle's relational query API) ---
 

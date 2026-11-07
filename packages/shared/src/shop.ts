@@ -98,6 +98,8 @@ export const shop = z.object({
   shippingZones: z.array(shippingZone),
   /** What checkout asks for. */
   checkoutFields,
+  /** Collective lab testing of products is turned on. */
+  testingEnabled: z.boolean(),
   /**
    * Public key (RSA-OAEP, base64 SPKI) the customer's device encrypts the
    * address with. Only the shop admin, holding the private key, can read it.
@@ -166,6 +168,7 @@ export const shopConfig = shop
     overpayMargin: true,
     shippingZones: true,
     checkoutFields: true,
+    testingEnabled: true,
     addressPublicKey: true,
     addressKeyFingerprint: true,
   })

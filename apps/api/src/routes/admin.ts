@@ -34,10 +34,13 @@ import {
   type Order,
   addToBlacklistRequest,
   blacklistWho,
+  updateTestingEnabledRequest,
 } from '@tma-shop/shared';
 import type { Context } from 'hono';
 import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth, requireOwner } from '../auth/middleware.js';
+import { testingAdminRoutes } from './testing.js';
+import { setTestingEnabled } from '../services/testing.js';
 import {
   createCategory,
   createProduct,
@@ -525,6 +528,11 @@ export function adminRoutes(): Hono<AppBindings> {
     c.json(await updateAutoCancel(c.get('db'), c.get('shopId'), c.req.valid('json').hours)),
   );
   // The GB's currency (administrators): the minimum, the margin and new products use it.
+  // Product testing on or off (administrators).
+  app.put('/shop/testing', requireOwner, zValidator('json', updateTestingEnabledRequest), async (c) =>
+    c.json(await setTestingEnabled(c.get('db'), c.get('shopId'), c.req.valid('json').enabled)),
+  );
+  app.route('/testings', testingAdminRoutes());
   app.put('/shop/currency', requireOwner, zValidator('json', updateShopCurrencyRequest), async (c) =>
     c.json(await updateShopCurrency(c.get('db'), c.get('shopId'), c.req.valid('json').currency)),
   );

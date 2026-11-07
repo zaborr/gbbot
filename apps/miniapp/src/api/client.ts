@@ -49,6 +49,9 @@ import type {
   WebCredentials,
   WebRole,
   CheckoutFields,
+  CreateTestingRequest,
+  Testing,
+  UpdateTestingRequest,
 } from '@tma-shop/shared';
 import { lang } from '../i18n/index.js';
 
@@ -758,6 +761,38 @@ export class ApiClient {
   }
 
   /** Hours without activity before an unpaid order is cancelled (0 = never). */
+  /** Administrators: product testing on or off for the GB. */
+  adminSetTestingEnabled(enabled: boolean): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/admin/shop/testing', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    });
+  }
+
+  adminGetTestings(): Promise<Testing[]> {
+    return this.request<Testing[]>('/admin/testings');
+  }
+
+  adminCreateTesting(input: CreateTestingRequest): Promise<Testing> {
+    return this.request<Testing>('/admin/testings', { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  adminUpdateTesting(id: string, input: UpdateTestingRequest): Promise<Testing> {
+    return this.request<Testing>(`/admin/testings/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
+  }
+
+  adminDeleteTesting(id: string): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/testings/${id}`, { method: 'DELETE' });
+  }
+
+  /** A product's testings (lab tests paid between its buyers). */
+  getProductTestings(productId: string): Promise<Testing[]> {
+    return this.request<Testing[]>(`/products/${productId}/testings`);
+  }
+
   /** Administrators: the GB's currency (minimum, margin, new products). */
   adminUpdateShopCurrency(currency: 'USDC' | 'EURC'): Promise<ShopAdminView> {
     return this.request<ShopAdminView>('/admin/shop/currency', {
