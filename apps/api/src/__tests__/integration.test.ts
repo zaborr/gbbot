@@ -1155,6 +1155,130 @@ describeDb('API integration', () => {
     await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
   });
 
+  it('settles a drawn testing: donors get it all back, the rest share the leftover', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const created = await request('/api/admin/testings', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({
+        productId,
+        variantId: null,
+        lab: 'Lab',
+        contribution: 1000,
+        refundThreshold: 200,
+        tiers: [{ id: 'mp', name: 'M&P', cost: 600, vials: 1 }],
+      }),
+    });
+    const { id: testingId } = (await created.json()) as { id: string };
+    const join = async (userId: number, name: string, volunteer: boolean): Promise<string> => {
+      const headers = { Authorization: `Bearer ${await authToken(userId, name)}`, 'content-type': 'application/json' };
+      await db.delete(carts).where(eq(carts.userId, userId));
+      await request('/api/cart/items', { method: 'POST', headers, body: JSON.stringify({ productId, quantity: 1 }) });
+      await request('/api/cart/testings', { method: 'POST', headers, body: JSON.stringify({ testingId, volunteer }) });
+      const placed = await request('/api/orders', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ contactUsername: `@${name.toLowerCase()}_test` }),
+      });
+      const { orderId } = (await placed.json()) as { orderId: string };
+      await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+      return orderId;
+    };
+    const volunteer = await join(CUSTOMER_ID, 'Alice', true);
+    const other = await join(555000888, 'Eve', false);
+
+    await db.update(shops).set({ closedAt: new Date() }).where(eq(shops.id, shopId));
+    try {
+      await db.update(testings).set({ status: 'closed' }).where(eq(testings.id, testingId));
+      const hash = 'cd'.repeat(32);
+      const explorer = (async (url: string | URL | Request) =>
+        new Response(String(url).endsWith('/blocks/tip/height') ? '900000' : hash)) as unknown as typeof fetch;
+      const shopRow = (await db.query.shops.findFirst({ where: eq(shops.id, shopId) }))!;
+      const launched = await launchDraw(db, testEnv, shopRow, testingId, explorer);
+      await finishDraw(db, testEnv, launched, explorer);
+
+      // The lab charged 500 in the end: 2 000 raised − 1 000 back to the donor − 500 = 500 for Eve.
+      const body = JSON.stringify({ realCosts: { mp: 500 } });
+      const preview = await request(`/api/admin/testings/${testingId}/settle-preview`, { method: 'POST', headers: admin, body });
+      expect(await preview.json()).toMatchObject({
+        settlement: { raised: 2000, spent: 500, donorRefunds: 1000, leftover: 500, perPerson: 500 },
+        refunds: { [volunteer.slice(0, 8)]: 1000, [other.slice(0, 8)]: 500 },
+      });
+      expect((await request(`/api/admin/testings/${testingId}/settle`, { method: 'POST', headers: admin, body })).status).toBe(200);
+      const rows = await db.select().from(orders).where(inArray(orders.id, [volunteer, other]));
+      const due = (id: string): number => {
+        const o = rows.find((r) => r.id === id)!;
+        return o.total - o.amountPaid;
+      };
+      expect(due(volunteer)).toBe(-1000);
+      expect(due(other)).toBe(-500);
+      const [settled] = await db.select().from(testings).where(eq(testings.id, testingId));
+      expect(settled?.status).toBe('settled');
+      // A GB with a settled testing cannot be opened again.
+      expect((await request('/api/admin/shop/reopen', { method: 'POST', headers: admin })).status).toBe(409);
+    } finally {
+      await db.update(shops).set({ closedAt: null }).where(eq(shops.id, shopId));
+    }
+    await db.delete(orderItems).where(inArray(orderItems.orderId, [volunteer, other]));
+    await db.delete(orders).where(inArray(orders.id, [volunteer, other]));
+    await db.delete(testings).where(eq(testings.id, testingId));
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
+    await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
+  });
+
+  it('cancels a testing: what was paid for it goes back', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const auth = {
+      Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const created = await request('/api/admin/testings', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({
+        productId,
+        variantId: null,
+        lab: 'Lab',
+        contribution: 1000,
+        refundThreshold: 200,
+        tiers: [{ id: 'mp', name: 'M&P', cost: 600, vials: 1 }],
+      }),
+    });
+    const { id: testingId } = (await created.json()) as { id: string };
+    await db.delete(carts).where(eq(carts.userId, CUSTOMER_ID));
+    await request('/api/cart/items', { method: 'POST', headers: auth, body: JSON.stringify({ productId, quantity: 1 }) });
+    await request('/api/cart/testings', { method: 'POST', headers: auth, body: JSON.stringify({ testingId, volunteer: false }) });
+    const placed = await request('/api/orders', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ contactUsername: '@alice_test' }),
+    });
+    const { orderId } = (await placed.json()) as { orderId: string };
+    await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+
+    expect((await request(`/api/admin/testings/${testingId}/cancel`, { method: 'POST', headers: admin })).status).toBe(200);
+    const [row] = await db.select().from(orders).where(eq(orders.id, orderId));
+    expect(row).toMatchObject({ testing: 0 });
+    expect((row?.total ?? 0) - (row?.amountPaid ?? 0)).toBe(-1000);
+    // Finished: the switch can be turned off.
+    expect(
+      (await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) })).status,
+    ).toBe(200);
+
+    await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
+    await db.delete(orders).where(eq(orders.id, orderId));
+    await db.delete(testings).where(eq(testings.id, testingId));
+    await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
+  });
+
   it('lets administrators set the GB currency', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,

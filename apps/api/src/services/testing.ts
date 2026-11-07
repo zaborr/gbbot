@@ -118,6 +118,8 @@ function toTestingDTO(
     pending: totals?.pending ?? 0,
     joined,
     draw: row.draw ?? null,
+    settlement: row.settlement ?? null,
+    reportSentAt: row.report?.sentAt ?? null,
   };
 }
 

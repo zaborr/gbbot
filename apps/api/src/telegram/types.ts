@@ -8,6 +8,10 @@ export interface TelegramUpdate {
     text?: string;
     /** A file sent to the bot. */
     document?: { file_id: string; file_name?: string; mime_type?: string; file_size?: number };
+    /** A picture (several sizes, the largest last). */
+    photo?: Array<{ file_id: string }>;
+    /** The bot's message this one answers. */
+    reply_to_message?: { message_id?: number };
   };
   /** Someone tapped one of the bot's inline buttons. */
   callback_query?: {

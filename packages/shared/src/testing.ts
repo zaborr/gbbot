@@ -14,6 +14,10 @@ export const testingTier = z.object({
   cost: z.number().int().positive().max(100_000_000),
   /** Vials it needs (0 when it reuses another tier's vial). */
   vials: z.number().int().min(0).max(20),
+  /** What the lab finally charged (set when settling). */
+  realCost: z.number().int().nonnegative().max(100_000_000).optional(),
+  /** Added when settling, paid with the leftover. */
+  extra: z.boolean().optional(),
 });
 export type TestingTier = z.infer<typeof testingTier>;
 
@@ -69,6 +73,10 @@ export const testing = z.object({
   joined: z.boolean(),
   /** The draw of donors, once launched. */
   draw: z.custom<TestingDraw>().nullable(),
+  /** How the money was worked out, once settled. */
+  settlement: z.custom<TestingSettlement>().nullable(),
+  /** When the lab report was sent to the participants. */
+  reportSentAt: z.string().nullable(),
 });
 export type Testing = z.infer<typeof testing>;
 
@@ -82,6 +90,22 @@ export interface TestingParticipant {
   /** Their whole order is paid. */
   paid: boolean;
   volunteer: boolean;
+}
+
+/** Settling: the real cost of each tier done, and maybe an extra tier paid with the leftover. */
+export const settleTestingRequest = z.object({
+  realCosts: z.record(z.string(), z.number().int().nonnegative().max(100_000_000)),
+  extra: z
+    .object({ name: z.string().trim().min(1).max(60), cost: z.number().int().positive().max(100_000_000) })
+    .optional(),
+});
+export type SettleTestingRequest = z.infer<typeof settleTestingRequest>;
+
+/** What settling gives (shown before confirming). */
+export interface SettlePreview {
+  settlement: Omit<TestingSettlement, 'at'>;
+  /** Short order id → what goes back. */
+  refunds: Record<string, number>;
 }
 
 export const updateTestingEnabledRequest = z.object({ enabled: z.boolean() });
@@ -179,4 +203,58 @@ export function settleDraw(
     done.push(tier.id);
   }
   return { tiersDone: done, donors: ranked.slice(0, vials).map((c) => c.ref) };
+}
+
+/** The money of a settled testing. */
+export interface TestingSettlement {
+  at: string;
+  /** Paid contributions. */
+  raised: number;
+  /** What the tiers done cost (real cost where set). */
+  spent: number;
+  /** Given back to donors who had paid (their testing is free). */
+  donorRefunds: number;
+  /** What is left for the others, before rounding and the threshold. */
+  leftover: number;
+  /** Sent back to each participant who paid (0 when below the threshold). */
+  perPerson: number;
+  /** No tier was reached: everything goes back. */
+  allBack: boolean;
+}
+
+export interface SettleEntry {
+  orderId: string;
+  amount: number;
+  donor: boolean;
+}
+
+/**
+ * What goes back to each participant. Donors who paid get it all back; the
+ * leftover (raised − cost − donors) is split in equal parts between the rest,
+ * unless that is below the threshold. With no tier done, everyone gets it all.
+ */
+export function settleMoney(
+  entries: readonly SettleEntry[],
+  spent: number,
+  threshold: number,
+  allBack: boolean,
+): { settlement: Omit<TestingSettlement, 'at'>; refunds: Map<string, number> } {
+  const refunds = new Map<string, number>();
+  const raised = entries.reduce((sum, e) => sum + e.amount, 0);
+  if (allBack) {
+    for (const e of entries) refunds.set(e.orderId, e.amount);
+    return {
+      settlement: { raised, spent: 0, donorRefunds: 0, leftover: raised, perPerson: 0, allBack: true },
+      refunds,
+    };
+  }
+  const donors = entries.filter((e) => e.donor);
+  const payers = entries.filter((e) => !e.donor);
+  const donorRefunds = donors.reduce((sum, e) => sum + e.amount, 0);
+  for (const e of donors) if (e.amount > 0) refunds.set(e.orderId, e.amount);
+  const leftover = payers.reduce((sum, e) => sum + e.amount, 0) - spent;
+  const share = payers.length > 0 ? Math.floor(Math.max(leftover, 0) / payers.length) : 0;
+  const perPerson = share >= Math.max(threshold, 1) ? share : 0;
+  if (perPerson > 0) for (const e of payers) refunds.set(e.orderId, Math.min(perPerson, e.amount));
+  return { settlement: { raised, spent, donorRefunds, leftover, perPerson, allBack: false }, refunds };
 }

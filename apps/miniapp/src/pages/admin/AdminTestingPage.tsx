@@ -6,6 +6,7 @@ import {
   MAX_TESTING_TIERS,
   tierProgress,
   type Product,
+  type SettlePreview,
   type Testing,
   type TestingTier,
 } from '@tma-shop/shared';
@@ -234,6 +235,8 @@ function TestingForm({
           pending: testing?.pending ?? 0,
           joined: false,
           draw: null,
+          settlement: null,
+          reportSentAt: null,
         }
       : null;
 
@@ -415,6 +418,12 @@ function TestingForm({
       {preview && <TestingCard testing={preview} preview />}
 
       {testing && <DrawSection testing={testing} onChange={onChange} />}
+
+      {testing && <SettleSection testing={testing} onChange={onChange} />}
+
+      {testing && <ReportSection testing={testing} />}
+
+      {testing && <CancelSection testing={testing} onChange={onChange} />}
 
       {testing && <Participants testing={testing} />}
 
@@ -605,6 +614,205 @@ function DrawSection({ testing, onChange }: { testing: Testing; onChange: () => 
           })}
         </Cell>
       ))}
+    </Section>
+  );
+}
+
+/**
+ * Settling the money: the real cost of the tests done, maybe an extra tier
+ * with the leftover, and what goes back to each participant (shown first).
+ */
+function SettleSection({ testing, onChange }: { testing: Testing; onChange: () => void }): React.JSX.Element | null {
+  const navigate = useNavigate();
+  const { to } = useShop();
+  const actions = useAdminActions(onChange);
+  const money = (amount: number): string => formatPrice(amount, testing.currency);
+  const doneIds = testing.status === 'drawn' ? (testing.draw?.tiersDone ?? []) : [];
+  const done = testing.tiers.filter((tier) => doneIds.includes(tier.id));
+  const [costs, setCosts] = useState<Record<string, string>>(() =>
+    Object.fromEntries(done.map((tier) => [tier.id, toMajor(tier.realCost ?? tier.cost)])),
+  );
+  const [extraName, setExtraName] = useState('');
+  const [extraCost, setExtraCost] = useState('');
+  const [preview, setPreview] = useState<SettlePreview | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  if (testing.status === 'settled' && testing.settlement) {
+    const s = testing.settlement;
+    return (
+      <Section header={t('testing.settleTitle')} footer={t('testing.settledFooter')}>
+        <SettlementCells settlement={s} money={money} />
+        <Cell onClick={() => navigate(to('/admin/orders?filter=attention'))} after="›" multiline>
+          {t('testing.seeRefunds')}
+        </Cell>
+      </Section>
+    );
+  }
+  if (testing.status !== 'drawn' && testing.status !== 'closed') return null;
+
+  const costsOk = done.every((tier) => MONEY_RE.test((costs[tier.id] ?? '').trim()));
+  const extraOk =
+    extraName.trim() === '' && extraCost.trim() === ''
+      ? true
+      : extraName.trim() !== '' && MONEY_RE.test(extraCost.trim()) && cents(extraCost) > 0;
+  const body = {
+    realCosts: Object.fromEntries(done.map((tier) => [tier.id, cents(costs[tier.id] ?? '0')])),
+    ...(extraName.trim() !== '' ? { extra: { name: extraName.trim(), cost: cents(extraCost) } } : {}),
+  };
+  const calc = (): void => {
+    setBusy(true);
+    void actions
+      .run(async () => setPreview(await api.adminSettlePreview(testing.id, body)))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <Section header={t('testing.settleTitle')} footer={t('testing.settleFooter')}>
+      <ErrorBanner message={actions.error} />
+      {testing.status === 'closed' && <Cell multiline>{t('testing.settleClosed')}</Cell>}
+      {done.map((tier) => (
+        <Input
+          key={tier.id}
+          header={t('testing.realCost', { tier: tier.name, currency: testing.currency })}
+          type="text"
+          inputMode="decimal"
+          value={costs[tier.id] ?? ''}
+          status={MONEY_RE.test((costs[tier.id] ?? '').trim()) ? 'default' : 'error'}
+          onChange={(e) => {
+            setCosts({ ...costs, [tier.id]: e.target.value });
+            setPreview(null);
+          }}
+        />
+      ))}
+      {testing.status === 'drawn' && (
+        <div className="gb-testing-tier-row">
+          <div style={{ flex: 3 }}>
+            <Input
+              header={t('testing.extraName')}
+              placeholder={t('testing.extraPlaceholder')}
+              value={extraName}
+              onChange={(e) => {
+                setExtraName(e.target.value);
+                setPreview(null);
+              }}
+            />
+          </div>
+          <div style={{ flex: 2 }}>
+            <Input
+              header={t('testing.extraCost', { currency: testing.currency })}
+              type="text"
+              inputMode="decimal"
+              value={extraCost}
+              status={extraOk ? 'default' : 'error'}
+              onChange={(e) => {
+                setExtraCost(e.target.value);
+                setPreview(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
+      {preview && <SettlementCells settlement={preview.settlement} money={money} />}
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {!preview ? (
+          <Button stretched mode="bezeled" loading={busy} disabled={!costsOk || !extraOk} onClick={calc}>
+            {t('testing.settleCalc')}
+          </Button>
+        ) : (
+          <Button
+            stretched
+            onClick={() => void actions.twoTap('settle', () => api.adminSettleTesting(testing.id, body))}
+          >
+            {actions.tapLabel('settle', t('testing.settleConfirm'))}
+          </Button>
+        )}
+      </div>
+    </Section>
+  );
+}
+
+/** The money, line by line. */
+function SettlementCells({
+  settlement,
+  money,
+}: {
+  settlement: SettlePreview['settlement'];
+  money: (amount: number) => string;
+}): React.JSX.Element {
+  return (
+    <>
+      <Cell after={money(settlement.raised)}>{t('testing.settleRaised')}</Cell>
+      {!settlement.allBack && <Cell after={money(settlement.spent)}>{t('testing.settleSpent')}</Cell>}
+      {settlement.donorRefunds > 0 && (
+        <Cell after={money(settlement.donorRefunds)} multiline>
+          {t('testing.settleDonors')}
+        </Cell>
+      )}
+      <Cell multiline after={<strong>{settlement.allBack ? money(settlement.raised) : money(Math.max(settlement.leftover, 0))}</strong>}>
+        {settlement.allBack ? t('testing.settleAllBack') : t('testing.settleLeftover')}
+      </Cell>
+      {!settlement.allBack && (
+        <Cell multiline>
+          {settlement.leftover < 0
+            ? t('testing.settleShort', { amount: money(-settlement.leftover) })
+            : settlement.perPerson > 0
+              ? t('testing.settlePerPerson', { amount: money(settlement.perPerson) })
+              : t('testing.settleBelowThreshold')}
+        </Cell>
+      )}
+    </>
+  );
+}
+
+/** The lab report: the bot asks the organiser for it and sends it on. */
+function ReportSection({ testing }: { testing: Testing }): React.JSX.Element | null {
+  const actions = useAdminActions(() => undefined);
+  const [asked, setAsked] = useState(false);
+  if (testing.status !== 'drawn' && testing.status !== 'settled') return null;
+  return (
+    <Section header={t('testing.reportTitle')} footer={t('testing.reportFooter')}>
+      <ErrorBanner message={actions.error} />
+      {testing.reportSentAt && (
+        <Cell multiline>
+          {t('testing.reportSentOn', { date: new Date(testing.reportSentAt).toLocaleString() })}
+        </Cell>
+      )}
+      {asked && <Cell multiline>{t('testing.reportAsked')}</Cell>}
+      <div style={{ padding: 16 }}>
+        <Button
+          stretched
+          mode="bezeled"
+          onClick={() =>
+            void actions.run(async () => {
+              await api.adminRequestTestingReport(testing.id);
+              setAsked(true);
+            })
+          }
+        >
+          {testing.reportSentAt ? t('testing.reportAgain') : t('testing.reportSend')}
+        </Button>
+      </div>
+    </Section>
+  );
+}
+
+/** Cancelling: everything paid for it goes back. */
+function CancelSection({ testing, onChange }: { testing: Testing; onChange: () => void }): React.JSX.Element | null {
+  const actions = useAdminActions(onChange);
+  if (testing.status === 'settled' || testing.status === 'cancelled') return null;
+  if (testing.participants === 0 && testing.pending === 0) return null;
+  return (
+    <Section footer={t('testing.cancelFooter')}>
+      <ErrorBanner message={actions.error} />
+      <div style={{ padding: 16 }}>
+        <Button
+          stretched
+          mode="plain"
+          onClick={() => void actions.twoTap('cancel', () => api.adminCancelTesting(testing.id))}
+        >
+          {actions.tapLabel('cancel', t('testing.cancel'))}
+        </Button>
+      </div>
     </Section>
   );
 }

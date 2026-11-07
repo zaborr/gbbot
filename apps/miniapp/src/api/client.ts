@@ -52,6 +52,8 @@ import type {
   CreateTestingRequest,
   Testing,
   TestingParticipant,
+  SettlePreview,
+  SettleTestingRequest,
   UpdateTestingRequest,
 } from '@tma-shop/shared';
 import { lang } from '../i18n/index.js';
@@ -510,6 +512,29 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify({ ref }),
     });
+  }
+
+  adminSettlePreview(id: string, input: SettleTestingRequest): Promise<SettlePreview> {
+    return this.request<SettlePreview>(`/admin/testings/${id}/settle-preview`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  adminSettleTesting(id: string, input: SettleTestingRequest): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/testings/${id}/settle`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  adminCancelTesting(id: string): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/testings/${id}/cancel`, { method: 'POST' });
+  }
+
+  /** The bot asks this organiser for the lab report (they reply with the file). */
+  adminRequestTestingReport(id: string): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/testings/${id}/report-request`, { method: 'POST' });
   }
 
   adminGetTestingParticipants(id: string): Promise<TestingParticipant[]> {

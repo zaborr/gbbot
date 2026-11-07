@@ -157,6 +157,12 @@ const en = {
   'testing.drawResult': '🎲 {shop}: result of the draw for the testing of {product} (block {height}). Donors: {donors}. Tests done: {tiers}. Check it: {link} — each place is sha256(block hash + order number).',
   'testing.drawDonor': '🎁 {shop}: you donate one vial of {product} to the testing (draw with block {height}: {link}). It is taken from your package before shipping, and the testing is free for you.',
   'testing.drawCancelled': '⚠️ {shop}: the draw for the testing of {product} has been cancelled because the GB was opened again. It will be drawn again, with a new block, when it closes.',
+  'testing.settledRefund': '💸 {shop}: the testing of {product} is settled. You get {amount} back: the organiser will send it to you (you will see it on your order).',
+  'testing.settledNoRefund': '✅ {shop}: the testing of {product} is settled. Nothing is left to send back (or it is below the refund threshold). The results will reach you through the bot.',
+  'testing.cancelled': '⚠️ {shop}: the testing of {product} has been cancelled. What you paid for it will be sent back to you (you will see it on your order).',
+  'testing.reportAsk': '📄 {shop}: send me the lab report of {product} ({lab}) as a reply to this message (PDF or picture). I will send it to the participants and donors.',
+  'testing.reportCaption': '📄 {shop}: lab report of {product} ({lab}).',
+  'testing.reportSent': '✅ Report sent to {count} people.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -306,6 +312,12 @@ const es: Record<BotMessageKey, string> = {
   'testing.drawResult': '🎲 {shop}: resultado del sorteo del testing de {product} (bloque {height}). Donan: {donors}. Análisis que se hacen: {tiers}. Compruébalo: {link} — cada puesto es sha256(hash del bloque + número de pedido).',
   'testing.drawDonor': '🎁 {shop}: donas un vial de {product} para el testing (sorteo con el bloque {height}: {link}). Se retira de tu paquete antes del envío y el testing te sale gratis.',
   'testing.drawCancelled': '⚠️ {shop}: el sorteo del testing de {product} se ha anulado porque se ha reabierto el GB. Se volverá a sortear, con un bloque nuevo, cuando cierre.',
+  'testing.settledRefund': '💸 {shop}: el testing de {product} está liquidado. Te corresponden {amount}: el organizador te los devolverá (lo verás en tu pedido).',
+  'testing.settledNoRefund': '✅ {shop}: el testing de {product} está liquidado. No sobra nada que devolver (o queda por debajo del umbral). Los resultados te llegarán por el bot.',
+  'testing.cancelled': '⚠️ {shop}: el testing de {product} se ha cancelado. Lo que pagaste por él se te devolverá (lo verás en tu pedido).',
+  'testing.reportAsk': '📄 {shop}: envíame el informe del laboratorio de {product} ({lab}) respondiendo a este mensaje (PDF o imagen). Lo enviaré a los participantes y donantes.',
+  'testing.reportCaption': '📄 {shop}: informe del laboratorio de {product} ({lab}).',
+  'testing.reportSent': '✅ Informe enviado a {count} personas.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -453,6 +465,12 @@ const it: Record<BotMessageKey, string> = {
   'testing.drawResult': '🎲 {shop}: risultato del sorteggio del testing di {product} (blocco {height}). Donano: {donors}. Analisi che si fanno: {tiers}. Verificalo: {link} — ogni posto è sha256(hash del blocco + numero d\'ordine).',
   'testing.drawDonor': '🎁 {shop}: doni una fiala di {product} per il testing (sorteggio con il blocco {height}: {link}). Si toglie dal tuo pacco prima della spedizione e il testing per te è gratis.',
   'testing.drawCancelled': '⚠️ {shop}: il sorteggio del testing di {product} è stato annullato perché il GB è stato riaperto. Si rifarà, con un nuovo blocco, quando chiuderà.',
+  'testing.settledRefund': '💸 {shop}: il testing di {product} è liquidato. Ti spettano {amount}: l\'organizzatore te li restituirà (lo vedrai nel tuo ordine).',
+  'testing.settledNoRefund': '✅ {shop}: il testing di {product} è liquidato. Non avanza nulla da restituire (o è sotto la soglia). I risultati ti arriveranno tramite il bot.',
+  'testing.cancelled': '⚠️ {shop}: il testing di {product} è stato annullato. Quanto hai pagato ti verrà restituito (lo vedrai nel tuo ordine).',
+  'testing.reportAsk': '📄 {shop}: inviami il referto del laboratorio di {product} ({lab}) rispondendo a questo messaggio (PDF o immagine). Lo invierò ai partecipanti e ai donatori.',
+  'testing.reportCaption': '📄 {shop}: referto del laboratorio di {product} ({lab}).',
+  'testing.reportSent': '✅ Referto inviato a {count} persone.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -600,6 +618,12 @@ const pt: Record<BotMessageKey, string> = {
   'testing.drawResult': '🎲 {shop}: resultado do sorteio do testing de {product} (bloco {height}). Doam: {donors}. Análises que se fazem: {tiers}. Verifique: {link} — cada lugar é sha256(hash do bloco + número do pedido).',
   'testing.drawDonor': '🎁 {shop}: doa um frasco de {product} para o testing (sorteio com o bloco {height}: {link}). É retirado do seu pacote antes do envio e o testing fica-lhe grátis.',
   'testing.drawCancelled': '⚠️ {shop}: o sorteio do testing de {product} foi anulado porque o GB foi reaberto. Voltará a ser sorteado, com um bloco novo, quando fechar.',
+  'testing.settledRefund': '💸 {shop}: o testing de {product} está liquidado. Correspondem-lhe {amount}: o organizador devolve-lhos (verá no seu pedido).',
+  'testing.settledNoRefund': '✅ {shop}: o testing de {product} está liquidado. Não sobra nada para devolver (ou fica abaixo do limite). Os resultados chegam-lhe pelo bot.',
+  'testing.cancelled': '⚠️ {shop}: o testing de {product} foi cancelado. O que pagou por ele ser-lhe-á devolvido (verá no seu pedido).',
+  'testing.reportAsk': '📄 {shop}: envie-me o relatório do laboratório de {product} ({lab}) respondendo a esta mensagem (PDF ou imagem). Envio-o aos participantes e doadores.',
+  'testing.reportCaption': '📄 {shop}: relatório do laboratório de {product} ({lab}).',
+  'testing.reportSent': '✅ Relatório enviado a {count} pessoas.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };
