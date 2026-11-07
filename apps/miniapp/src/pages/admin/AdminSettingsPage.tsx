@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Cell, List, Section, Switch } from '@telegram-apps/telegram-ui';
+import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import { Input, Textarea } from '../../components/Field.js';
 import type { ShopAdminView } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
@@ -39,42 +39,10 @@ function AdminSettings(): React.JSX.Element {
         onSaved={() => setReloadKey((k) => k + 1)}
       />
       <CurrencySection />
-      <TestingSection />
     </List>
   );
 }
 
-/** Product testing on or off for the GB (administrators). */
-function TestingSection(): React.JSX.Element {
-  const { shop, reload } = useShop();
-  const actions = useAdminActions(reload);
-  const [busy, setBusy] = useState(false);
-  return (
-    <Section
-      header={t('testing.title')}
-      footer={shop.canOwn ? t('testing.switchFooter') : t('testing.switchFooterOwners')}
-    >
-      <ErrorBanner message={actions.error} />
-      <Cell
-        Component="label"
-        after={
-          <Switch
-            checked={shop.testingEnabled}
-            disabled={!shop.canOwn || busy}
-            onChange={(e) => {
-              const enabled = e.target.checked;
-              setBusy(true);
-              void actions.run(() => api.adminSetTestingEnabled(enabled)).finally(() => setBusy(false));
-            }}
-          />
-        }
-        multiline
-      >
-        {t('testing.switch')}
-      </Cell>
-    </Section>
-  );
-}
 
 /**
  * The GB's currency: the minimum and the overpayment margin are in it, and new
