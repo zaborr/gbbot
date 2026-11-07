@@ -40,7 +40,7 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
   const navigate = useNavigate();
   const to = useShopPath();
   const { shop } = useShop();
-  const { add, itemCount, cart } = useCart();
+  const { add, itemCount, cart, joinTesting } = useCart();
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   // What was just added: shown here, so the customer can go on (another colour…).
@@ -89,6 +89,14 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
       ? formatPrice(min, product.currency)
       : `${formatPrice(min, product.currency)} – ${formatPrice(max, product.currency)}`;
 
+  // Its lab testings: the chosen variant's, or all of them until one is chosen.
+  const testings = useAsync(() => api.getProductTestings(product.id), [product.id]);
+  const shownTestings = (testings.data ?? []).filter(
+    (x) => !withVariants || variant === null || x.variantId === variant.id,
+  );
+  // Testings ticked before the product is in the cart: joined when it goes in.
+  const [choices, setChoices] = useState<Record<string, TestingChoice>>({});
+
   const onAdd = useCallback(async () => {
     if (withVariants && !variant) {
       setAddError(t('product.chooseFirst'));
@@ -99,6 +107,17 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
     setAdded(null);
     try {
       await add(product.id, variant?.id ?? null, qty);
+      const chosen = (testings.data ?? []).filter(
+        (x) => choices[x.id]?.join && (x.variantId === null || x.variantId === (variant?.id ?? null)),
+      );
+      for (const x of chosen) await joinTesting(x.id, choices[x.id]?.volunteer ?? false);
+      if (chosen.length > 0) {
+        setChoices((prev) => {
+          const next = { ...prev };
+          for (const x of chosen) delete next[x.id];
+          return next;
+        });
+      }
       // Stay on the product: say what went in and start again from 1.
       setAdded(`${productTitle(product)}${variant ? ` · ${variant.label}` : ''} ×${qty}`);
       setQuantity(1);
@@ -112,7 +131,7 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
     } finally {
       setAdding(false);
     }
-  }, [product, withVariants, variant, qty, add]);
+  }, [product, withVariants, variant, qty, add, testings.data, choices, joinTesting]);
 
   useMainButton({
     text: shop.isClosed
@@ -133,11 +152,6 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
     onClick: onAdd,
   });
 
-  // Its lab testings: the chosen variant's, or all of them until one is chosen.
-  const testings = useAsync(() => api.getProductTestings(product.id), [product.id]);
-  const shownTestings = (testings.data ?? []).filter(
-    (x) => !withVariants || variant === null || x.variantId === variant.id,
-  );
 
   const tiers = tierTable(product, variant, vip);
   const vipShown = variant ? vipPriceFor(product, variant, vip) !== null : hasVipPrice(product, vip);
@@ -227,7 +241,13 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
 
       {shownTestings.map((x) => (
         <TestingCard key={x.id} testing={x}>
-          <TestingActions testing={x} product={product} closed={shop.isClosed} />
+          <TestingActions
+            testing={x}
+            product={product}
+            closed={shop.isClosed}
+            choice={choices[x.id] ?? NO_CHOICE}
+            onChoice={(choice) => setChoices((prev) => ({ ...prev, [x.id]: choice }))}
+          />
         </TestingCard>
       ))}
 
@@ -310,18 +330,30 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
   );
 }
 
+interface TestingChoice {
+  join: boolean;
+  volunteer: boolean;
+}
+
+const NO_CHOICE: TestingChoice = { join: false, volunteer: false };
+
 /**
- * Joining a testing from the product page: it goes with the cart, so the
- * tested product (or variant) has to be in it first.
+ * Joining a testing from the product page. It goes with the cart: with the
+ * product already in it the switches apply at once; otherwise they are kept
+ * and applied when the product is added.
  */
 function TestingActions({
   testing,
   product,
   closed,
+  choice,
+  onChoice,
 }: {
   testing: Testing;
   product: Product;
   closed: boolean;
+  choice: TestingChoice;
+  onChoice: (choice: TestingChoice) => void;
 }): React.JSX.Element {
   const { cart, joinTesting, leaveTesting } = useCart();
   const [busy, setBusy] = useState(false);
@@ -344,46 +376,38 @@ function TestingActions({
 
   if (testing.joined) return <Cell multiline>{t('testing.joinedAlready')}</Cell>;
   if (closed || testing.status !== 'open') return <Cell multiline>{t('testing.closedNow')}</Cell>;
-  if (!inCart) return <Cell multiline>{t('testing.addProductFirst', { item: what })}</Cell>;
-  if (!ticked) {
-    return (
-      <div style={{ padding: 16 }}>
-        <Button stretched mode="bezeled" loading={busy} onClick={() => run(() => joinTesting(testing.id, false))}>
-          {t('testing.joinAmount', { amount })}
-        </Button>
-        {error && <div className="gb-hint" style={{ marginTop: 8 }}>{error}</div>}
-      </div>
-    );
-  }
+
+  const joined = inCart ? ticked !== undefined : choice.join;
+  const volunteer = inCart ? (ticked?.volunteer ?? false) : choice.volunteer;
+  const setJoined = (join: boolean): void => {
+    if (!inCart) onChoice({ join, volunteer: join && choice.volunteer });
+    else run(() => (join ? joinTesting(testing.id, false) : leaveTesting(testing.id)));
+  };
+  const setVolunteer = (value: boolean): void => {
+    if (!inCart) onChoice({ ...choice, volunteer: value });
+    else run(() => joinTesting(testing.id, value));
+  };
+
   return (
     <>
       <Cell
-        after={
-          <Button size="s" mode="plain" loading={busy} onClick={() => run(() => leaveTesting(testing.id))}>
-            {t('cart.remove')}
-          </Button>
-        }
-        multiline
-      >
-        {t('testing.inCart', { amount })}
-      </Cell>
-      <Cell
         Component="label"
-        after={
-          <Switch
-            checked={ticked.volunteer}
-            disabled={busy}
-            onChange={(e) => {
-              const volunteer = e.target.checked;
-              run(() => joinTesting(testing.id, volunteer));
-            }}
-          />
-        }
-        subtitle={t('testing.volunteerHint')}
+        after={<Switch checked={joined} disabled={busy} onChange={(e) => setJoined(e.target.checked)} />}
+        subtitle={inCart ? (joined ? t('testing.joinInCart') : undefined) : t('testing.joinOnAdd', { item: what })}
         multiline
       >
-        {t('testing.volunteer')}
+        {t('testing.joinSwitch', { amount })}
       </Cell>
+      {joined && (
+        <Cell
+          Component="label"
+          after={<Switch checked={volunteer} disabled={busy} onChange={(e) => setVolunteer(e.target.checked)} />}
+          subtitle={t('testing.volunteerHint')}
+          multiline
+        >
+          {t('testing.volunteer')}
+        </Cell>
+      )}
       {error && <Cell multiline>{error}</Cell>}
     </>
   );
