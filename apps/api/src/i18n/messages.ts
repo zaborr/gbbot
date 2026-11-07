@@ -153,6 +153,10 @@ const en = {
   'update.done': '✅ Updated to {version}.',
   'update.failed': '❌ The update to {version} failed. Last lines:',
   'testing.tierReached': '🎉 {shop}: the testing of {product} now covers {tiers}. Thanks for taking part!',
+  'testing.drawAnnounced': '🎲 {shop}: draw of donors for the testing of {product}. It is decided by Bitcoin block {height}, the next one to be mined (about 10 minutes). Candidates (🙋 volunteers go first): {candidates}.',
+  'testing.drawResult': '🎲 {shop}: result of the draw for the testing of {product} (block {height}). Donors: {donors}. Tests done: {tiers}. Check it: {link} — each place is sha256(block hash + order number).',
+  'testing.drawDonor': '🎁 {shop}: you donate one vial of {product} to the testing (draw with block {height}: {link}). It is taken from your package before shipping, and the testing is free for you.',
+  'testing.drawCancelled': '⚠️ {shop}: the draw for the testing of {product} has been cancelled because the GB was opened again. It will be drawn again, with a new block, when it closes.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -298,6 +302,10 @@ const es: Record<BotMessageKey, string> = {
   'update.done': '✅ Actualizado a {version}.',
   'update.failed': '❌ Ha fallado la actualización a {version}. Últimas líneas:',
   'testing.tierReached': '🎉 {shop}: el testing de {product} ya cubre {tiers}. ¡Gracias por participar!',
+  'testing.drawAnnounced': '🎲 {shop}: sorteo de donantes del testing de {product}. Lo decide el bloque de Bitcoin {height}, el próximo que se mine (unos 10 minutos). Candidatos (🙋 los voluntarios van primero): {candidates}.',
+  'testing.drawResult': '🎲 {shop}: resultado del sorteo del testing de {product} (bloque {height}). Donan: {donors}. Análisis que se hacen: {tiers}. Compruébalo: {link} — cada puesto es sha256(hash del bloque + número de pedido).',
+  'testing.drawDonor': '🎁 {shop}: donas un vial de {product} para el testing (sorteo con el bloque {height}: {link}). Se retira de tu paquete antes del envío y el testing te sale gratis.',
+  'testing.drawCancelled': '⚠️ {shop}: el sorteo del testing de {product} se ha anulado porque se ha reabierto el GB. Se volverá a sortear, con un bloque nuevo, cuando cierre.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -441,6 +449,10 @@ const it: Record<BotMessageKey, string> = {
   'update.done': '✅ Aggiornato a {version}.',
   'update.failed': '❌ L\'aggiornamento a {version} è fallito. Ultime righe:',
   'testing.tierReached': '🎉 {shop}: il testing di {product} ora copre {tiers}. Grazie per partecipare!',
+  'testing.drawAnnounced': '🎲 {shop}: sorteggio dei donatori del testing di {product}. Lo decide il blocco Bitcoin {height}, il prossimo che verrà minato (circa 10 minuti). Candidati (🙋 i volontari vanno prima): {candidates}.',
+  'testing.drawResult': '🎲 {shop}: risultato del sorteggio del testing di {product} (blocco {height}). Donano: {donors}. Analisi che si fanno: {tiers}. Verificalo: {link} — ogni posto è sha256(hash del blocco + numero d\'ordine).',
+  'testing.drawDonor': '🎁 {shop}: doni una fiala di {product} per il testing (sorteggio con il blocco {height}: {link}). Si toglie dal tuo pacco prima della spedizione e il testing per te è gratis.',
+  'testing.drawCancelled': '⚠️ {shop}: il sorteggio del testing di {product} è stato annullato perché il GB è stato riaperto. Si rifarà, con un nuovo blocco, quando chiuderà.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -584,6 +596,10 @@ const pt: Record<BotMessageKey, string> = {
   'update.done': '✅ Atualizado para {version}.',
   'update.failed': '❌ A atualização para {version} falhou. Últimas linhas:',
   'testing.tierReached': '🎉 {shop}: o testing de {product} já cobre {tiers}. Obrigado por participar!',
+  'testing.drawAnnounced': '🎲 {shop}: sorteio de doadores do testing de {product}. Decide-o o bloco de Bitcoin {height}, o próximo a ser minerado (cerca de 10 minutos). Candidatos (🙋 os voluntários vão primeiro): {candidates}.',
+  'testing.drawResult': '🎲 {shop}: resultado do sorteio do testing de {product} (bloco {height}). Doam: {donors}. Análises que se fazem: {tiers}. Verifique: {link} — cada lugar é sha256(hash do bloco + número do pedido).',
+  'testing.drawDonor': '🎁 {shop}: doa um frasco de {product} para o testing (sorteio com o bloco {height}: {link}). É retirado do seu pacote antes do envio e o testing fica-lhe grátis.',
+  'testing.drawCancelled': '⚠️ {shop}: o sorteio do testing de {product} foi anulado porque o GB foi reaberto. Voltará a ser sorteado, com um bloco novo, quando fechar.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

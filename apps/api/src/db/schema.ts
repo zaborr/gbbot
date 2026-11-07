@@ -26,6 +26,7 @@ import type {
   VipClub,
   CheckoutFields,
   TestingTier,
+  TestingDraw,
   WebRole,
 } from '@tma-shop/shared';
 
@@ -264,6 +265,8 @@ export const orders = pgTable('orders', {
   shipping: integer('shipping').notNull().default(0),
   /** Contributions to product testings (part of `total`; see testing_entries). */
   testing: integer('testing').notNull().default(0),
+  /** Drawn to donate one vial of each of these (product · variant): taken from the package. */
+  donatedVials: jsonb('donated_vials').$type<string[]>().notNull().default([]),
   shippingZoneName: text('shipping_zone_name'),
   /** Address encrypted on the customer's device; the server cannot read it. */
   encryptedAddress: text('encrypted_address'),
@@ -375,6 +378,8 @@ export const testings = pgTable(
     status: text('status').notNull().default('open'),
     /** How many tiers the participants were told are covered. */
     notifiedTiers: integer('notified_tiers').notNull().default(0),
+    /** The draw of donors (block, candidates, result). */
+    draw: jsonb('draw').$type<TestingDraw>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

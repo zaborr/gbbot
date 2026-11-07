@@ -128,6 +128,11 @@ function AdminOrder(): React.JSX.Element {
           </Cell>
         )}
         {o.testing > 0 && <Cell after={money(o.testing)}>{t('testing.orderLine')}</Cell>}
+        {o.donatedVials.map((v) => (
+          <Cell key={v} multiline>
+            {t('testing.minusVialAdmin', { item: v })}
+          </Cell>
+        ))}
         <Cell after={<strong>{money(o.total)}</strong>}>{t('cart.total')}</Cell>
         {o.isVip && <Cell multiline>{t('adminOrder.vip')}</Cell>}
       </Section>

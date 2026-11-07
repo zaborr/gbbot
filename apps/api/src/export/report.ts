@@ -66,6 +66,7 @@ const TEXT = {
     'col.products': 'Products',
     'col.shipping': 'Shipping',
     'col.testing': 'Testing',
+    'col.donated': 'Donated vials (testing)',
     'col.total': 'Total',
     'col.paid': 'Paid',
     'col.balance': 'Balance (+due / −refund)',
@@ -123,6 +124,7 @@ const TEXT = {
     'col.products': 'Productos',
     'col.shipping': 'Envío',
     'col.testing': 'Testing',
+    'col.donated': 'Viales donados (testing)',
     'col.total': 'Total',
     'col.paid': 'Pagado',
     'col.balance': 'Saldo (+pendiente / −devolver)',
@@ -180,6 +182,7 @@ const TEXT = {
     'col.products': 'Prodotti',
     'col.shipping': 'Spedizione',
     'col.testing': 'Testing',
+    'col.donated': 'Fiale donate (testing)',
     'col.total': 'Totale',
     'col.paid': 'Pagato',
     'col.balance': 'Saldo (+dovuto / −da rimborsare)',
@@ -237,6 +240,7 @@ const TEXT = {
     'col.products': 'Produtos',
     'col.shipping': 'Envio',
     'col.testing': 'Testing',
+    'col.donated': 'Frascos doados (testing)',
     'col.total': 'Total',
     'col.paid': 'Pago',
     'col.balance': 'Saldo (+por pagar / −a reembolsar)',
@@ -347,6 +351,7 @@ function ordersSheet(input: ReportInput, orders: readonly Order[]): Sheet {
     L('col.tracking'),
     L('col.notes'),
     L('col.items'),
+    L('col.donated'),
   ];
   const rows = orders.map((o): CellValue[] => {
     const customer = o.userId === null ? undefined : input.customers.get(o.userId);
@@ -378,6 +383,7 @@ function ordersSheet(input: ReportInput, orders: readonly Order[]): Sheet {
       o.trackingNumber ?? '',
       notes(L, o),
       o.items.map((i) => `${i.quantity}× ${itemName(i)}`).join(', '),
+      o.donatedVials.join(', '),
     ];
   });
   return {

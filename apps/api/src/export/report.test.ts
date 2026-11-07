@@ -21,6 +21,7 @@ function order(partial: Partial<Order> & Pick<Order, 'id' | 'status' | 'createdA
     fee: 0,
     shipping: 0,
     testing: 0,
+    donatedVials: [],
     shippingZoneName: null,
     encryptedAddress: null,
     addressKeyFingerprint: null,

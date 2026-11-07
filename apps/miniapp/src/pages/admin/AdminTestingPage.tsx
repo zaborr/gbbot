@@ -54,10 +54,11 @@ export function AdminTestingPage(): React.JSX.Element {
 function AdminTesting(): React.JSX.Element {
   const { id } = useParams();
   const isNew = id === undefined || id === 'new';
-  const testings = useAsync(() => api.adminGetTestings(), []);
+  const [reloadKey, setReloadKey] = useState(0);
+  const testings = useAsync(() => api.adminGetTestings(), [reloadKey]);
   const products = useAsync(() => api.adminGetProducts(), []);
 
-  if (testings.loading || products.loading) return <Loader />;
+  if ((testings.loading && !testings.data) || products.loading) return <Loader />;
   const error = testings.error ?? products.error;
   if (error) return <ErrorView message={error} />;
   const all = testings.data ?? [];
@@ -66,10 +67,11 @@ function AdminTesting(): React.JSX.Element {
 
   return (
     <TestingForm
-      key={current?.id ?? 'new'}
+      key={`${current?.id ?? 'new'}|${current?.status ?? ''}`}
       testing={current}
       testings={all}
       products={products.data ?? []}
+      onChange={() => setReloadKey((k) => k + 1)}
     />
   );
 }
@@ -78,10 +80,13 @@ function TestingForm({
   testing,
   testings,
   products,
+  onChange,
 }: {
   testing: Testing | null;
   testings: readonly Testing[];
   products: readonly Product[];
+  /** Load the testing again (after the draw, a substitution…). */
+  onChange: () => void;
 }): React.JSX.Element {
   const navigate = useNavigate();
   const { shop, to } = useShop();
@@ -228,6 +233,7 @@ function TestingForm({
           participants: testing?.participants ?? 0,
           pending: testing?.pending ?? 0,
           joined: false,
+          draw: null,
         }
       : null;
 
@@ -408,6 +414,8 @@ function TestingForm({
 
       {preview && <TestingCard testing={preview} preview />}
 
+      {testing && <DrawSection testing={testing} onChange={onChange} />}
+
       {testing && <Participants testing={testing} />}
 
       {editable && (
@@ -471,6 +479,130 @@ function Participants({ testing }: { testing: Testing }): React.JSX.Element | nu
           multiline
         >
           {p.contact ? `${p.name} · @${p.contact}` : p.name}
+        </Cell>
+      ))}
+    </Section>
+  );
+}
+
+/**
+ * The draw of donors: launched by hand once the GB is closed and every
+ * contribution paid; the next Bitcoin block decides it.
+ */
+function DrawSection({ testing, onChange }: { testing: Testing; onChange: () => void }): React.JSX.Element {
+  const navigate = useNavigate();
+  const { to } = useShop();
+  const actions = useAdminActions(onChange);
+  const status = useAsync(
+    () => (testing.status === 'closed' ? api.adminGetDrawStatus(testing.id) : Promise.resolve({ blocker: null })),
+    [testing.id, testing.status],
+  );
+  const draw = testing.draw;
+  const blockLink = (hash: string): string => `https://mempool.space/block/${hash}`;
+  const vials = testing.tiers.reduce((sum, tier) => sum + tier.vials, 0);
+
+  if (testing.status === 'open' || testing.status === 'cancelled') {
+    return (
+      <Section header={t('testing.drawTitle')}>
+        <Cell multiline>{t('testing.drawWhen', { vials })}</Cell>
+      </Section>
+    );
+  }
+
+  if (testing.status === 'closed') {
+    const blocker = status.data?.blocker ?? null;
+    const reason =
+      blocker === 'gb_open'
+        ? t('testing.drawGbOpen')
+        : blocker === 'unpaid'
+          ? t('testing.drawUnpaid')
+          : t('testing.drawReady', { vials });
+    return (
+      <Section header={t('testing.drawTitle')} footer={t('testing.drawFooter')}>
+        <ErrorBanner message={actions.error} />
+        <Cell multiline>{reason}</Cell>
+        <div style={{ padding: 16 }}>
+          <Button
+            stretched
+            disabled={status.loading || blocker !== null}
+            onClick={() => void actions.twoTap('draw', () => api.adminLaunchDraw(testing.id))}
+          >
+            {actions.tapLabel('draw', t('testing.drawLaunch'))}
+          </Button>
+        </div>
+      </Section>
+    );
+  }
+
+  // Drawing (waiting for the block) or drawn.
+  const byRef = new Map((draw?.candidates ?? []).map((c) => [c.ref, c]));
+  return (
+    <Section header={t('testing.drawTitle')} footer={t('testing.drawCheck')}>
+      <ErrorBanner message={actions.error} />
+      {testing.status === 'drawing' && draw && (
+        <Cell
+          multiline
+          after={
+            <Button size="s" mode="plain" onClick={onChange}>
+              {t('testing.refresh')}
+            </Button>
+          }
+        >
+          {t('testing.drawWaiting', { height: draw.height, count: draw.candidates.length })}
+        </Cell>
+      )}
+      {testing.status === 'drawn' && draw?.hash && (
+        <>
+          <Cell
+            multiline
+            after={
+              <a href={blockLink(draw.hash)} target="_blank" rel="noreferrer">
+                {t('testing.drawSeeBlock')}
+              </a>
+            }
+            subtitle={`${draw.hash.slice(0, 16)}…`}
+          >
+            {t('testing.drawBlock', { height: draw.height })}
+          </Cell>
+          <Cell multiline>
+            {t('testing.drawTiersDone', {
+              tiers: testing.tiers.filter((x) => draw.tiersDone.includes(x.id)).map((x) => x.name).join(', ') || '—',
+            })}
+          </Cell>
+          {draw.donors.length === 0 && <Cell multiline>{t('testing.drawNoDonors')}</Cell>}
+          {draw.donors.map((ref) => {
+            const candidate = byRef.get(ref);
+            return (
+              <Cell
+                key={ref}
+                onClick={candidate ? () => navigate(to(`/admin/orders/${candidate.orderId}`)) : undefined}
+                subtitle={candidate?.volunteer ? t('testing.volunteerChip') : t('testing.drawnAmongBuyers')}
+                after={
+                  <Button
+                    size="s"
+                    mode="plain"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void actions.twoTap(`sub-${ref}`, () => api.adminSubstituteDonor(testing.id, ref));
+                    }}
+                  >
+                    {actions.tapLabel(`sub-${ref}`, t('testing.substitute'))}
+                  </Button>
+                }
+                multiline
+              >
+                {`🎁 #${ref}`}
+              </Cell>
+            );
+          })}
+        </>
+      )}
+      {(draw?.history ?? []).map((h) => (
+        <Cell key={`${h.height}-${h.cancelledAt}`} multiline>
+          {t('testing.drawCancelledLine', {
+            height: h.height,
+            donors: h.donors.map((r) => `#${r}`).join(', ') || '—',
+          })}
         </Cell>
       ))}
     </Section>

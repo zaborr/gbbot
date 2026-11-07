@@ -57,6 +57,7 @@ export function orderRows(
     t('sheet.unitPrice'),
     t('sheet.subtotal'),
     t('sheet.currency'),
+    t('testing.donatedColumn'),
   ];
   if (addresses) {
     header.push(
@@ -85,7 +86,16 @@ export function orderRows(
       ? [o.shippingZoneName ?? '', ...addressCells(addresses.get(o.id))]
       : [];
     const line = (name: string, qty: number, unit: number, subtotal: number): void => {
-      rows.push([...base, name, qty, amount(unit), amount(subtotal), o.currency, ...extra]);
+      rows.push([
+        ...base,
+        name,
+        qty,
+        amount(unit),
+        amount(subtotal),
+        o.currency,
+        o.donatedVials.map((v) => t('testing.minusVial', { item: v })).join(', '),
+        ...extra,
+      ]);
     };
     for (const item of o.items) line(itemName(item), item.quantity, item.unitPrice, item.subtotal);
     if (o.fee > 0) line(feeLabel, 1, o.fee, o.fee);

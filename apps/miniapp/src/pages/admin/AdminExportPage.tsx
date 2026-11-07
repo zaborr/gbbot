@@ -202,7 +202,11 @@ function AdminExport({ part }: { part: 'files' | 'shipping' }): React.JSX.Elemen
       for (const o of orders) {
         try {
           const a = await decryptAddress(o.encryptedAddress ?? '', privateKey);
-          const items = o.items.map((i) => `${i.quantity}× ${itemName(i)}`).join(', ');
+          // Vials drawn for a testing are taken out of the package.
+          const items = [
+            o.items.map((i) => `${i.quantity}× ${itemName(i)}`).join(', '),
+            ...o.donatedVials.map((v) => t('testing.minusVial', { item: v })),
+          ].join(' · ');
           entries.push({
             id: o.id,
             title: `#${o.id.slice(0, 8)}${o.contactUsername ? ` · @${o.contactUsername}` : ''}`,
@@ -235,7 +239,7 @@ function AdminExport({ part }: { part: 'files' | 'shipping' }): React.JSX.Elemen
             a.country,
             a.phone,
             a.notes,
-            o.items.map((i) => `${i.quantity}× ${itemName(i)}`).join(', '),
+            items,
           ]);
         } catch {
           failed += 1;

@@ -4,6 +4,7 @@ import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { carts, orders, shops, testings } from '../db/schema.js';
 import { dropUnpaidTesting } from './testing.js';
+import { cancelDrawsOnReopen } from './testingDraw.js';
 import { toOrderDTO } from '../db/mappers.js';
 import { ApiError } from '../lib/errors.js';
 import { buildChangeDecisionMessage, notifyUsers } from './notifications.js';
@@ -95,7 +96,16 @@ export async function closeShop(db: Database, env: Env, shop: ShopRow): Promise<
 }
 
 /** Opens a closed GB again (deleted orders do not come back). */
-export async function reopenShop(db: Database, shop: ShopRow): Promise<ShopRow> {
+export async function reopenShop(db: Database, env: Env, shop: ShopRow): Promise<ShopRow> {
+  // A testing already settled (money worked out) cannot go back.
+  const settled = await db.query.testings.findFirst({
+    where: and(eq(testings.shopId, shop.id), eq(testings.status, 'settled')),
+  });
+  if (settled) {
+    throw ApiError.conflict('testing_settled', 'This GB has a settled testing: it cannot be opened again');
+  }
+  // Draws not settled are cancelled (kept in their history; everyone is told).
+  await cancelDrawsOnReopen(db, env, shop);
   const [row] = await db
     .update(shops)
     .set({ closedAt: null, closesAt: null })

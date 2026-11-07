@@ -117,6 +117,7 @@ function toTestingDTO(
     participants: totals?.participants ?? 0,
     pending: totals?.pending ?? 0,
     joined,
+    draw: row.draw ?? null,
   };
 }
 

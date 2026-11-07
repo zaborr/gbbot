@@ -17,6 +17,7 @@ import {
   productVariants,
   products,
   shops,
+  testings,
   users,
 } from '../db/schema.js';
 import { runRetention } from '../services/retention.js';
@@ -24,6 +25,7 @@ import { cancelExpiredOrders } from '../services/autoCancel.js';
 import { markOrderPaid } from '../services/orders.js';
 import { assertProductKeepsTestings, dropUnpaidTesting } from '../services/testing.js';
 import { goalTotals } from '../services/goal.js';
+import { cancelDrawsOnReopen, finishDraw, launchDraw } from '../services/testingDraw.js';
 import { sendPaymentReminders } from '../services/reminders.js';
 import { resetMiniAppUrlCache } from '../services/bot.js';
 import { closeDueShops } from '../services/closing.js';
@@ -1057,6 +1059,97 @@ describeDb('API integration', () => {
 
     await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
     await db.delete(orders).where(eq(orders.id, orderId));
+    await request(`/api/admin/testings/${testingId}`, { method: 'DELETE', headers: admin });
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
+    await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
+  });
+
+  it('draws the donors with the next Bitcoin block, volunteers first', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const auth = {
+      Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const created = await request('/api/admin/testings', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({
+        productId,
+        variantId: null,
+        lab: 'Lab',
+        contribution: 1000,
+        refundThreshold: 200,
+        tiers: [{ id: 'mp', name: 'M&P', cost: 500, vials: 1 }],
+      }),
+    });
+    const { id: testingId } = (await created.json()) as { id: string };
+    await db.delete(carts).where(eq(carts.userId, CUSTOMER_ID));
+    await request('/api/cart/items', { method: 'POST', headers: auth, body: JSON.stringify({ productId, quantity: 1 }) });
+    await request('/api/cart/testings', { method: 'POST', headers: auth, body: JSON.stringify({ testingId, volunteer: true }) });
+    const placed = await request('/api/orders', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ contactUsername: '@alice_test' }),
+    });
+    const { orderId } = (await placed.json()) as { orderId: string };
+    await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+    // Someone else takes part too (not offering a vial): the donor's contribution goes back.
+    const dan = {
+      Authorization: `Bearer ${await authToken(555000777, 'Dan')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/cart/items', { method: 'POST', headers: dan, body: JSON.stringify({ productId, quantity: 1 }) });
+    await request('/api/cart/testings', { method: 'POST', headers: dan, body: JSON.stringify({ testingId, volunteer: false }) });
+    const danPlaced = await request('/api/orders', {
+      method: 'POST',
+      headers: dan,
+      body: JSON.stringify({ contactUsername: '@dan_test' }),
+    });
+    const { orderId: danOrder } = (await danPlaced.json()) as { orderId: string };
+    await request(`/api/admin/orders/${danOrder}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+
+    // Only once the GB is closed.
+    expect((await request(`/api/admin/testings/${testingId}/draw`, { method: 'POST', headers: admin })).status).toBe(409);
+    await db.update(shops).set({ closedAt: new Date() }).where(eq(shops.id, shopId));
+    try {
+      await db.update(testings).set({ status: 'closed' }).where(eq(testings.id, testingId));
+      const status = await request(`/api/admin/testings/${testingId}/draw`, { headers: admin });
+      expect(await status.json()).toEqual({ blocker: null });
+
+      const hash = 'ab'.repeat(32);
+      const explorer = (async (url: string | URL | Request) =>
+        new Response(String(url).endsWith('/blocks/tip/height') ? '900000' : hash)) as unknown as typeof fetch;
+      const shopRow = (await db.query.shops.findFirst({ where: eq(shops.id, shopId) }))!;
+      const launched = await launchDraw(db, testEnv, shopRow, testingId, explorer);
+      expect(launched.draw).toMatchObject({ height: 900001, hash: null });
+      expect(launched.draw?.candidates).toEqual([
+        expect.objectContaining({ orderId, volunteer: true, paid: 1000 }),
+        expect.objectContaining({ orderId: danOrder, volunteer: false, paid: 1000 }),
+      ]);
+
+      expect(await finishDraw(db, testEnv, launched, explorer)).toBe(true);
+      const [drawn] = await db.select().from(testings).where(eq(testings.id, testingId));
+      expect(drawn).toMatchObject({ status: 'drawn' });
+      expect(drawn?.draw).toMatchObject({ hash, donors: [orderId.slice(0, 8)], tiersDone: ['mp'] });
+      const [donor] = await db.select().from(orders).where(eq(orders.id, orderId));
+      expect(donor?.donatedVials).toEqual(['Sencha']);
+
+      // Opening the GB again cancels the draw (kept in its history) and the mark.
+      await cancelDrawsOnReopen(db, testEnv, shopRow);
+      const [reopened] = await db.select().from(testings).where(eq(testings.id, testingId));
+      expect(reopened?.status).toBe('open');
+      expect(reopened?.draw?.history).toHaveLength(1);
+      const [cleared] = await db.select().from(orders).where(eq(orders.id, orderId));
+      expect(cleared?.donatedVials).toEqual([]);
+    } finally {
+      await db.update(shops).set({ closedAt: null }).where(eq(shops.id, shopId));
+    }
+    await db.delete(orderItems).where(inArray(orderItems.orderId, [orderId, danOrder]));
+    await db.delete(orders).where(inArray(orders.id, [orderId, danOrder]));
     await request(`/api/admin/testings/${testingId}`, { method: 'DELETE', headers: admin });
     await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
     await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));

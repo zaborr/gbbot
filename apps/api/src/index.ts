@@ -4,6 +4,7 @@ import { createDb, createPool } from './db/client.js';
 import { createApp } from './app.js';
 import { configureBot } from './services/bot.js';
 import { scheduleMaintenance } from './services/maintenance.js';
+import { scheduleDrawWatcher } from './services/testingDraw.js';
 import { resumePaymentChecks } from './services/paymentCheck.js';
 
 // A stray failed background task must not take the whole API down.
@@ -22,6 +23,7 @@ void configureBot(env);
 // Every 3 hours (and now): cancel unpaid orders past their deadline, then
 // delete personal data past its retention period. One run, one database wake-up.
 scheduleMaintenance(db, env);
+scheduleDrawWatcher(db, env);
 
 // Payment checks that were running before a restart.
 resumePaymentChecks(db, env).catch((error: unknown) => {

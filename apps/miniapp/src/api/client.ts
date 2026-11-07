@@ -496,6 +496,22 @@ export class ApiClient {
     return this.request<Testing[]>('/products/testings');
   }
 
+  /** Why the draw cannot be launched yet (`gb_open`, `not_closed`, `unpaid`), or null. */
+  adminGetDrawStatus(id: string): Promise<{ blocker: string | null }> {
+    return this.request<{ blocker: string | null }>(`/admin/testings/${id}/draw`);
+  }
+
+  adminLaunchDraw(id: string): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/testings/${id}/draw`, { method: 'POST' });
+  }
+
+  adminSubstituteDonor(id: string, ref: string): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/testings/${id}/substitute`, {
+      method: 'POST',
+      body: JSON.stringify({ ref }),
+    });
+  }
+
   adminGetTestingParticipants(id: string): Promise<TestingParticipant[]> {
     return this.request<TestingParticipant[]>(`/admin/testings/${id}/participants`);
   }
