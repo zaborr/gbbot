@@ -3,6 +3,7 @@ import { isClosedAt, type ClosePreview } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { carts, orders, shops, testings } from '../db/schema.js';
+import { dropUnpaidTesting } from './testing.js';
 import { toOrderDTO } from '../db/mappers.js';
 import { ApiError } from '../lib/errors.js';
 import { buildChangeDecisionMessage, notifyUsers } from './notifications.js';
@@ -62,6 +63,8 @@ async function cleanUpClosed(db: Database, env: Env, shop: ShopRow): Promise<voi
     .update(testings)
     .set({ status: 'closed', updatedAt: new Date() })
     .where(and(eq(testings.shopId, shop.id), eq(testings.status, 'open')));
+  // Testings added to paid orders and not paid: they drop out (the order is paid again).
+  await dropUnpaidTesting(db, shop.id);
   await db.delete(orders).where(unpaidOrders(shop.id));
   await db.delete(carts).where(eq(carts.shopId, shop.id));
   const rejected = await db
