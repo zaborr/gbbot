@@ -67,6 +67,8 @@ export const testing = z.object({
   pending: z.number().int(),
   /** For the customer asking: already in it (on an order). */
   joined: z.boolean(),
+  /** The draw of donors, once launched. */
+  draw: z.custom<TestingDraw>().nullable(),
 });
 export type Testing = z.infer<typeof testing>;
 
@@ -118,4 +120,63 @@ export function tierProgress(
 /** Total cost of every tier. */
 export function testingTotalCost(tiersList: readonly TestingTier[]): number {
   return tiersList.reduce((sum, tier) => sum + tier.cost, 0);
+}
+
+/** One person who can be drawn to donate a vial (their order, published by its short id). */
+export interface DrawCandidate {
+  orderId: string;
+  /** First 8 characters of the order id, as published (and hashed). */
+  ref: string;
+  /** Offered to donate. */
+  volunteer: boolean;
+  /** What they paid for the testing (0 if they did not take part): a donor gets it back. */
+  paid: number;
+}
+
+/**
+ * The draw of a testing: the block that decides it, who could be drawn and the
+ * result. Saved when it is launched, completed when the block is mined.
+ */
+export interface TestingDraw {
+  /** The first block after the announcement. */
+  height: number;
+  hash: string | null;
+  announcedAt: string;
+  drawnAt: string | null;
+  candidates: DrawCandidate[];
+  /** After the draw: volunteers first, then everyone else, each group by its hash. */
+  ranking: string[];
+  /** Short order ids of the donors, in draw order. */
+  donors: string[];
+  /** Tiers done (ids) with those donors. */
+  tiersDone: string[];
+  /** Earlier draws, cancelled when the GB was opened again. */
+  history?: Array<{ height: number; hash: string | null; donors: string[]; cancelledAt: string }>;
+}
+
+/**
+ * Which tiers can be done and who donates, once the candidates are ranked:
+ * tiers are taken in order while the money raised (less what goes back to the
+ * donors taking part) covers them and there are enough candidates for their
+ * vials. The donors are the first ones in the ranking, one per vial.
+ */
+export function settleDraw(
+  tiersList: readonly TestingTier[],
+  raised: number,
+  ranked: ReadonlyArray<Pick<DrawCandidate, 'ref' | 'paid'>>,
+): { tiersDone: string[]; donors: string[] } {
+  let cost = 0;
+  let vials = 0;
+  const done: string[] = [];
+  for (const tier of tiersList) {
+    const nextCost = cost + tier.cost;
+    const nextVials = vials + tier.vials;
+    if (nextVials > ranked.length) break;
+    const refunds = ranked.slice(0, nextVials).reduce((sum, c) => sum + c.paid, 0);
+    if (nextCost > raised - refunds) break;
+    cost = nextCost;
+    vials = nextVials;
+    done.push(tier.id);
+  }
+  return { tiersDone: done, donors: ranked.slice(0, vials).map((c) => c.ref) };
 }

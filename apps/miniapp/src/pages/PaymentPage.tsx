@@ -133,6 +133,11 @@ export function PaymentPage(): React.JSX.Element {
         {current.testing > 0 && (
           <Cell after={formatPrice(current.testing, current.currency)}>{t('testing.orderLine')}</Cell>
         )}
+        {current.donatedVials.map((v) => (
+          <Cell key={v} multiline>
+            {t('testing.donorLine', { item: v })}
+          </Cell>
+        ))}
         <Cell after={formatPrice(current.total, current.currency)}>{t('cart.total')}</Cell>
         {current.amountPaid > 0 && (
           <Cell after={formatPrice(current.amountPaid, current.currency)}>{t('order.paidSoFar')}</Cell>

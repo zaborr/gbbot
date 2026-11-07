@@ -244,6 +244,7 @@ export function toOrderDTO(row: OrderRow, items: OrderItemRow[]): Order {
     fee: row.fee,
     shipping: row.shipping,
     testing: row.testing,
+    donatedVials: row.donatedVials,
     shippingZoneName: row.shippingZoneName,
     encryptedAddress: row.encryptedAddress,
     addressKeyFingerprint: row.addressKeyFingerprint,

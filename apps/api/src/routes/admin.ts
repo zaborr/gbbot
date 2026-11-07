@@ -202,7 +202,7 @@ export function adminRoutes(): Hono<AppBindings> {
     c.json(getShopAdminView(await closeShop(c.get('db'), c.get('env'), c.get('shop')))),
   );
   app.post('/shop/reopen', async (c) =>
-    c.json(getShopAdminView(await reopenShop(c.get('db'), c.get('shop')))),
+    c.json(getShopAdminView(await reopenShop(c.get('db'), c.get('env'), c.get('shop')))),
   );
   // The minimum for the GB to go ahead (any manager, like the closing date).
   app.put('/shop/goal', zValidator('json', updateGoalRequest), async (c) => {

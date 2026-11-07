@@ -102,6 +102,8 @@ export const order = z.object({
   shipping: moneyAmount,
   /** Contributions to product testings on this order (part of `total`). */
   testing: moneyAmount,
+  /** Drawn to donate one vial of each of these (product · variant) to a testing. */
+  donatedVials: z.array(z.string()),
   /** Name of the shipping zone chosen at checkout. */
   shippingZoneName: z.string().nullable(),
   /**

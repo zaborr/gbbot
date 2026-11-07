@@ -80,6 +80,20 @@ export function TestingCard({
             : t('testing.allReached', { raised: money(testing.raised) })}
           {testing.pending > 0 && ` · ${t('testing.pendingAmount', { amount: money(testing.pending) })}`}
         </span>
+        {testing.status === 'drawing' && testing.draw && (
+          <span className="gb-hint">{t('testing.cardDrawing', { height: testing.draw.height })}</span>
+        )}
+        {testing.status === 'drawn' && testing.draw?.hash && (
+          <span className="gb-hint">
+            {t('testing.cardDrawn', {
+              height: testing.draw.height,
+              donors: testing.draw.donors.map((r) => `#${r}`).join(', ') || '—',
+            })}{' '}
+            <a href={`https://mempool.space/block/${testing.draw.hash}`} target="_blank" rel="noreferrer">
+              {t('testing.drawSeeBlock')}
+            </a>
+          </span>
+        )}
       </div>
       {progress.map((p) => (
         <Cell

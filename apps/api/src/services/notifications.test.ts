@@ -12,6 +12,7 @@ const base: Order = {
   fee: 0,
   shipping: 590,
   testing: 0,
+  donatedVials: [],
   shippingZoneName: 'Spain',
   encryptedAddress: null,
   addressKeyFingerprint: null,
