@@ -37,7 +37,7 @@ export function CartPage(): React.JSX.Element {
   const navigate = useNavigate();
   const to = useShopPath();
   const closed = useShop().shop.isClosed;
-  const { cart, loading, setQuantity, remove, refresh } = useCart();
+  const { cart, loading, setQuantity, remove, refresh, joinTesting, leaveTesting } = useCart();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user } = useSession();
@@ -68,7 +68,25 @@ export function CartPage(): React.JSX.Element {
     return { ...EMPTY_ADDRESS, name };
   });
   const [remember, setRemember] = useState(true);
-  const itemsTotal = cart ? cart.total - cart.fee : 0;
+  // Testings joined here are part of the total, but not of what the products cost.
+  const testingTotal = (cart?.testings ?? []).reduce((sum, x) => sum + x.amount, 0);
+  const itemsTotal = cart ? cart.total - cart.fee - testingTotal : 0;
+  // Testings this cart could join (it holds what they test), not joined yet.
+  const testingList = useAsync(() => api.getTestings(), [cart?.lines.length ?? 0]);
+  const offers = (testingList.data ?? []).filter(
+    (x) =>
+      x.status === 'open' &&
+      !x.joined &&
+      !(cart?.testings ?? []).some((c) => c.testingId === x.id) &&
+      (cart?.lines ?? []).some(
+        (line) => line.product.id === x.productId && (x.variantId === null || line.variant?.id === x.variantId),
+      ),
+  );
+  const [testingBusy, setTestingBusy] = useState<string | null>(null);
+  const onTesting = (id: string, action: () => Promise<void>): void => {
+    setTestingBusy(id);
+    void action().finally(() => setTestingBusy(null));
+  };
   // Products below their minimum (all variants together): checkout waits.
   const shortfalls = (() => {
     const byProduct = new Map<string, { name: string; min: number; quantity: number }>();
@@ -332,6 +350,26 @@ export function CartPage(): React.JSX.Element {
             {shop.data?.orderFeeLabel ?? t('cart.serviceFee')}
           </Cell>
         )}
+        {(cart?.testings ?? []).map((x) => (
+          <Cell
+            key={x.testingId}
+            after={money(x.amount)}
+            subtitle={x.volunteer ? t('testing.volunteerChip') : undefined}
+            description={
+              <Button
+                size="s"
+                mode="plain"
+                loading={testingBusy === x.testingId}
+                onClick={() => onTesting(x.testingId, () => leaveTesting(x.testingId))}
+              >
+                {t('cart.remove')}
+              </Button>
+            }
+            multiline
+          >
+            {t('testing.cartLine', { item: x.label })}
+          </Cell>
+        ))}
         {needsShipping && (
           <Cell after={zone && cart ? money(shipping) : '—'}>
             {zone ? t('cart.shippingZoneLine', { zone: zone.name }) : t('cart.shipping')}
@@ -345,6 +383,29 @@ export function CartPage(): React.JSX.Element {
           </Cell>
         )}
       </Section>
+      {cart && offers.length > 0 && (
+        <Section header={t('testing.offerTitle')} footer={t('testing.offerFooter')}>
+          {offers.map((x) => (
+            <Cell
+              key={x.id}
+              subtitle={t('testing.offerSubtitle', { lab: x.lab, amount: formatPrice(x.contribution, x.currency) })}
+              after={
+                <Button
+                  size="s"
+                  mode="bezeled"
+                  loading={testingBusy === x.id}
+                  onClick={() => onTesting(x.id, () => joinTesting(x.id, false))}
+                >
+                  {t('testing.join')}
+                </Button>
+              }
+              multiline
+            >
+              {x.variantLabel ? `${x.productTitle} · ${x.variantLabel}` : x.productTitle}
+            </Cell>
+          ))}
+        </Section>
+      )}
       {needsShipping && cart && (
         <Section header={`2 · ${t('cart.shippingZone')}`}>
           {zones.map((z) => {

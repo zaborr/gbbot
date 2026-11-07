@@ -152,6 +152,7 @@ const en = {
   'update.running': '⏳ Updating to {version}… (backup, build and restart: a few minutes). This message will change when it is done.',
   'update.done': '✅ Updated to {version}.',
   'update.failed': '❌ The update to {version} failed. Last lines:',
+  'testing.tierReached': '🎉 {shop}: the testing of {product} now covers {tiers}. Thanks for taking part!',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -296,6 +297,7 @@ const es: Record<BotMessageKey, string> = {
   'update.running': '⏳ Actualizando a {version}… (copia, build y reinicio: unos minutos). Este mensaje cambiará al terminar.',
   'update.done': '✅ Actualizado a {version}.',
   'update.failed': '❌ Ha fallado la actualización a {version}. Últimas líneas:',
+  'testing.tierReached': '🎉 {shop}: el testing de {product} ya cubre {tiers}. ¡Gracias por participar!',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -438,6 +440,7 @@ const it: Record<BotMessageKey, string> = {
   'update.running': '⏳ Aggiornamento a {version}… (copia, build e riavvio: qualche minuto). Questo messaggio cambierà alla fine.',
   'update.done': '✅ Aggiornato a {version}.',
   'update.failed': '❌ L\'aggiornamento a {version} è fallito. Ultime righe:',
+  'testing.tierReached': '🎉 {shop}: il testing di {product} ora copre {tiers}. Grazie per partecipare!',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -580,6 +583,7 @@ const pt: Record<BotMessageKey, string> = {
   'update.running': '⏳ A atualizar para {version}… (cópia, build e reinício: uns minutos). Esta mensagem muda quando terminar.',
   'update.done': '✅ Atualizado para {version}.',
   'update.failed': '❌ A atualização para {version} falhou. Últimas linhas:',
+  'testing.tierReached': '🎉 {shop}: o testing de {product} já cobre {tiers}. Obrigado por participar!',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

@@ -840,7 +840,7 @@ describeDb('API integration', () => {
     expect(await sees()).toBe(true);
   });
 
-  it('sets up product testings, shown only to the team for now', async () => {
+  it('sets up product testings per product or variant', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
       'content-type': 'application/json',
@@ -884,11 +884,11 @@ describeDb('API integration', () => {
     });
     expect(withVariant.status).toBe(400);
 
-    // Customers do not see it yet; the team does, as a preview.
+    // Customers see it on the product, and in the GB's list.
     const seen = await request(`/api/products/${productId}/testings`, { headers: customer });
-    expect(await seen.json()).toEqual([]);
-    const preview = await request(`/api/products/${productId}/testings`, { headers: admin });
-    expect(((await preview.json()) as unknown[]).length).toBe(1);
+    expect(((await seen.json()) as unknown[]).length).toBe(1);
+    const all = await request('/api/products/testings', { headers: customer });
+    expect(((await all.json()) as unknown[]).length).toBe(1);
 
     // The product keeps its token while it has a testing.
     await expect(assertProductKeepsTestings(db, productId, 'EURC', false)).rejects.toThrow(/token/);
@@ -908,6 +908,99 @@ describeDb('API integration', () => {
     const removed = await request(`/api/admin/testings/${testing.id}`, { method: 'DELETE', headers: admin });
     expect(removed.status).toBe(200);
     expect((await toggle(false)).status).toBe(200);
+  });
+
+  it('lets buyers of the tested product join a testing with their order', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const auth = {
+      Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const created = await request('/api/admin/testings', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({
+        productId,
+        variantId: null,
+        lab: 'Lab',
+        contribution: 2000,
+        refundThreshold: 200,
+        tiers: [{ id: 'mp', name: 'M&P', cost: 2000, vials: 1 }],
+      }),
+    });
+    const { id: testingId } = (await created.json()) as { id: string };
+    const join = (): Promise<Response> =>
+      Promise.resolve(
+        request('/api/cart/testings', {
+          method: 'POST',
+          headers: auth,
+          body: JSON.stringify({ testingId, volunteer: true }),
+        }),
+      );
+
+    // Only with the product in the cart.
+    expect((await join()).status).toBe(409);
+    await request('/api/cart/items', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ productId, quantity: 1 }),
+    });
+    const cart = (await (await join()).json()) as {
+      total: number;
+      lines: Array<{ subtotal: number }>;
+      testings: Array<{ amount: number; volunteer: boolean }>;
+    };
+    expect(cart.testings).toEqual([expect.objectContaining({ amount: 2000, volunteer: true })]);
+    const items = cart.lines.reduce((sum, line) => sum + line.subtotal, 0);
+    expect(cart.total).toBe(items + 2000);
+
+    const placed = await request('/api/orders', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ contactUsername: '@alice_test' }),
+    });
+    const { orderId } = (await placed.json()) as { orderId: string };
+    const order = (await (await request(`/api/orders/${orderId}`, { headers: auth })).json()) as {
+      total: number;
+      testing: number;
+    };
+    expect(order).toMatchObject({ total: items + 2000, testing: 2000 });
+    const listed = async (): Promise<{ raised: number; pending: number; joined: boolean }> => {
+      const res = await request(`/api/products/${productId}/testings`, { headers: auth });
+      return ((await res.json()) as Array<{ raised: number; pending: number; joined: boolean }>)[0]!;
+    };
+    expect(await listed()).toMatchObject({ raised: 0, pending: 2000, joined: true });
+
+    // Counted once the whole order is paid; and one entry per person.
+    await request(`/api/admin/orders/${orderId}`, {
+      method: 'PATCH',
+      headers: admin,
+      body: JSON.stringify({ status: 'paid' }),
+    });
+    expect(await listed()).toMatchObject({ raised: 2000, pending: 0 });
+    await request('/api/cart/items', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ productId, quantity: 1 }),
+    });
+    expect((await join()).status).toBe(409);
+    const participants = await request(`/api/admin/testings/${testingId}/participants`, { headers: admin });
+    expect(await participants.json()).toEqual([
+      expect.objectContaining({ contact: 'alice_test', paid: true, volunteer: true, amount: 2000 }),
+    ]);
+    // Taken part in: it cannot be deleted, nor its tiers changed.
+    expect((await request(`/api/admin/testings/${testingId}`, { method: 'DELETE', headers: admin })).status).toBe(409);
+
+    await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
+    await db.delete(orders).where(eq(orders.id, orderId));
+    await request(`/api/admin/testings/${testingId}`, { method: 'DELETE', headers: admin });
+    await db.delete(carts).where(eq(carts.userId, CUSTOMER_ID));
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
+    await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
   });
 
   it('lets administrators set the GB currency', async () => {

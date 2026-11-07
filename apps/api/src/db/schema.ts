@@ -262,6 +262,8 @@ export const orders = pgTable('orders', {
   fee: integer('fee').notNull().default(0),
   /** Shipping charged once, frozen at creation (0 = free or not shipped). */
   shipping: integer('shipping').notNull().default(0),
+  /** Contributions to product testings (part of `total`; see testing_entries). */
+  testing: integer('testing').notNull().default(0),
   shippingZoneName: text('shipping_zone_name'),
   /** Address encrypted on the customer's device; the server cannot read it. */
   encryptedAddress: text('encrypted_address'),
@@ -371,6 +373,8 @@ export const testings = pgTable(
     refundThreshold: integer('refund_threshold').notNull().default(200),
     tiers: jsonb('tiers').$type<TestingTier[]>().notNull(),
     status: text('status').notNull().default('open'),
+    /** How many tiers the participants were told are covered. */
+    notifiedTiers: integer('notified_tiers').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -378,6 +382,48 @@ export const testings = pgTable(
     unique('testings_product_variant_unique').on(table.productId, table.variantId).nullsNotDistinct(),
     index('testings_shop_idx').on(table.shopId),
   ],
+);
+
+/** Someone's contribution to a testing, on one of their orders (one per person). */
+export const testingEntries = pgTable(
+  'testing_entries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    testingId: uuid('testing_id')
+      .notNull()
+      .references(() => testings.id, { onDelete: 'cascade' }),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => orders.id, { onDelete: 'cascade' }),
+    /** Null once the order is anonymized (data retention). */
+    userId: bigint('user_id', { mode: 'number' }).references(() => users.telegramId, {
+      onDelete: 'set null',
+    }),
+    /** What it adds to the order (minor units of the testing's currency). */
+    amount: integer('amount').notNull(),
+    /** Offers to donate a vial. */
+    volunteer: boolean('volunteer').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('testing_entries_testing_order_unique').on(table.testingId, table.orderId),
+    index('testing_entries_order_idx').on(table.orderId),
+  ],
+);
+
+/** Testings ticked in a cart: they become entries when the order is placed. */
+export const cartTestings = pgTable(
+  'cart_testings',
+  {
+    cartId: uuid('cart_id')
+      .notNull()
+      .references(() => carts.id, { onDelete: 'cascade' }),
+    testingId: uuid('testing_id')
+      .notNull()
+      .references(() => testings.id, { onDelete: 'cascade' }),
+    volunteer: boolean('volunteer').notNull().default(false),
+  },
+  (table) => [primaryKey({ columns: [table.cartId, table.testingId] })],
 );
 
 // --- relations (used by Drizzle's relational query API) ---

@@ -31,6 +31,7 @@ import {
 import { notifyShopTeam } from './webNotices.js';
 import { withoutBlocked } from './blacklist.js';
 import { announceGoalMilestones } from './goal.js';
+import { announceTestingTiers } from './testing.js';
 
 /** Orders store minor units (cents); USDC/EURC have 6 decimals on-chain. */
 const RAW_PER_CENT = 10n ** BigInt(TOKEN_DECIMALS - 2);
@@ -233,6 +234,7 @@ export async function runPaymentCheck(
       }
       await saveCheck(db, orderId, { status: 'verified', reason: null, vars: null, at: now() });
       await announceGoalMilestones(db, env, row.shopId);
+      await announceTestingTiers(db, env, row.shopId);
       const order = await getOrder(db, row.shopId, orderId);
       if (!order) return;
       const customer = order.userId === null ? '—' : await describeCustomer(db, order.userId);

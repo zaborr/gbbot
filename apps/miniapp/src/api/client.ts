@@ -51,6 +51,7 @@ import type {
   CheckoutFields,
   CreateTestingRequest,
   Testing,
+  TestingParticipant,
   UpdateTestingRequest,
 } from '@tma-shop/shared';
 import { lang } from '../i18n/index.js';
@@ -468,6 +469,27 @@ export class ApiClient {
       method: 'PATCH',
       body: JSON.stringify({ quantity }),
     });
+  }
+
+  /** Joins a product testing with this cart (or changes the vial offer). */
+  joinTesting(testingId: string, volunteer: boolean): Promise<Cart> {
+    return this.request<Cart>('/cart/testings', {
+      method: 'POST',
+      body: JSON.stringify({ testingId, volunteer }),
+    });
+  }
+
+  leaveTesting(testingId: string): Promise<Cart> {
+    return this.request<Cart>(`/cart/testings/${testingId}`, { method: 'DELETE' });
+  }
+
+  /** The GB's product testings (for the catalog). */
+  getTestings(): Promise<Testing[]> {
+    return this.request<Testing[]>('/products/testings');
+  }
+
+  adminGetTestingParticipants(id: string): Promise<TestingParticipant[]> {
+    return this.request<TestingParticipant[]>(`/admin/testings/${id}/participants`);
   }
 
   removeCartItem(lineId: string): Promise<Cart> {

@@ -40,7 +40,7 @@ import type { Context } from 'hono';
 import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth, requireOwner } from '../auth/middleware.js';
 import { testingAdminRoutes } from './testing.js';
-import { setTestingEnabled } from '../services/testing.js';
+import { announceTestingTiers, setTestingEnabled } from '../services/testing.js';
 import {
   createCategory,
   createProduct,
@@ -697,7 +697,10 @@ export function adminRoutes(): Hono<AppBindings> {
           buildStatusMessage(lang, shop.name, order, previous),
         );
         // A confirmed payment may pass a milestone of the GB's minimum.
-        if (order.status === 'paid') await announceGoalMilestones(c.get('db'), c.get('env'), shop.id);
+        if (order.status === 'paid') {
+          await announceGoalMilestones(c.get('db'), c.get('env'), shop.id);
+          await announceTestingTiers(c.get('db'), c.get('env'), shop.id);
+        }
       }
       return c.json(order);
     },

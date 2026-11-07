@@ -41,6 +41,7 @@ interface CurrencyTotal {
   revenue: number;
   fees: number;
   shipping: number;
+  testing: number;
 }
 
 /** Totals per product (and per currency) over the selected paid orders. */
@@ -56,11 +57,13 @@ function summarize(orders: Order[]): { products: ProductTotal[]; currencies: Cur
       revenue: 0,
       fees: 0,
       shipping: 0,
+      testing: 0,
     };
     cur.orders += 1;
     cur.revenue += order.total;
     cur.fees += order.fee;
     cur.shipping += order.shipping;
+    cur.testing += order.testing;
 
     for (const item of order.items) {
       const key = `${itemKey(item)}:${order.currency}`;
@@ -164,6 +167,9 @@ function AdminSummary(): React.JSX.Element {
               c.fees > 0 ? t('summary.fees', { amount: formatPrice(c.fees, c.currency) }) : null,
               c.shipping > 0
                 ? t('summary.shipping', { amount: formatPrice(c.shipping, c.currency) })
+                : null,
+              c.testing > 0
+                ? t('summary.testing', { amount: formatPrice(c.testing, c.currency) })
                 : null,
             ]
               .filter(Boolean)

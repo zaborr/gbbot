@@ -65,8 +65,22 @@ export const testing = z.object({
   participants: z.number().int(),
   /** Contributions ordered but not paid yet. */
   pending: z.number().int(),
+  /** For the customer asking: already in it (on an order). */
+  joined: z.boolean(),
 });
 export type Testing = z.infer<typeof testing>;
+
+/** Someone taking part, for the organiser. */
+export interface TestingParticipant {
+  orderId: string;
+  name: string;
+  /** Telegram @ given on the order (or their username). */
+  contact: string | null;
+  amount: number;
+  /** Their whole order is paid. */
+  paid: boolean;
+  volunteer: boolean;
+}
 
 export const updateTestingEnabledRequest = z.object({ enabled: z.boolean() });
 

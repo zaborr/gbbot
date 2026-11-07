@@ -8,7 +8,7 @@ import { getShopConfig, teamIds } from '../services/shop.js';
 import { loadGoalProgress } from '../services/goal.js';
 import { loadPeople, organizerTags } from '../services/team.js';
 import { acceptDisclaimer } from '../services/disclaimer.js';
-import { listProductTestings } from '../services/testing.js';
+import { listVisibleTestings } from '../services/testing.js';
 import { requireAuth, requireTelegramUser } from '../auth/middleware.js';
 import { ApiError } from '../lib/errors.js';
 
@@ -53,6 +53,11 @@ export function catalogRoutes(): Hono<AppBindings> {
     return c.json(page);
   });
 
+  // Product testings of the GB (lab tests paid between the buyers). Before
+  // `/products/:id`, which would take "testings" for an id.
+  app.get('/products/testings', requireAuth, async (c) =>
+    c.json(await listVisibleTestings(c.get('db'), c.get('shop'), c.get('claims').sub)),
+  );
   app.get('/products/:id', zValidator('param', idParam), async (c) => {
     const product = await getProductById(
       c.get('db'),
@@ -65,10 +70,10 @@ export function catalogRoutes(): Hono<AppBindings> {
     return c.json(product);
   });
 
-  // The product's testings (lab tests paid between its buyers).
-  app.get('/products/:id/testings', zValidator('param', idParam), async (c) =>
+  // One product's testings.
+  app.get('/products/:id/testings', requireAuth, zValidator('param', idParam), async (c) =>
     c.json(
-      await listProductTestings(c.get('db'), c.get('shop'), c.req.valid('param').id, c.get('canManage')),
+      await listVisibleTestings(c.get('db'), c.get('shop'), c.get('claims').sub, c.req.valid('param').id),
     ),
   );
 

@@ -18,6 +18,7 @@ import { PageTitle } from '../../components/PageTitle.js';
 import { Input } from '../../components/Field.js';
 import { TestingCard } from '../../components/TestingCard.js';
 import { productTitle } from '../../lib/localize.js';
+import { formatPrice } from '../../lib/format.js';
 import { AdminOnly, ErrorBanner, toMajor, useAdminActions } from './common.js';
 import { TestingStatusChip } from './AdminTestingsPage.js';
 import { t, tn } from '../../i18n/index.js';
@@ -116,6 +117,10 @@ function TestingForm({
       : [newTier()],
   );
   const editable = testing === null || testing.status === 'open';
+  // Once people take part, what they signed up for stays: same contribution and
+  // tiers (new ones can be added at the end).
+  const locked = testing !== null && (testing.participants > 0 || testing.pending > 0);
+  const lockedTiers = locked ? (testing?.tiers.length ?? 0) : 0;
   const currency = testing?.currency ?? product?.currency ?? shop.currency;
 
   const contributionOk = MONEY_RE.test(contribution.trim()) && cents(contribution) > 0;
@@ -299,7 +304,7 @@ function TestingForm({
           placeholder="20.00"
           status={contribution.trim() === '' || contributionOk ? 'default' : 'error'}
           value={contribution}
-          disabled={!editable}
+          disabled={!editable || locked}
           onChange={(e) => setContribution(e.target.value)}
         />
         <Input
@@ -316,9 +321,12 @@ function TestingForm({
 
       <Section
         header={t('testing.tiers')}
-        footer={needs.length > 0 ? needs.join(' · ') : t('testing.tiersFooter')}
+        footer={[locked ? t('testing.lockedFooter') : null, needs.length > 0 ? needs.join(' · ') : t('testing.tiersFooter')]
+          .filter(Boolean)
+          .join(' ')}
       >
         {tiers.map((tier, index) => {
+          const fixed = index < lockedTiers;
           const costBad = tier.cost.trim() !== '' && !(MONEY_RE.test(tier.cost.trim()) && cents(tier.cost) > 0);
           const vialsBad = !COUNT_RE.test(tier.vials.trim());
           return (
@@ -339,7 +347,7 @@ function TestingForm({
                     placeholder="200.00"
                     status={costBad ? 'error' : 'default'}
                     value={tier.cost}
-                    disabled={!editable}
+                    disabled={!editable || fixed}
                     onChange={(e) => updateTier(index, { cost: e.target.value })}
                   />
                 </div>
@@ -351,14 +359,19 @@ function TestingForm({
                     placeholder="1"
                     status={vialsBad ? 'error' : 'default'}
                     value={tier.vials}
-                    disabled={!editable}
+                    disabled={!editable || fixed}
                     onChange={(e) => updateTier(index, { vials: e.target.value })}
                   />
                 </div>
               </div>
-              {editable && (
+              {editable && !fixed && (
                 <div className="gb-testing-tier-actions">
-                  <Button size="s" mode="plain" disabled={index === 0} onClick={() => moveTier(index, -1)}>
+                  <Button
+                    size="s"
+                    mode="plain"
+                    disabled={index <= lockedTiers}
+                    onClick={() => moveTier(index, -1)}
+                  >
                     ↑
                   </Button>
                   <Button
@@ -394,6 +407,8 @@ function TestingForm({
 
       {preview && <TestingCard testing={preview} preview />}
 
+      {testing && <Participants testing={testing} />}
+
       {editable && (
         <Section footer={problem ?? undefined}>
           <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -405,7 +420,7 @@ function TestingForm({
             >
               {testing ? t('common.save') : t('testing.create')}
             </Button>
-            {testing && (
+            {testing && !locked && (
               <Button
                 stretched
                 mode="plain"
@@ -423,5 +438,40 @@ function TestingForm({
         </Section>
       )}
     </List>
+  );
+}
+
+/** Who takes part: paid first, then those still to pay; tap one to see the order. */
+function Participants({ testing }: { testing: Testing }): React.JSX.Element | null {
+  const navigate = useNavigate();
+  const { to } = useShop();
+  const list = useAsync(() => api.adminGetTestingParticipants(testing.id), [testing.id]);
+  if (!list.data) return null;
+  const money = (amount: number): string => formatPrice(amount, testing.currency);
+  const volunteers = list.data.filter((p) => p.volunteer).length;
+  return (
+    <Section
+      header={t('testing.participants', { count: list.data.length })}
+      footer={t('testing.participantsFooter', {
+        raised: money(testing.raised),
+        pending: money(testing.pending),
+        volunteers,
+      })}
+    >
+      {list.data.length === 0 && <Cell multiline>{t('testing.noParticipants')}</Cell>}
+      {list.data.map((p) => (
+        <Cell
+          key={p.orderId}
+          onClick={() => navigate(to(`/admin/orders/${p.orderId}`))}
+          subtitle={[p.paid ? t('testing.paid') : t('testing.unpaid'), p.volunteer ? t('testing.volunteerChip') : null]
+            .filter(Boolean)
+            .join(' · ')}
+          after={money(p.amount)}
+          multiline
+        >
+          {p.contact ? `${p.name} · @${p.contact}` : p.name}
+        </Cell>
+      ))}
+    </Section>
   );
 }

@@ -31,6 +31,7 @@ export function ShopCard({
       : shop.closesAt
         ? { text: t('shops.closes', { date: closingDate(shop.closesAt) }), kind: 'warn' }
         : null,
+    shop.testingOpen ? { text: t('shops.testing'), kind: 'info' } : null,
     shop.isVisible ? null : { text: t('shops.hidden'), kind: '' },
     shop.isVisible && shop.vipOnly
       ? {

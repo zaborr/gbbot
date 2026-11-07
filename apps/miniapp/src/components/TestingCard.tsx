@@ -43,10 +43,13 @@ export function TestingBar({ testing }: { testing: Testing }): React.JSX.Element
 export function TestingCard({
   testing,
   preview = false,
+  children,
 }: {
   testing: Testing;
-  /** Only the team sees it for now. */
+  /** How it will look (while setting it up). */
   preview?: boolean;
+  /** What the customer can do (join, offer a vial…), at the end. */
+  children?: React.ReactNode;
 }): React.JSX.Element {
   const money = (amount: number): string => formatPrice(amount, testing.currency);
   const progress = tierProgress(testing.tiers, testing.raised, testing.contribution);
@@ -100,6 +103,7 @@ export function TestingCard({
           {p.tier.name}
         </Cell>
       ))}
+      {children}
     </Section>
   );
 }

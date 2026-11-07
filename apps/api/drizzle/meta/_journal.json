@@ -337,6 +337,13 @@
       "when": 1794081600000,
       "tag": "0047_testing",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1794168000000,
+      "tag": "0048_testing_entries",
+      "breakpoints": true
     }
   ]
 }

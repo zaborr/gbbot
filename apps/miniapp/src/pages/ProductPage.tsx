@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { hapticFeedback } from '@telegram-apps/sdk-react';
-import { Button, Cell, List, Section, Text, Title } from '@telegram-apps/telegram-ui';
-import { unitPriceFor, type Product } from '@tma-shop/shared';
+import { Button, Cell, List, Section, Switch, Text, Title } from '@telegram-apps/telegram-ui';
+import { unitPriceFor, type Product, type Testing } from '@tma-shop/shared';
 import { api, ApiClientError } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useCart } from '../providers/CartProvider.js';
@@ -226,8 +226,9 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
       )}
 
       {shownTestings.map((x) => (
-        // Only the team sees them for now (a preview).
-        <TestingCard key={x.id} testing={x} preview />
+        <TestingCard key={x.id} testing={x}>
+          <TestingActions testing={x} product={product} closed={shop.isClosed} />
+        </TestingCard>
       ))}
 
       {!outOfStock && (
@@ -306,5 +307,84 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
         </Cell>
       </Section>
     </List>
+  );
+}
+
+/**
+ * Joining a testing from the product page: it goes with the cart, so the
+ * tested product (or variant) has to be in it first.
+ */
+function TestingActions({
+  testing,
+  product,
+  closed,
+}: {
+  testing: Testing;
+  product: Product;
+  closed: boolean;
+}): React.JSX.Element {
+  const { cart, joinTesting, leaveTesting } = useCart();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = (action: () => Promise<void>): void => {
+    setBusy(true);
+    setError(null);
+    void action()
+      .catch((err: unknown) => setError(err instanceof ApiClientError ? err.message : t('error.title')))
+      .finally(() => setBusy(false));
+  };
+  const inCart = (cart?.lines ?? []).some(
+    (line) =>
+      line.product.id === testing.productId &&
+      (testing.variantId === null || line.variant?.id === testing.variantId),
+  );
+  const ticked = (cart?.testings ?? []).find((x) => x.testingId === testing.id);
+  const amount = formatPrice(testing.contribution, testing.currency);
+  const what = testing.variantLabel ?? productTitle(product);
+
+  if (testing.joined) return <Cell multiline>{t('testing.joinedAlready')}</Cell>;
+  if (closed || testing.status !== 'open') return <Cell multiline>{t('testing.closedNow')}</Cell>;
+  if (!inCart) return <Cell multiline>{t('testing.addProductFirst', { item: what })}</Cell>;
+  if (!ticked) {
+    return (
+      <div style={{ padding: 16 }}>
+        <Button stretched mode="bezeled" loading={busy} onClick={() => run(() => joinTesting(testing.id, false))}>
+          {t('testing.joinAmount', { amount })}
+        </Button>
+        {error && <div className="gb-hint" style={{ marginTop: 8 }}>{error}</div>}
+      </div>
+    );
+  }
+  return (
+    <>
+      <Cell
+        after={
+          <Button size="s" mode="plain" loading={busy} onClick={() => run(() => leaveTesting(testing.id))}>
+            {t('cart.remove')}
+          </Button>
+        }
+        multiline
+      >
+        {t('testing.inCart', { amount })}
+      </Cell>
+      <Cell
+        Component="label"
+        after={
+          <Switch
+            checked={ticked.volunteer}
+            disabled={busy}
+            onChange={(e) => {
+              const volunteer = e.target.checked;
+              run(() => joinTesting(testing.id, volunteer));
+            }}
+          />
+        }
+        subtitle={t('testing.volunteerHint')}
+        multiline
+      >
+        {t('testing.volunteer')}
+      </Cell>
+      {error && <Cell multiline>{error}</Cell>}
+    </>
   );
 }

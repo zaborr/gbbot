@@ -21,6 +21,9 @@ interface CartValue {
   /** By cart line id. */
   setQuantity: (lineId: string, quantity: number) => Promise<void>;
   remove: (lineId: string) => Promise<void>;
+  /** Product testings joined with this cart. */
+  joinTesting: (testingId: string, volunteer: boolean) => Promise<void>;
+  leaveTesting: (testingId: string) => Promise<void>;
 }
 
 const CartContext = createContext<CartValue | null>(null);
@@ -56,9 +59,27 @@ export function CartProvider({ children }: { children: ReactNode }): React.JSX.E
     setCart(await api.removeCartItem(lineId));
   }, []);
 
+  const joinTesting = useCallback(async (testingId: string, volunteer: boolean) => {
+    setCart(await api.joinTesting(testingId, volunteer));
+  }, []);
+
+  const leaveTesting = useCallback(async (testingId: string) => {
+    setCart(await api.leaveTesting(testingId));
+  }, []);
+
   const value = useMemo<CartValue>(
-    () => ({ cart, loading, itemCount: cart?.itemCount ?? 0, refresh, add, setQuantity, remove }),
-    [cart, loading, refresh, add, setQuantity, remove],
+    () => ({
+      cart,
+      loading,
+      itemCount: cart?.itemCount ?? 0,
+      refresh,
+      add,
+      setQuantity,
+      remove,
+      joinTesting,
+      leaveTesting,
+    }),
+    [cart, loading, refresh, add, setQuantity, remove, joinTesting, leaveTesting],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

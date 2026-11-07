@@ -23,8 +23,24 @@ export const cartLine = z.object({
 });
 export type CartLine = z.infer<typeof cartLine>;
 
+/** A product testing the buyer joins with this cart (it goes on the order). */
+export const cartTesting = z.object({
+  testingId: id,
+  /** "Product · variant", for display. */
+  label: z.string(),
+  amount: moneyAmount,
+  /** Offers to donate a vial (free testing if drawn). */
+  volunteer: z.boolean(),
+});
+export type CartTesting = z.infer<typeof cartTesting>;
+
+export const cartTestingRequest = z.object({ testingId: id, volunteer: z.boolean() });
+export type CartTestingRequest = z.infer<typeof cartTestingRequest>;
+
 export const cart = z.object({
   lines: z.array(cartLine),
+  /** Testings joined (their contribution is part of `total`). */
+  testings: z.array(cartTesting),
   currency: currencyCode,
   /** Per-order fee included in `total` (0 when the cart is empty or no fee is set). */
   fee: moneyAmount,

@@ -2,7 +2,7 @@ import { and, eq, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { isClosedAt, type ClosePreview } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
-import { carts, orders, shops } from '../db/schema.js';
+import { carts, orders, shops, testings } from '../db/schema.js';
 import { toOrderDTO } from '../db/mappers.js';
 import { ApiError } from '../lib/errors.js';
 import { buildChangeDecisionMessage, notifyUsers } from './notifications.js';
@@ -57,6 +57,11 @@ export async function closePreview(db: Database, shopId: string): Promise<CloseP
  * still to pay stay.
  */
 async function cleanUpClosed(db: Database, env: Env, shop: ShopRow): Promise<void> {
+  // Testings close with the GB: nobody can join any more.
+  await db
+    .update(testings)
+    .set({ status: 'closed', updatedAt: new Date() })
+    .where(and(eq(testings.shopId, shop.id), eq(testings.status, 'open')));
   await db.delete(orders).where(unpaidOrders(shop.id));
   await db.delete(carts).where(eq(carts.shopId, shop.id));
   const rejected = await db
@@ -94,6 +99,11 @@ export async function reopenShop(db: Database, shop: ShopRow): Promise<ShopRow> 
     .where(eq(shops.id, shop.id))
     .returning();
   if (!row) throw ApiError.notFound('Shop not found');
+  // Its testings open again (those not drawn yet).
+  await db
+    .update(testings)
+    .set({ status: 'open', updatedAt: new Date() })
+    .where(and(eq(testings.shopId, shop.id), eq(testings.status, 'closed')));
   return row;
 }
 

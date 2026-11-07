@@ -100,6 +100,8 @@ export const order = z.object({
   fee: moneyAmount,
   /** Shipping cost charged once (0 when free or not shipped). */
   shipping: moneyAmount,
+  /** Contributions to product testings on this order (part of `total`). */
+  testing: moneyAmount,
   /** Name of the shipping zone chosen at checkout. */
   shippingZoneName: z.string().nullable(),
   /**

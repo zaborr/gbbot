@@ -20,6 +20,7 @@ function order(partial: Partial<Order> & Pick<Order, 'id' | 'status' | 'createdA
     total: 1800,
     fee: 0,
     shipping: 0,
+    testing: 0,
     shippingZoneName: null,
     encryptedAddress: null,
     addressKeyFingerprint: null,

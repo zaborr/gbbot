@@ -3,7 +3,13 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { createTestingRequest, updateTestingRequest } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
-import { createTesting, deleteTesting, listTestings, updateTesting } from '../services/testing.js';
+import {
+  createTesting,
+  deleteTesting,
+  listParticipants,
+  listTestings,
+  updateTesting,
+} from '../services/testing.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -19,6 +25,9 @@ export function testingAdminRoutes(): Hono<AppBindings> {
     c.json(
       await updateTesting(c.get('db'), c.get('shopId'), c.req.valid('param').id, c.req.valid('json')),
     ),
+  );
+  app.get('/:id/participants', zValidator('param', idParam), async (c) =>
+    c.json(await listParticipants(c.get('db'), c.get('shopId'), c.req.valid('param').id)),
   );
   app.delete('/:id', zValidator('param', idParam), async (c) => {
     await deleteTesting(c.get('db'), c.get('shopId'), c.req.valid('param').id);

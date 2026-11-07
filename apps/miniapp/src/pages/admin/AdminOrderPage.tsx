@@ -127,6 +127,7 @@ function AdminOrder(): React.JSX.Element {
             {t('cart.shippingZoneLine', { zone: o.shippingZoneName })}
           </Cell>
         )}
+        {o.testing > 0 && <Cell after={money(o.testing)}>{t('testing.orderLine')}</Cell>}
         <Cell after={<strong>{money(o.total)}</strong>}>{t('cart.total')}</Cell>
         {o.isVip && <Cell multiline>{t('adminOrder.vip')}</Cell>}
       </Section>
