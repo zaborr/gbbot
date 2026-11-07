@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Cell, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
+import { Button, Cell, List, Placeholder, Section, Switch } from '@telegram-apps/telegram-ui';
 import { Input } from '../components/Field.js';
 import {
   RATE_SCALE,
@@ -147,6 +147,8 @@ export function PaymentPage(): React.JSX.Element {
           <Cell after={`@${current.contactUsername}`}>{t('order.contact')}</Cell>
         )}
       </Section>
+
+      {!closed && shop.data.testingEnabled && <OrderTestingOffers order={current} onAdded={reload} />}
 
       {!done && <StatusSection order={current} autoCancelHours={shop.data.autoCancelHours} />}
 
@@ -940,5 +942,66 @@ function StepHeader({ text }: { text: string }): React.JSX.Element {
       <span className="gb-step-dot gb-step-dot--now">{match[1]}</span>
       {match[2]}
     </span>
+  );
+}
+
+/**
+ * Product testings this order could still join (it has what they test): the
+ * contribution is added to the order and only that difference is paid.
+ */
+function OrderTestingOffers({ order, onAdded }: { order: Order; onAdded: () => void }): React.JSX.Element | null {
+  const testings = useAsync(() => api.getTestings(), [order.id, order.testing]);
+  const [volunteer, setVolunteer] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  // Not while a payment is being checked (its amount would not match any more).
+  const open = order.status === 'paid' || (order.status === 'pending' && order.amountSubmitted === 0);
+  const offers = (testings.data ?? []).filter(
+    (x) =>
+      x.status === 'open' &&
+      !x.joined &&
+      x.currency === order.currency &&
+      order.items.some(
+        (item) => item.productId === x.productId && (x.variantId === null || item.variantId === x.variantId),
+      ),
+  );
+  if (!open || offers.length === 0) return null;
+
+  const add = (testingId: string): void => {
+    setBusy(testingId);
+    setError(null);
+    void api
+      .addOrderTesting(order.id, testingId, volunteer)
+      .then(onAdded)
+      .catch((err: unknown) => setError(err instanceof ApiClientError ? err.message : t('error.title')))
+      .finally(() => setBusy(null));
+  };
+
+  return (
+    <Section header={t('testing.offerTitle')} footer={t('testing.addToOrderFooter')}>
+      {offers.map((x) => (
+        <Cell
+          key={x.id}
+          subtitle={t('testing.offerSubtitle', { lab: x.lab, amount: formatPrice(x.contribution, x.currency) })}
+          after={
+            <Button size="s" mode="bezeled" loading={busy === x.id} onClick={() => add(x.id)}>
+              {t('testing.join')}
+            </Button>
+          }
+          multiline
+        >
+          {x.variantLabel ? `${x.productTitle} · ${x.variantLabel}` : x.productTitle}
+        </Cell>
+      ))}
+      <Cell
+        Component="label"
+        after={<Switch checked={volunteer} onChange={(e) => setVolunteer(e.target.checked)} />}
+        subtitle={t('testing.volunteerHint')}
+        multiline
+      >
+        {t('testing.volunteer')}
+      </Cell>
+      {error && <Cell multiline>{error}</Cell>}
+    </Section>
   );
 }

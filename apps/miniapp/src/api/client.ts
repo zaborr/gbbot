@@ -483,6 +483,14 @@ export class ApiClient {
     return this.request<Cart>(`/cart/testings/${testingId}`, { method: 'DELETE' });
   }
 
+  /** Joins a product testing with an order already placed (paid or not). */
+  addOrderTesting(orderId: string, testingId: string, volunteer: boolean): Promise<Order> {
+    return this.request<Order>(`/orders/${orderId}/testings`, {
+      method: 'POST',
+      body: JSON.stringify({ testingId, volunteer }),
+    });
+  }
+
   /** The GB's product testings (for the catalog). */
   getTestings(): Promise<Testing[]> {
     return this.request<Testing[]>('/products/testings');

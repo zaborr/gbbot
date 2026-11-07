@@ -12,6 +12,7 @@ import type {
 import type { Database } from '../db/client.js';
 import {
   cartTestings,
+  orderItems,
   orders,
   productVariants,
   products,
@@ -571,4 +572,101 @@ export async function announceTestingTiers(db: Database, env: Env, shopId: strin
       tr(lang, 'testing.tierReached', { shop: shop.name, product: what, tiers: newly }),
     );
   }
+}
+
+/**
+ * Once the GB is closed nobody can pay for a testing any more: an order whose
+ * products are paid but not its testing drops the testing and is paid again.
+ * `orderId` limits it to one order (a payment rejected after closing).
+ */
+export async function dropUnpaidTesting(db: Database, shopId: string, orderId?: string): Promise<number> {
+  const rows = await db
+    .select()
+    .from(orders)
+    .where(
+      and(
+        eq(orders.shopId, shopId),
+        orderId ? eq(orders.id, orderId) : undefined,
+        eq(orders.status, 'pending'),
+        eq(orders.amountSubmitted, 0),
+        sql`${orders.testing} > 0`,
+        sql`${orders.amountPaid} > 0`,
+        sql`${orders.amountPaid} >= ${orders.total} - ${orders.testing}`,
+        sql`${orders.amountPaid} < ${orders.total}`,
+      ),
+    );
+  for (const row of rows) {
+    await db.transaction(async (tx) => {
+      await tx.delete(testingEntries).where(eq(testingEntries.orderId, row.id));
+      await tx
+        .update(orders)
+        .set({ total: row.total - row.testing, testing: 0, status: 'paid', updatedAt: new Date() })
+        .where(eq(orders.id, row.id));
+    });
+  }
+  return rows.length;
+}
+
+/**
+ * Joins a testing with an order already placed (paid, or not paid yet): its
+ * contribution is added to the order, which then waits for that payment.
+ */
+export async function joinTestingWithOrder(
+  db: Database,
+  shop: ShopRow,
+  userId: number,
+  orderId: string,
+  testingId: string,
+  volunteer: boolean,
+): Promise<void> {
+  if (!shop.testingEnabled) {
+    throw ApiError.conflict('testing_off', 'Turn on product testing in the GB settings first');
+  }
+  await db.transaction(async (tx) => {
+    const [order] = await tx
+      .select()
+      .from(orders)
+      .where(and(eq(orders.shopId, shop.id), eq(orders.id, orderId), eq(orders.userId, userId)))
+      .for('update');
+    if (!order) throw ApiError.notFound('Order not found');
+    // Not while a payment is being checked: its amount would not match any more.
+    if (order.status !== 'paid' && !(order.status === 'pending' && order.amountSubmitted === 0)) {
+      throw ApiError.conflict('testing_order_state', 'A testing cannot be added to this order now');
+    }
+    const testing = await tx.query.testings.findFirst({
+      where: and(eq(testings.shopId, shop.id), eq(testings.id, testingId)),
+    });
+    if (!testing) throw ApiError.notFound('Testing not found');
+    if (testing.status !== 'open') throw ApiError.conflict('testing_not_open', 'This testing is closed');
+    if (testing.currency !== order.currency) {
+      throw ApiError.conflict('mixed_currency', `This order is in ${order.currency}`);
+    }
+    const items = await tx
+      .select({ productId: orderItems.productId, variantId: orderItems.variantId })
+      .from(orderItems)
+      .where(eq(orderItems.orderId, order.id));
+    if (!covers(testing, items)) {
+      throw ApiError.conflict('testing_needs_product', 'This order does not have the tested product');
+    }
+    if ((await joinedBy(tx, userId, [testing.id])).size > 0) {
+      throw ApiError.conflict('testing_joined', 'You already take part in this testing');
+    }
+    await tx.insert(testingEntries).values({
+      testingId: testing.id,
+      orderId: order.id,
+      userId,
+      amount: testing.contribution,
+      volunteer,
+    });
+    await tx
+      .update(orders)
+      .set({
+        testing: order.testing + testing.contribution,
+        total: order.total + testing.contribution,
+        // Paid already: back to waiting for the difference (the testing).
+        status: 'pending',
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, order.id));
+  });
 }

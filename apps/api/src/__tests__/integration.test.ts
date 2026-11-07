@@ -22,7 +22,8 @@ import {
 import { runRetention } from '../services/retention.js';
 import { cancelExpiredOrders } from '../services/autoCancel.js';
 import { markOrderPaid } from '../services/orders.js';
-import { assertProductKeepsTestings } from '../services/testing.js';
+import { assertProductKeepsTestings, dropUnpaidTesting } from '../services/testing.js';
+import { goalTotals } from '../services/goal.js';
 import { sendPaymentReminders } from '../services/reminders.js';
 import { resetMiniAppUrlCache } from '../services/bot.js';
 import { closeDueShops } from '../services/closing.js';
@@ -999,6 +1000,64 @@ describeDb('API integration', () => {
     await db.delete(orders).where(eq(orders.id, orderId));
     await request(`/api/admin/testings/${testingId}`, { method: 'DELETE', headers: admin });
     await db.delete(carts).where(eq(carts.userId, CUSTOMER_ID));
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
+    await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
+  });
+
+  it('adds a testing to a paid order, and drops it if unpaid when the GB closes', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const auth = {
+      Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const created = await request('/api/admin/testings', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({
+        productId,
+        variantId: null,
+        lab: 'Lab',
+        contribution: 1000,
+        refundThreshold: 200,
+        tiers: [{ id: 'mp', name: 'M&P', cost: 5000, vials: 1 }],
+      }),
+    });
+    const { id: testingId } = (await created.json()) as { id: string };
+
+    await db.delete(carts).where(eq(carts.userId, CUSTOMER_ID));
+    await request('/api/cart/items', { method: 'POST', headers: auth, body: JSON.stringify({ productId, quantity: 1 }) });
+    const placed = await request('/api/orders', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ contactUsername: '@alice_test' }),
+    });
+    const { orderId } = (await placed.json()) as { orderId: string };
+    await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+    const before = (await goalTotals(db, [shopId])).get(shopId);
+
+    const added = await request(`/api/orders/${orderId}/testings`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ testingId, volunteer: true }),
+    });
+    expect(added.status).toBe(200);
+    const order = (await added.json()) as { status: string; testing: number; amountDue: number };
+    expect(order).toMatchObject({ status: 'pending', testing: 1000, amountDue: 1000 });
+    // Its products still count as paid towards the GB minimum.
+    expect((await goalTotals(db, [shopId])).get(shopId)).toEqual(before);
+
+    // Unpaid when the GB closes: the testing drops out and the order is paid again.
+    expect(await dropUnpaidTesting(db, shopId)).toBe(1);
+    const [row] = await db.select().from(orders).where(eq(orders.id, orderId));
+    expect(row).toMatchObject({ status: 'paid', testing: 0 });
+
+    await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
+    await db.delete(orders).where(eq(orders.id, orderId));
+    await request(`/api/admin/testings/${testingId}`, { method: 'DELETE', headers: admin });
     await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
     await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
   });

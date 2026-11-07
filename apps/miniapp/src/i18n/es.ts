@@ -929,6 +929,7 @@ export const es: Record<MessageKey, string> = {
   'summary.totals': 'Totales',
   'testing.addProductFirst': 'Para participar, añade {item} al carrito: el testing va con ese pedido.',
   'testing.addTier': '➕ Añadir tramo',
+  'testing.addToOrderFooter': 'Opcional: se suma a este pedido y solo pagas esa diferencia. La aportación es lo máximo que pagas; lo que sobre se devuelve. Si el GB cierra antes de que lo pagues, se quita.',
   'testing.allReached': '{raised} recaudados: todos los tramos cubiertos',
   'testing.alreadyTested': 'Ya tiene un testing',
   'testing.badContribution': 'Escribe la aportación por persona, p. ej. 20.00.',

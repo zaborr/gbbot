@@ -929,6 +929,7 @@ export const it: Record<MessageKey, string> = {
   'summary.totals': 'Totali',
   'testing.addProductFirst': 'Per partecipare, aggiungi {item} al carrello: il testing va con quell\'ordine.',
   'testing.addTier': '➕ Aggiungi fascia',
+  'testing.addToOrderFooter': 'Facoltativo: si aggiunge a questo ordine e paghi solo quella differenza. Il contributo è il massimo che paghi; ciò che avanza si restituisce. Se il GB chiude prima che lo paghi, si toglie.',
   'testing.allReached': '{raised} raccolti: tutte le fasce coperte',
   'testing.alreadyTested': 'Ha già un testing',
   'testing.badContribution': 'Scrivi il contributo per persona, es. 20.00.',

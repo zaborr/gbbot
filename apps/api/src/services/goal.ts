@@ -25,19 +25,24 @@ export async function goalTotals(
 ): Promise<Map<string, GoalTotals>> {
   const result = new Map<string, GoalTotals>();
   if (shopIds.length === 0) return result;
+  // Products count as paid when the order is, or when all but its testing is
+  // paid (a testing added to a paid order is waiting for its own payment).
+  const productsPaid = sql<boolean>`(${orders.amountPaid} > 0 and ${orders.amountPaid} >= ${orders.total} - ${orders.testing})`;
   const rows = await db
     .select({
       shopId: orders.shopId,
       status: orders.status,
+      productsPaid,
       amount: sql<number>`coalesce(sum(${orderItems.subtotal}), 0)::bigint`,
     })
     .from(orderItems)
     .innerJoin(orders, eq(orderItems.orderId, orders.id))
     .where(and(inArray(orders.shopId, [...shopIds]), ne(orders.status, 'cancelled')))
-    .groupBy(orders.shopId, orders.status);
+    .groupBy(orders.shopId, orders.status, productsPaid);
   for (const row of rows) {
     const totals = result.get(row.shopId) ?? { paid: 0, pending: 0 };
-    if (isSaleStatus(row.status as OrderStatus)) totals.paid += Number(row.amount);
+    const paid = isSaleStatus(row.status as OrderStatus) || (row.status === 'pending' && row.productsPaid);
+    if (paid) totals.paid += Number(row.amount);
     else totals.pending += Number(row.amount);
     result.set(row.shopId, totals);
   }

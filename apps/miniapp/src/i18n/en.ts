@@ -927,6 +927,7 @@ export const en = {
   'summary.totals': 'Totals',
   'testing.addProductFirst': 'To take part, add {item} to the cart: the testing goes with that order.',
   'testing.addTier': '➕ Add tier',
+  'testing.addToOrderFooter': 'Optional: it is added to this order and you only pay that difference. The contribution is the most you pay; whatever is left over is sent back. If the GB closes before you pay it, it is removed.',
   'testing.allReached': '{raised} raised: every tier is covered',
   'testing.alreadyTested': 'Already has a testing',
   'testing.badContribution': 'Enter the contribution per person, e.g. 20.00.',

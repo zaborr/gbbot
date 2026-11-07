@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import {
+  cartTestingRequest,
   createOrderRequest,
   isClosedAt,
   MANUAL_METHOD_PREFIX,
@@ -32,6 +33,7 @@ import { paymentMethodLabel } from '../config/payment-methods.js';
 import { notifyShopTeam } from '../services/webNotices.js';
 import { ApiError } from '../lib/errors.js';
 import { assertOpen } from '../services/closing.js';
+import { joinTestingWithOrder } from '../services/testing.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -190,6 +192,18 @@ export function orderRoutes(): Hono<AppBindings> {
       return c.json(order);
     },
   );
+
+  // Joining a product testing with an order already placed (the contribution is added to it).
+  app.post('/:id/testings', zValidator('param', idParam), zValidator('json', cartTestingRequest), async (c) => {
+    const { sub } = c.get('claims');
+    const { id } = c.req.valid('param');
+    const { testingId, volunteer } = c.req.valid('json');
+    assertOpen(c.get('shop'));
+    await joinTestingWithOrder(c.get('db'), c.get('shop'), sub, id, testingId, volunteer);
+    const order = await getOrder(c.get('db'), c.get('shopId'), id, sub);
+    if (!order) throw ApiError.notFound('Order not found');
+    return c.json(order);
+  });
 
   // Customer withdraws their pending change request.
   app.delete('/:id/change', zValidator('param', idParam), async (c) => {

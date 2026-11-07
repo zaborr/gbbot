@@ -23,7 +23,7 @@ import {
   shops,
   testingEntries,
 } from '../db/schema.js';
-import { cartTestingsFor, testingAfterChange } from './testing.js';
+import { cartTestingsFor, dropUnpaidTesting, testingAfterChange } from './testing.js';
 import { toOrderDTO, variantLabel } from '../db/mappers.js';
 import { lineStock, loadVariants, quantitiesByProduct, tieredPrice } from './variants.js';
 import { ApiError } from '../lib/errors.js';
@@ -608,6 +608,13 @@ export async function changeOrderStatus(
     if (!updated) throw new Error('Failed to update order');
     return toOrderDTO(updated, items);
   });
+  // A testing payment rejected once the GB is closed cannot be sent again.
+  if (change.status === 'pending' && order.testing > 0) {
+    const shop = await db.query.shops.findFirst({ where: eq(shops.id, shopId) });
+    if (shop?.closedAt && (await dropUnpaidTesting(db, shopId, orderId)) > 0) {
+      return { order: (await getOrder(db, shopId, orderId)) ?? order, previous };
+    }
+  }
   return { order, previous };
 }
 
