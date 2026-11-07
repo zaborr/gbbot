@@ -1,5 +1,5 @@
 import { Cell, Section } from '@telegram-apps/telegram-ui';
-import { testingTotalCost, tierProgress, type Testing } from '@tma-shop/shared';
+import { testingTarget, tierProgress, type Testing } from '@tma-shop/shared';
 import { formatPrice } from '../lib/format.js';
 import { t, tn } from '../i18n/index.js';
 
@@ -10,7 +10,7 @@ const GREEN = '#31b545';
  * where each tier is reached (its cumulative cost).
  */
 export function TestingBar({ testing }: { testing: Testing }): React.JSX.Element {
-  const total = Math.max(testingTotalCost(testing.tiers), 1);
+  const total = Math.max(testingTarget(testing.tiers, testing.contribution), 1);
   const percent = (amount: number): string => `${Math.min((amount / total) * 100, 100)}%`;
   const progress = tierProgress(testing.tiers, testing.raised, testing.contribution);
   const allReached = progress.every((p) => p.reached);

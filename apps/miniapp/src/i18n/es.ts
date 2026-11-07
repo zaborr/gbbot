@@ -1058,7 +1058,7 @@ export const es: Record<MessageKey, string> = {
   'testing.tierReached': 'Cubierto',
   'testing.tierVials': 'Viales',
   'testing.tiers': 'Tramos (análisis)',
-  'testing.tiersFooter': 'En orden: cada tramo se hace cuando lo recaudado cubre su coste y el de los anteriores. Viales: los que necesita (0 si usa los de otro tramo).',
+  'testing.tiersFooter': 'En orden. Coste: lo que cuesta ese análisis por separado; se suma a los anteriores. Cada tramo se hace cuando lo recaudado cubre su coste, el de los anteriores y lo que se devuelve a los donantes de sus viales. Viales: los que necesita (0 si usa los de otro tramo).',
   'testing.title': '🧪 Testing',
   'testing.unpaid': '⏳ Pendiente de pago',
   'testing.variant': 'Variante',

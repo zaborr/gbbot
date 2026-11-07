@@ -1058,7 +1058,7 @@ export const pt: Record<MessageKey, string> = {
   'testing.tierReached': 'Coberto',
   'testing.tierVials': 'Frascos',
   'testing.tiers': 'Patamares (análises)',
-  'testing.tiersFooter': 'Por ordem: cada patamar faz-se quando o recolhido cobre o seu custo e o dos anteriores. Frascos: os que precisa (0 se usar os de outro patamar).',
+  'testing.tiersFooter': 'Por ordem. Custo: o que custa essa análise sozinha; soma-se às anteriores. Cada patamar faz-se quando o recolhido cobre o seu custo, o dos anteriores e o que se devolve aos doadores dos seus frascos. Frascos: os que precisa (0 se usar os de outro patamar).',
   'testing.title': '🧪 Testing',
   'testing.unpaid': '⏳ Pendente de pagamento',
   'testing.variant': 'Variante',

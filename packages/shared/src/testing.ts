@@ -129,7 +129,8 @@ export function tierProgress(
 ): TierProgress[] {
   let threshold = 0;
   return tiersList.map((tier) => {
-    threshold += tier.cost;
+    // Donors get their contribution back, so each vial needs one more.
+    threshold += tier.cost + tier.vials * contribution;
     const missing = Math.max(threshold - raised, 0);
     return {
       tier,
@@ -144,6 +145,11 @@ export function tierProgress(
 /** Total cost of every tier. */
 export function testingTotalCost(tiersList: readonly TestingTier[]): number {
   return tiersList.reduce((sum, tier) => sum + tier.cost, 0);
+}
+
+/** What has to be raised for every tier: their cost plus what goes back to the donors. */
+export function testingTarget(tiersList: readonly TestingTier[], contribution: number): number {
+  return tiersList.reduce((sum, tier) => sum + tier.cost + tier.vials * contribution, 0);
 }
 
 /** One person who can be drawn to donate a vial (their order, published by its short id). */
