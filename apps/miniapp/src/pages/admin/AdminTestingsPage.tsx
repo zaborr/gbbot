@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { Cell, List, Section } from '@telegram-apps/telegram-ui';
+import { useState } from 'react';
+import { Cell, List, Section, Switch } from '@telegram-apps/telegram-ui';
 import { testingTotalCost, type Testing } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
@@ -8,7 +9,7 @@ import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { PageTitle } from '../../components/PageTitle.js';
 import { formatPrice } from '../../lib/format.js';
-import { AdminOnly } from './common.js';
+import { AdminOnly, ErrorBanner, useAdminActions } from './common.js';
 import { t, type MessageKey } from '../../i18n/index.js';
 
 const STATUS: Record<Testing['status'], { key: MessageKey; chip: string }> = {
@@ -37,52 +38,79 @@ export function AdminTestingsPage(): React.JSX.Element {
 function AdminTestings(): React.JSX.Element {
   const navigate = useNavigate();
   const { shop, to } = useShop();
-  const list = useAsync(() => api.adminGetTestings(), []);
-
-  if (!shop.testingEnabled) {
-    return (
-      <List>
-        <PageTitle title={t('testing.title')} />
-        <Section footer={t('testing.offFooter')}>
-          <Cell onClick={() => navigate(to('/admin/settings'))} after="›" multiline>
-            {t('testing.turnOn')}
-          </Cell>
-        </Section>
-      </List>
-    );
-  }
-  if (list.loading && !list.data) return <Loader />;
-  if (list.error) return <ErrorView message={list.error} />;
-  const testings = list.data ?? [];
+  const list = useAsync(() => api.adminGetTestings(), [shop.testingEnabled]);
 
   return (
     <List>
       <PageTitle title={t('testing.title')} />
-      <Section footer={t('testing.listFooter')}>
-        {testings.length === 0 && <Cell multiline>{t('testing.none')}</Cell>}
-        {testings.map((testing) => (
-          <Cell
-            key={testing.id}
-            onClick={() => navigate(to(`/admin/testings/${testing.id}`))}
-            subtitle={
-              <span className="gb-chips" style={{ marginTop: 4 }}>
-                <TestingStatusChip status={testing.status} />
-                <span className="gb-chip">
-                  {formatPrice(testing.raised, testing.currency)} /{' '}
-                  {formatPrice(testingTotalCost(testing.tiers), testing.currency)}
-                </span>
-              </span>
-            }
-            after="›"
-            multiline
-          >
-            {testing.variantLabel
-              ? `${testing.productTitle} · ${testing.variantLabel}`
-              : testing.productTitle}
-          </Cell>
+      <TestingSwitch />
+      {shop.testingEnabled &&
+        (list.loading && !list.data ? (
+          <Loader />
+        ) : list.error ? (
+          <ErrorView message={list.error} />
+        ) : (
+          <Section footer={t('testing.listFooter')}>
+            {(list.data ?? []).length === 0 && <Cell multiline>{t('testing.none')}</Cell>}
+            {(list.data ?? []).map((testing) => (
+              <Cell
+                key={testing.id}
+                onClick={() => navigate(to(`/admin/testings/${testing.id}`))}
+                subtitle={
+                  <span className="gb-chips" style={{ marginTop: 4 }}>
+                    <TestingStatusChip status={testing.status} />
+                    <span className="gb-chip">
+                      {formatPrice(testing.raised, testing.currency)} /{' '}
+                      {formatPrice(testingTotalCost(testing.tiers), testing.currency)}
+                    </span>
+                  </span>
+                }
+                after="›"
+                multiline
+              >
+                {testing.variantLabel
+                  ? `${testing.productTitle} · ${testing.variantLabel}`
+                  : testing.productTitle}
+              </Cell>
+            ))}
+            <Cell onClick={() => navigate(to('/admin/testings/new'))}>{t('testing.new')}</Cell>
+          </Section>
         ))}
-        <Cell onClick={() => navigate(to('/admin/testings/new'))}>{t('testing.new')}</Cell>
-      </Section>
     </List>
+  );
+}
+
+/** Product testing on or off for the GB (administrators). */
+function TestingSwitch(): React.JSX.Element {
+  const { shop, reload } = useShop();
+  const actions = useAdminActions(reload);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Section
+      footer={
+        shop.canOwn
+          ? t('testing.switchFooter')
+          : `${t('testing.switchFooter')} ${t('testing.switchFooterOwners')}`
+      }
+    >
+      <ErrorBanner message={actions.error} />
+      <Cell
+        Component="label"
+        after={
+          <Switch
+            checked={shop.testingEnabled}
+            disabled={!shop.canOwn || busy}
+            onChange={(e) => {
+              const enabled = e.target.checked;
+              setBusy(true);
+              void actions.run(() => api.adminSetTestingEnabled(enabled)).finally(() => setBusy(false));
+            }}
+          />
+        }
+        multiline
+      >
+        {t('testing.switch')}
+      </Cell>
+    </Section>
   );
 }
