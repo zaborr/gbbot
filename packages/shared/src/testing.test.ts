@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { settleDraw, tierProgress, type TestingTier } from './testing.js';
+import { settleDraw, settleMoney, tierProgress, type TestingTier } from './testing.js';
 
 const tiers: TestingTier[] = [
   { id: 'mp', name: 'M&P', cost: 20000, vials: 1 },
@@ -32,5 +32,30 @@ describe('testing tiers', () => {
       donors: ['a'],
     });
     expect(settleDraw(tiers, 100000, [])).toEqual({ tiersDone: [], donors: [] });
+  });
+});
+
+describe('settling a testing', () => {
+  const entries = [
+    { orderId: 'a', amount: 2000, donor: true },
+    { orderId: 'b', amount: 2000, donor: false },
+    { orderId: 'c', amount: 2000, donor: false },
+  ];
+
+  it('gives donors all back and splits the leftover between the rest', () => {
+    const { settlement, refunds } = settleMoney(entries, 2900, 200, false);
+    expect(settlement).toMatchObject({ raised: 6000, donorRefunds: 2000, leftover: 1100, perPerson: 550 });
+    expect(Object.fromEntries(refunds)).toEqual({ a: 2000, b: 550, c: 550 });
+  });
+
+  it('keeps a leftover below the threshold', () => {
+    const { settlement, refunds } = settleMoney(entries, 3700, 200, false);
+    expect(settlement.perPerson).toBe(0);
+    expect(Object.fromEntries(refunds)).toEqual({ a: 2000 });
+  });
+
+  it('sends everything back when no tier was done', () => {
+    const { refunds } = settleMoney(entries, 0, 200, true);
+    expect(Object.fromEntries(refunds)).toEqual({ a: 2000, b: 2000, c: 2000 });
   });
 });

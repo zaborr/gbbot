@@ -70,6 +70,15 @@ export class TelegramApi {
     return body.result;
   }
 
+  /** Sends again a file Telegram already holds (by its id), as a document or a picture. */
+  sendFileById(chatId: number, kind: 'document' | 'photo', fileId: string, caption?: string): Promise<unknown> {
+    return this.call<unknown>(kind === 'photo' ? 'sendPhoto' : 'sendDocument', {
+      chat_id: chatId,
+      [kind]: fileId,
+      ...(caption ? { caption: caption.slice(0, 1024) } : {}),
+    });
+  }
+
   /** Sends a plain-text message. The user must have started the bot first. */
   sendMessage(chatId: number, text: string, replyMarkup?: InlineKeyboard): Promise<unknown> {
     return this.call<unknown>('sendMessage', {

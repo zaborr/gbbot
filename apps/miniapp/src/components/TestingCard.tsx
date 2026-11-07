@@ -80,6 +80,13 @@ export function TestingCard({
             : t('testing.allReached', { raised: money(testing.raised) })}
           {testing.pending > 0 && ` · ${t('testing.pendingAmount', { amount: money(testing.pending) })}`}
         </span>
+        {testing.status === 'settled' && <span className="gb-hint">{t('testing.cardSettled')}</span>}
+        {testing.status === 'cancelled' && <span className="gb-hint">{t('testing.cardCancelled')}</span>}
+        {testing.reportSentAt && (
+          <span className="gb-hint">
+            {t('testing.cardReport', { date: new Date(testing.reportSentAt).toLocaleDateString() })}
+          </span>
+        )}
         {testing.status === 'drawing' && testing.draw && (
           <span className="gb-hint">{t('testing.cardDrawing', { height: testing.draw.height })}</span>
         )}

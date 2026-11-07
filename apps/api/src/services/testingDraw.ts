@@ -136,7 +136,7 @@ async function loadCandidates(db: Database, env: Env, shop: ShopRow, testing: Te
 }
 
 /** What is tested, for messages and the "−1 vial" marks. */
-async function testedLabel(db: Database, testing: TestingRow): Promise<string> {
+export async function testedLabel(db: Database, testing: TestingRow): Promise<string> {
   const product = await db.query.products.findFirst({ where: eq(products.id, testing.productId) });
   const variant = testing.variantId
     ? await db.query.productVariants.findFirst({ where: eq(productVariants.id, testing.variantId) })
@@ -146,7 +146,12 @@ async function testedLabel(db: Database, testing: TestingRow): Promise<string> {
 }
 
 /** Telegram ids of the candidates and participants (who hear about the draw). */
-async function audience(db: Database, env: Env, shop: ShopRow, orderIds: readonly string[]): Promise<number[]> {
+export async function audience(
+  db: Database,
+  env: Env,
+  shop: ShopRow,
+  orderIds: readonly string[],
+): Promise<number[]> {
   if (orderIds.length === 0) return [];
   const rows = await db
     .select({ userId: orders.userId })

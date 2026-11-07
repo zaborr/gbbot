@@ -7,6 +7,7 @@ import { TelegramApi, type InlineKeyboard } from '../telegram/api.js';
 import type { TelegramUpdate } from '../telegram/types.js';
 import { handleUploadChoice, handleUploadedFile } from './uploads.js';
 import { handleUpdateButton, isUpdateCommand, updateReply } from './serverUpdate.js';
+import { handleReportReply } from './testingSettle.js';
 import { isSuperAdmin } from './shop.js';
 
 const MENU_CACHE_MS = 60 * 60 * 1000;
@@ -87,6 +88,12 @@ export async function handleBotMessage(
     return;
   }
   const message = update.message;
+  // A testing's lab report, sent in reply to the bot asking for it.
+  if ((message?.document || message?.photo) && message.reply_to_message && message.chat?.type === 'private' && db) {
+    const known = message.from ? (await languagesOf(db, [message.from.id])).get(message.from.id) : undefined;
+    const lang = known ?? langFrom(message.from?.language_code);
+    if (await handleReportReply(db, env, telegram, message, lang)) return;
+  }
   // A CSV or backup sent to the bot: it offers to open the import screen.
   if (message?.document && message.chat?.type === 'private' && db) {
     await handleUploadedFile(db, env, telegram, message, await miniAppUrl(telegram));

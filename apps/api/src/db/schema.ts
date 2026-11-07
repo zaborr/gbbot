@@ -27,6 +27,7 @@ import type {
   CheckoutFields,
   TestingTier,
   TestingDraw,
+  TestingSettlement,
   WebRole,
 } from '@tma-shop/shared';
 
@@ -380,6 +381,12 @@ export const testings = pgTable(
     notifiedTiers: integer('notified_tiers').notNull().default(0),
     /** The draw of donors (block, candidates, result). */
     draw: jsonb('draw').$type<TestingDraw>(),
+    /** How the money was worked out, once settled. */
+    settlement: jsonb('settlement').$type<TestingSettlement>(),
+    /** The lab report (a file in Telegram) and when it was sent to the participants. */
+    report: jsonb('report').$type<{ fileId: string; kind: 'document' | 'photo'; sentAt: string }>(),
+    /** The bot asked an organiser for the report: their reply carries it. */
+    reportRequest: jsonb('report_request').$type<{ chatId: number; messageId: number }>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
