@@ -1058,7 +1058,7 @@ export const it: Record<MessageKey, string> = {
   'testing.tierReached': 'Coperta',
   'testing.tierVials': 'Fiale',
   'testing.tiers': 'Fasce (analisi)',
-  'testing.tiersFooter': 'In ordine: ogni fascia si fa quando il raccolto copre il suo costo e quello delle precedenti. Fiale: quante ne servono (0 se usa quelle di un\'altra fascia).',
+  'testing.tiersFooter': 'In ordine. Costo: quanto costa quell\'analisi da sola; si somma alle precedenti. Ogni fascia si fa quando il raccolto copre il suo costo, quello delle precedenti e quanto si restituisce ai donatori delle sue fiale. Fiale: quante ne servono (0 se usa quelle di un\'altra fascia).',
   'testing.title': '🧪 Testing',
   'testing.unpaid': '⏳ In attesa di pagamento',
   'testing.variant': 'Variante',

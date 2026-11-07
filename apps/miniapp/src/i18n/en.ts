@@ -1056,7 +1056,7 @@ export const en = {
   'testing.tierReached': 'Covered',
   'testing.tierVials': 'Vials',
   'testing.tiers': 'Tiers (lab tests)',
-  'testing.tiersFooter': 'In order: each tier is done once the money raised covers it and all the ones before. Vials: how many it needs (0 if it uses another tier\'s).',
+  'testing.tiersFooter': 'In order. Cost: what that test costs on its own; it adds to the ones before. A tier is done once the money raised covers its cost, the ones before and what goes back to the donors of its vials. Vials: how many it needs (0 if it uses another tier\'s).',
   'testing.title': '🧪 Testing',
   'testing.unpaid': '⏳ Waiting for payment',
   'testing.variant': 'Variant',

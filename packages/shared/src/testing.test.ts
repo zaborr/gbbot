@@ -9,9 +9,11 @@ const tiers: TestingTier[] = [
 
 describe('testing tiers', () => {
   it('says how far each tier is and how many people it still needs', () => {
+    // M&P needs 20 000 + one donor's 2 000 back; Endo 10 000 more.
     const [mp, endo] = tierProgress(tiers, 25000, 2000);
-    expect(mp).toMatchObject({ reached: true, missing: 0 });
-    expect(endo).toMatchObject({ reached: false, missing: 5000, people: 3 });
+    expect(mp).toMatchObject({ reached: true, missing: 0, threshold: 22000 });
+    expect(endo).toMatchObject({ reached: false, missing: 7000, people: 4 });
+    expect(tierProgress(tiers, 21000, 2000)[0]).toMatchObject({ reached: false, missing: 1000, people: 1 });
   });
 
   it('takes tiers while the money, less what donors get back, covers them', () => {

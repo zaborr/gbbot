@@ -331,7 +331,7 @@ function TestingForm({
 
       <Section
         header={t('testing.tiers')}
-        footer={[locked ? t('testing.lockedFooter') : null, needs.length > 0 ? needs.join(' · ') : t('testing.tiersFooter')]
+        footer={[locked ? t('testing.lockedFooter') : null, t('testing.tiersFooter'), needs.length > 0 ? `${needs.join(' · ')}.` : null]
           .filter(Boolean)
           .join(' ')}
       >
