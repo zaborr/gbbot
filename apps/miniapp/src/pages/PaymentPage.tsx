@@ -130,6 +130,9 @@ export function PaymentPage(): React.JSX.Element {
             {t('cart.shippingZoneLine', { zone: current.shippingZoneName })}
           </Cell>
         )}
+        {current.testing > 0 && (
+          <Cell after={formatPrice(current.testing, current.currency)}>{t('testing.orderLine')}</Cell>
+        )}
         <Cell after={formatPrice(current.total, current.currency)}>{t('cart.total')}</Cell>
         {current.amountPaid > 0 && (
           <Cell after={formatPrice(current.amountPaid, current.currency)}>{t('order.paidSoFar')}</Cell>
@@ -667,6 +670,9 @@ function PendingChange({
       {order.shipping > 0 && (
         <Cell after={formatPrice(order.shipping, order.currency)}>{t('cart.shipping')}</Cell>
       )}
+      {order.testing > 0 && (
+        <Cell after={formatPrice(order.testing, order.currency)}>{t('testing.orderLine')}</Cell>
+      )}
       <Cell after={formatPrice(change.total, order.currency)}>{t('change.newTotal')}</Cell>
       <div style={{ padding: 16 }}>
         <Button stretched mode="plain" loading={busy} onClick={() => void withdraw()}>
@@ -768,7 +774,8 @@ function ChangeEditor({
   // unpaid order, where it follows the zone again (free shipping threshold).
   const zone = direct ? zones.find((z) => z.name === order.shippingZoneName) : undefined;
   const shipping = zone ? shippingCost(zone, itemsTotal, vipFreeShipping) : order.shipping;
-  const total = itemsTotal + order.fee + shipping;
+  // Testings stay while the order holds what they test (the server drops the others).
+  const total = itemsTotal + order.fee + shipping + order.testing;
   const diff = total - coveredAmount(order);
   // One addable entry per product, or per variant for products with options.
   const addable: DraftLine[] = (catalog.data?.items ?? [])
@@ -867,6 +874,11 @@ function ChangeEditor({
         {(order.shipping > 0 || shipping > 0) && (
           <Cell after={shipping > 0 ? formatPrice(shipping, order.currency) : t('cart.free')}>
             {t('cart.shipping')}
+          </Cell>
+        )}
+        {order.testing > 0 && (
+          <Cell after={formatPrice(order.testing, order.currency)} subtitle={t('testing.orderLineHint')} multiline>
+            {t('testing.orderLine')}
           </Cell>
         )}
         <Cell after={formatPrice(total, order.currency)}>{t('change.newTotal')}</Cell>

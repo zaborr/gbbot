@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
-import { awaitsPayment, type Product } from '@tma-shop/shared';
+import { awaitsPayment, type Product, type Testing } from '@tma-shop/shared';
 import { Input } from '../components/Field.js';
 import { UnpaidOrdersBanner } from '../components/UnpaidOrdersBanner.js';
 import { ClosingNotice, closingDate, closingSoon } from '../components/ClosingNotice.js';
@@ -47,6 +47,10 @@ export function CatalogPage(): React.JSX.Element {
   const categories = useAsync(() => api.getCategories(), []);
   // Orders still to pay: a note at the top and a badge on "My orders".
   const myOrders = useAsync(() => api.getOrders(), []);
+  // Open testings, for a label on their products (none when the GB has testing off).
+  const testings = useAsync(() => (shop.testingEnabled ? api.getTestings() : Promise.resolve<Testing[]>([])), [
+    shop.testingEnabled,
+  ]);
   const unpaid = (myOrders.data ?? []).filter(awaitsPayment);
   const query = { categoryId, search: search.trim() || undefined };
   const products = useAsync(() => api.getProducts({ ...query, limit: PAGE_SIZE }), [categoryId, search]);
@@ -214,7 +218,9 @@ export function CatalogPage(): React.JSX.Element {
           {items.length === 0 ? (
             <Cell>{t('catalog.noProducts')}</Cell>
           ) : (
-            items.map((product) => <ProductCard key={product.id} product={product} />)
+            items.map((product) => (
+              <ProductCard key={product.id} product={product} testings={testings.data ?? []} />
+            ))
           )}
           {items.length < total && (
             <div style={{ padding: 16 }}>

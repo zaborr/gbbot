@@ -13,7 +13,17 @@ import {
   type PaymentLogEntry,
 } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
-import { cartItems, orderItems, orders, productVariants, products, shops } from '../db/schema.js';
+import {
+  cartItems,
+  cartTestings,
+  orderItems,
+  orders,
+  productVariants,
+  products,
+  shops,
+  testingEntries,
+} from '../db/schema.js';
+import { cartTestingsFor, testingAfterChange } from './testing.js';
 import { toOrderDTO, variantLabel } from '../db/mappers.js';
 import { lineStock, loadVariants, quantitiesByProduct, tieredPrice } from './variants.js';
 import { ApiError } from '../lib/errors.js';
@@ -92,6 +102,13 @@ export function buildOrderDraft(lines: DraftLine[]): OrderDraft {
     };
   });
   return { items, total: items.reduce((sum, item) => sum + item.subtotal, 0) };
+}
+
+/** Order lines as testings look at them. */
+function linesOf(
+  items: ReadonlyArray<{ productId: string; variantId?: string | null }>,
+): Array<{ productId: string; variantId: string | null }> {
+  return items.map((item) => ({ productId: item.productId, variantId: item.variantId ?? null }));
 }
 
 /** Creates an order from the user's current cart inside a single transaction. */
@@ -247,6 +264,14 @@ export async function createOrderFromCart(
     // The shop's per-order fee is frozen on the order and charged once (VIPs
     // may be spared it).
     const fee = isVip && shop.vipNoFee ? 0 : shop.orderFee;
+    // Testings ticked in the cart that still apply go on the order.
+    const testingLines = draft.items.map((item) => ({
+      productId: item.productId,
+      variantId: item.variantId,
+      label: item.variantLabel ? `${item.title} · ${item.variantLabel}` : item.title,
+    }));
+    const ticked = cart ? await cartTestingsFor(tx, shop, cart.id, userId, testingLines) : [];
+    const testing = ticked.reduce((sum, x) => sum + x.amount, 0);
     const [order] = await tx
       .insert(orders)
       .values({
@@ -254,9 +279,10 @@ export async function createOrderFromCart(
         userId,
         status: 'pending',
         isVip,
-        total: draft.total + fee + shipping,
+        total: draft.total + fee + shipping + testing,
         fee,
         shipping,
+        testing,
         shippingZoneName,
         encryptedAddress,
         addressKeyFingerprint,
@@ -267,7 +293,21 @@ export async function createOrderFromCart(
     if (!order) throw new Error('Failed to create order');
 
     await tx.insert(orderItems).values(draft.items.map((item) => ({ orderId: order.id, ...item })));
-    if (cart) await tx.delete(cartItems).where(eq(cartItems.cartId, cart.id));
+    if (ticked.length > 0) {
+      await tx.insert(testingEntries).values(
+        ticked.map((x) => ({
+          testingId: x.testingId,
+          orderId: order.id,
+          userId,
+          amount: x.amount,
+          volunteer: x.volunteer,
+        })),
+      );
+    }
+    if (cart) {
+      await tx.delete(cartItems).where(eq(cartItems.cartId, cart.id));
+      await tx.delete(cartTestings).where(eq(cartTestings.cartId, cart.id));
+    }
 
     return toOrderDTO(
       order,
@@ -819,10 +859,12 @@ export async function requestOrderChange(
   // Nothing paid yet: the change applies at once, no approval needed.
   if (direct) return applyUnpaidEdit(db, shopId, order.id, items);
 
+  // Testings stay while the order still holds what they test.
+  const testing = await testingAfterChange(db, order.id, linesOf(items), false);
   const changeRequest: OrderChangeRequest = {
     items,
     // Fee and shipping stay the same: they are charged once per order.
-    total: items.reduce((sum, item) => sum + item.subtotal, 0) + order.fee + order.shipping,
+    total: items.reduce((sum, item) => sum + item.subtotal, 0) + order.fee + order.shipping + testing,
     requestedAt: new Date().toISOString(),
   };
   const [updated] = await db
@@ -873,11 +915,13 @@ async function applyUnpaidEdit(
         })),
       )
       .returning();
+    const testing = await testingAfterChange(tx, order.id, linesOf(items), true);
     const [updated] = await tx
       .update(orders)
       .set({
-        total: itemsTotal + order.fee + shipping,
+        total: itemsTotal + order.fee + shipping + testing,
         shipping,
+        testing,
         changeRequest: null,
         paymentReminderAt: null,
         updatedAt: new Date(),
@@ -988,11 +1032,14 @@ export async function approveOrderChange(
       )
       .returning();
 
-    const status =
-      order.status === 'paid' && change.total > order.amountPaid ? 'pending' : order.status;
+    // Testings whose product left the order drop out (what was paid for them is refunded).
+    const testing = await testingAfterChange(tx, order.id, linesOf(change.items), true);
+    const total =
+      change.items.reduce((sum, item) => sum + item.subtotal, 0) + order.fee + order.shipping + testing;
+    const status = order.status === 'paid' && total > order.amountPaid ? 'pending' : order.status;
     const [updated] = await tx
       .update(orders)
-      .set({ total: change.total, changeRequest: null, status, updatedAt: new Date() })
+      .set({ total, testing, changeRequest: null, status, updatedAt: new Date() })
       .where(eq(orders.id, order.id))
       .returning();
     if (!updated) throw new Error('Failed to update order');

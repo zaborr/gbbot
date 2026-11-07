@@ -1,5 +1,8 @@
-import { and, asc, eq, inArray, isNull, notInArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, notInArray, sql } from 'drizzle-orm';
+import { tierProgress } from '@tma-shop/shared';
 import type {
+  CartTesting,
+  TestingParticipant,
   CreateTestingRequest,
   ShopAdminView,
   Testing,
@@ -7,9 +10,22 @@ import type {
   UpdateTestingRequest,
 } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
-import { productVariants, products, shops, testings } from '../db/schema.js';
+import {
+  cartTestings,
+  orders,
+  productVariants,
+  products,
+  shops,
+  testingEntries,
+  testings,
+  users,
+} from '../db/schema.js';
 import { toShopAdminDTO, variantLabel } from '../db/mappers.js';
 import { ApiError } from '../lib/errors.js';
+import type { Env } from '../config/env.js';
+import { tr } from '../i18n/messages.js';
+import { notifyUsers } from './notifications.js';
+import { withoutBlocked } from './blacklist.js';
 import type { ShopRow } from './shop.js';
 
 /**
@@ -20,6 +36,59 @@ import type { ShopRow } from './shop.js';
 type TestingRow = typeof testings.$inferSelect;
 /** A Drizzle transaction or the database itself. */
 type Executor = Pick<Database, 'select'>;
+type Writer = Pick<Database, 'select' | 'insert' | 'update' | 'delete'>;
+
+/** Money raised for each testing: an entry counts once its whole order is paid. */
+export interface TestingTotals {
+  raised: number;
+  pending: number;
+  participants: number;
+}
+
+export async function testingTotals(
+  db: Executor,
+  testingIds: readonly string[],
+): Promise<Map<string, TestingTotals>> {
+  const result = new Map<string, TestingTotals>();
+  if (testingIds.length === 0) return result;
+  const paid = sql`${orders.amountPaid} >= ${orders.total}`;
+  const rows = await db
+    .select({
+      testingId: testingEntries.testingId,
+      raised: sql<number>`coalesce(sum(case when ${paid} then ${testingEntries.amount} else 0 end), 0)::bigint`,
+      pending: sql<number>`coalesce(sum(case when ${paid} then 0 else ${testingEntries.amount} end), 0)::bigint`,
+      participants: sql<number>`count(*) filter (where ${paid})::int`,
+    })
+    .from(testingEntries)
+    .innerJoin(orders, eq(testingEntries.orderId, orders.id))
+    .where(and(inArray(testingEntries.testingId, [...testingIds]), ne(orders.status, 'cancelled')))
+    .groupBy(testingEntries.testingId);
+  for (const row of rows) {
+    result.set(row.testingId, {
+      raised: Number(row.raised),
+      pending: Number(row.pending),
+      participants: Number(row.participants),
+    });
+  }
+  return result;
+}
+
+/** The testings this person already takes part in (on an order not cancelled). */
+async function joinedBy(db: Executor, userId: number | undefined, testingIds: readonly string[]): Promise<Set<string>> {
+  if (userId === undefined || testingIds.length === 0) return new Set();
+  const rows = await db
+    .select({ testingId: testingEntries.testingId })
+    .from(testingEntries)
+    .innerJoin(orders, eq(testingEntries.orderId, orders.id))
+    .where(
+      and(
+        inArray(testingEntries.testingId, [...testingIds]),
+        eq(testingEntries.userId, userId),
+        ne(orders.status, 'cancelled'),
+      ),
+    );
+  return new Set(rows.map((r) => r.testingId));
+}
 
 /** Testings still running: they keep the product, variant and switch as they are. */
 const FINISHED: TestingStatus[] = ['settled', 'cancelled'];
@@ -28,6 +97,8 @@ function toTestingDTO(
   row: TestingRow,
   productTitle: string,
   label: string | null,
+  totals: TestingTotals | undefined,
+  joined: boolean,
 ): Testing {
   return {
     id: row.id,
@@ -41,16 +112,18 @@ function toTestingDTO(
     refundThreshold: row.refundThreshold,
     tiers: row.tiers,
     status: row.status as TestingStatus,
-    // Taking part (and so the money raised) comes with orders.
-    raised: 0,
-    participants: 0,
-    pending: 0,
+    raised: totals?.raised ?? 0,
+    participants: totals?.participants ?? 0,
+    pending: totals?.pending ?? 0,
+    joined,
   };
 }
 
-/** The shop's testings with their product titles and variant labels. */
-async function withLabels(db: Database, rows: TestingRow[]): Promise<Testing[]> {
+/** The shop's testings with their product titles, variant labels and money raised. */
+async function withLabels(db: Database, rows: TestingRow[], userId?: number): Promise<Testing[]> {
   if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.id);
+  const [totals, joined] = await Promise.all([testingTotals(db, ids), joinedBy(db, userId, ids)]);
   const productIds = [...new Set(rows.map((r) => r.productId))];
   const variantIds = rows.flatMap((r) => (r.variantId ? [r.variantId] : []));
   const [productRows, variantRows] = await Promise.all([
@@ -69,6 +142,8 @@ async function withLabels(db: Database, rows: TestingRow[]): Promise<Testing[]> 
       row,
       titles.get(row.productId) ?? '',
       row.variantId ? (labels.get(row.variantId) ?? null) : null,
+      totals.get(row.id),
+      joined.has(row.id),
     ),
   );
 }
@@ -83,29 +158,152 @@ export async function listTestings(db: Database, shopId: string): Promise<Testin
 }
 
 /**
- * The testings a customer sees on a product page. For now only the team sees
- * them (a preview), until taking part arrives.
+ * The testings customers see (all of the GB's, or one product's): those not
+ * cancelled, while the GB has testing on.
  */
-export async function listProductTestings(
+export async function listVisibleTestings(
   db: Database,
   shop: ShopRow,
-  productId: string,
-  canManage: boolean,
+  userId: number | undefined,
+  productId?: string,
 ): Promise<Testing[]> {
-  if (!shop.testingEnabled || !canManage) return [];
+  if (!shop.testingEnabled) return [];
   const rows = await db
     .select()
     .from(testings)
     .where(
       and(
         eq(testings.shopId, shop.id),
-        eq(testings.productId, productId),
+        productId ? eq(testings.productId, productId) : undefined,
         notInArray(testings.status, ['cancelled']),
       ),
     )
     .orderBy(asc(testings.createdAt));
-  return withLabels(db, rows);
+  return withLabels(db, rows, userId);
 }
+
+/** Whether a GB has a testing people can join now (start screen). */
+export async function shopsWithOpenTesting(db: Database, shopIds: readonly string[]): Promise<Set<string>> {
+  if (shopIds.length === 0) return new Set();
+  const rows = await db
+    .selectDistinct({ shopId: testings.shopId })
+    .from(testings)
+    .innerJoin(shops, eq(testings.shopId, shops.id))
+    .where(and(inArray(testings.shopId, [...shopIds]), eq(testings.status, 'open'), eq(shops.testingEnabled, true)));
+  return new Set(rows.map((r) => r.shopId));
+}
+
+/** A line (product, variant) as the cart and the order hold it. */
+interface Line {
+  productId: string;
+  variantId: string | null;
+}
+
+const covers = (testing: Pick<TestingRow, 'productId' | 'variantId'>, lines: readonly Line[]): boolean =>
+  lines.some(
+    (l) => l.productId === testing.productId && (testing.variantId === null || l.variantId === testing.variantId),
+  );
+
+/**
+ * The testings ticked in a cart that still apply: the GB has testing on and is
+ * open, the testing is open, the cart holds what it tests, and this person is
+ * not in it already.
+ */
+export async function cartTestingsFor(
+  db: Executor,
+  shop: ShopRow,
+  cartId: string,
+  userId: number,
+  lines: ReadonlyArray<Line & { label: string }>,
+): Promise<CartTesting[]> {
+  if (!shop.testingEnabled || shop.closedAt) return [];
+  const rows = await db
+    .select({ ticked: cartTestings, testing: testings })
+    .from(cartTestings)
+    .innerJoin(testings, eq(cartTestings.testingId, testings.id))
+    .where(eq(cartTestings.cartId, cartId));
+  if (rows.length === 0) return [];
+  const joined = await joinedBy(
+    db,
+    userId,
+    rows.map((r) => r.testing.id),
+  );
+  return rows.flatMap(({ ticked, testing }) => {
+    if (testing.shopId !== shop.id || testing.status !== 'open' || joined.has(testing.id)) return [];
+    const line = lines.find(
+      (l) => l.productId === testing.productId && (testing.variantId === null || l.variantId === testing.variantId),
+    );
+    if (!line) return [];
+    return [
+      {
+        testingId: testing.id,
+        label: line.label,
+        amount: testing.contribution,
+        volunteer: ticked.volunteer,
+      },
+    ];
+  });
+}
+
+/** Ticks (or updates) a testing in the cart; the cart must hold what it tests. */
+export async function tickCartTesting(
+  db: Database,
+  shop: ShopRow,
+  cartId: string,
+  userId: number,
+  testingId: string,
+  volunteer: boolean,
+  lines: readonly Line[],
+): Promise<void> {
+  if (!shop.testingEnabled) {
+    throw ApiError.conflict('testing_off', 'Turn on product testing in the GB settings first');
+  }
+  const testing = await db.query.testings.findFirst({
+    where: and(eq(testings.shopId, shop.id), eq(testings.id, testingId)),
+  });
+  if (!testing) throw ApiError.notFound('Testing not found');
+  if (testing.status !== 'open') throw ApiError.conflict('testing_not_open', 'This testing is closed');
+  if (!covers(testing, lines)) {
+    throw ApiError.conflict('testing_needs_product', 'Add the tested product to the cart first');
+  }
+  if ((await joinedBy(db, userId, [testing.id])).size > 0) {
+    throw ApiError.conflict('testing_joined', 'You already take part in this testing');
+  }
+  await db
+    .insert(cartTestings)
+    .values({ cartId, testingId, volunteer })
+    .onConflictDoUpdate({ target: [cartTestings.cartId, cartTestings.testingId], set: { volunteer } });
+}
+
+export async function untickCartTesting(db: Database, cartId: string, testingId: string): Promise<void> {
+  await db
+    .delete(cartTestings)
+    .where(and(eq(cartTestings.cartId, cartId), eq(cartTestings.testingId, testingId)));
+}
+
+/**
+ * What an order's testings add once its lines become `lines`: entries whose
+ * product or variant is no longer on it drop out (removed when `apply`).
+ */
+export async function testingAfterChange(
+  tx: Writer,
+  orderId: string,
+  lines: readonly Line[],
+  apply: boolean,
+): Promise<number> {
+  const rows = await tx
+    .select({ entry: testingEntries, testing: testings })
+    .from(testingEntries)
+    .innerJoin(testings, eq(testingEntries.testingId, testings.id))
+    .where(eq(testingEntries.orderId, orderId));
+  const gone = rows.filter((r) => !covers(r.testing, lines)).map((r) => r.entry.id);
+  if (apply && gone.length > 0) {
+    await tx.delete(testingEntries).where(inArray(testingEntries.id, gone));
+  }
+  return rows.filter((r) => !gone.includes(r.entry.id)).reduce((sum, r) => sum + r.entry.amount, 0);
+}
+
+
 
 async function findTesting(db: Database, shopId: string, id: string): Promise<TestingRow> {
   const row = await db.query.testings.findFirst({
@@ -178,6 +376,23 @@ export async function updateTesting(
   if (current.status !== 'open') {
     throw ApiError.conflict('testing_not_open', 'Only an open testing can be changed');
   }
+  // Once people take part, what they signed up for stays: same contribution,
+  // same tiers in the same order (new ones can be added at the end).
+  if (await hasEntries(db, current.id)) {
+    const kept = input.tiers.slice(0, current.tiers.length);
+    const same =
+      input.contribution === current.contribution &&
+      kept.length === current.tiers.length &&
+      current.tiers.every(
+        (tier, i) => kept[i]?.id === tier.id && kept[i]?.cost === tier.cost && kept[i]?.vials === tier.vials,
+      );
+    if (!same) {
+      throw ApiError.conflict(
+        'testing_joined_by_others',
+        'People already take part: only new tiers can be added at the end',
+      );
+    }
+  }
   const [row] = await db
     .update(testings)
     .set({
@@ -193,11 +408,48 @@ export async function updateTesting(
   return oneTesting(db, row);
 }
 
+async function hasEntries(db: Executor, testingId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: testingEntries.id })
+    .from(testingEntries)
+    .where(eq(testingEntries.testingId, testingId))
+    .limit(1);
+  return row !== undefined;
+}
+
+/** Who takes part, for the organiser (paid first, then waiting for payment). */
+export async function listParticipants(
+  db: Database,
+  shopId: string,
+  id: string,
+): Promise<TestingParticipant[]> {
+  const testing = await findTesting(db, shopId, id);
+  const rows = await db
+    .select({ entry: testingEntries, order: orders, user: users })
+    .from(testingEntries)
+    .innerJoin(orders, eq(testingEntries.orderId, orders.id))
+    .leftJoin(users, eq(testingEntries.userId, users.telegramId))
+    .where(and(eq(testingEntries.testingId, testing.id), ne(orders.status, 'cancelled')))
+    .orderBy(asc(testingEntries.createdAt));
+  const list = rows.map(({ entry, order, user }) => ({
+    orderId: order.id,
+    name: user?.firstName ?? '—',
+    contact: order.contactUsername ?? user?.username ?? null,
+    amount: entry.amount,
+    paid: order.amountPaid >= order.total,
+    volunteer: entry.volunteer,
+  }));
+  return [...list.filter((p) => p.paid), ...list.filter((p) => !p.paid)];
+}
+
 /** Removes a testing nobody has taken part in yet. */
 export async function deleteTesting(db: Database, shopId: string, id: string): Promise<void> {
   const current = await findTesting(db, shopId, id);
   if (current.status !== 'open' && current.status !== 'cancelled') {
     throw ApiError.conflict('testing_not_open', 'Only an open testing can be changed');
+  }
+  if (await hasEntries(db, current.id)) {
+    throw ApiError.conflict('testing_has_entries', 'People already take part in this testing');
   }
   await db.delete(testings).where(eq(testings.id, current.id));
 }
@@ -263,5 +515,60 @@ export async function assertVariantsFreeOfTestings(
     .limit(1);
   if (row) {
     throw ApiError.conflict('testing_variant', 'A variant with a testing cannot be removed');
+  }
+}
+
+/**
+ * After a payment is confirmed: each testing of the GB that now covers more
+ * tiers tells its paid participants (each tier once).
+ */
+export async function announceTestingTiers(db: Database, env: Env, shopId: string): Promise<void> {
+  const shop = await db.query.shops.findFirst({ where: eq(shops.id, shopId) });
+  if (!shop?.testingEnabled) return;
+  const rows = await db
+    .select()
+    .from(testings)
+    .where(and(eq(testings.shopId, shop.id), inArray(testings.status, ['open', 'closed'])));
+  if (rows.length === 0) return;
+  const totals = await testingTotals(
+    db,
+    rows.map((r) => r.id),
+  );
+  const labels = await withLabels(db, rows);
+  for (const row of rows) {
+    const raised = totals.get(row.id)?.raised ?? 0;
+    const reached = tierProgress(row.tiers, raised, row.contribution).filter((p) => p.reached).length;
+    if (reached <= row.notifiedTiers) continue;
+    // Claim it first, so two payments at once do not announce it twice.
+    const claimed = await db
+      .update(testings)
+      .set({ notifiedTiers: reached })
+      .where(and(eq(testings.id, row.id), sql`${testings.notifiedTiers} < ${reached}`))
+      .returning({ id: testings.id });
+    if (claimed.length === 0) continue;
+
+    const people = await db
+      .select({ userId: testingEntries.userId })
+      .from(testingEntries)
+      .innerJoin(orders, eq(testingEntries.orderId, orders.id))
+      .where(
+        and(
+          eq(testingEntries.testingId, row.id),
+          ne(orders.status, 'cancelled'),
+          sql`${orders.amountPaid} >= ${orders.total}`,
+        ),
+      );
+    const ids = await withoutBlocked(
+      db,
+      env,
+      shop,
+      people.flatMap((p) => (p.userId === null ? [] : [p.userId])),
+    );
+    const dto = labels.find((l) => l.id === row.id);
+    const what = dto?.variantLabel ? `${dto.productTitle} · ${dto.variantLabel}` : (dto?.productTitle ?? '');
+    const newly = row.tiers.slice(row.notifiedTiers, reached).map((tier) => tier.name).join(', ');
+    await notifyUsers(db, env.BOT_TOKEN, ids, (lang) =>
+      tr(lang, 'testing.tierReached', { shop: shop.name, product: what, tiers: newly }),
+    );
   }
 }

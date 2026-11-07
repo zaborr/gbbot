@@ -229,6 +229,8 @@ export const shopSummary = shop
     goal: goalProgress.nullable(),
     /** The GB's admins, as shown under "Organised by". */
     organizers: z.array(organizerTag),
+    /** A product testing is open to join. */
+    testingOpen: z.boolean(),
   });
 export type ShopSummary = z.infer<typeof shopSummary>;
 

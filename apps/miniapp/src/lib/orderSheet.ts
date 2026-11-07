@@ -92,6 +92,7 @@ export function orderRows(
     if (o.shippingZoneName) {
       line(t('cart.shippingZoneLine', { zone: o.shippingZoneName }), 1, o.shipping, o.shipping);
     }
+    if (o.testing > 0) line(t('testing.orderLine'), 1, o.testing, o.testing);
   }
   return rows;
 }

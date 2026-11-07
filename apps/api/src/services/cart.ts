@@ -4,6 +4,8 @@ import type { Database } from '../db/client.js';
 import { cartItems, carts, productVariants, products, shops } from '../db/schema.js';
 import { toProductDTO, toVariantDTO, variantLabel } from '../db/mappers.js';
 import { ApiError } from '../lib/errors.js';
+import { cartTestingsFor, tickCartTesting, untickCartTesting } from './testing.js';
+import type { ShopRow } from './shop.js';
 import {
   lineStock,
   loadVariants,
@@ -149,13 +151,21 @@ export async function getCart(
   // (and not for VIPs when the GB says so).
   const fee =
     lines.length > 0 && !(isVip && shop?.vipNoFee) ? (shop?.orderFee ?? 0) : 0;
+  // Testings ticked here that still apply (the cart holds what they test).
+  const testings = shop
+    ? await cartTestingsFor(db, shop, cart.id, userId, cartLinesForTesting(lines))
+    : [];
 
   return {
     lines,
+    testings,
     // A cart holds a single currency (enforced in addItem); fall back to the shop's.
     currency: lines[0]?.product.currency ?? shop?.currency ?? 'USDC',
     fee,
-    total: lines.reduce((sum, line) => sum + line.subtotal, 0) + fee,
+    total:
+      lines.reduce((sum, line) => sum + line.subtotal, 0) +
+      fee +
+      testings.reduce((sum, x) => sum + x.amount, 0),
     isVip,
     itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
   };
@@ -249,6 +259,44 @@ export async function setItemQuantity(
     await db.update(cartItems).set({ quantity }).where(eq(cartItems.id, line.id));
   }
   await touchCart(db, cart.id);
+  return getCart(db, shopId, userId, isVip);
+}
+
+/** Cart lines as testings look at them: product, variant and a label. */
+function cartLinesForTesting(
+  lines: readonly CartLine[],
+): Array<{ productId: string; variantId: string | null; label: string }> {
+  return lines.map((line) => ({
+    productId: line.product.id,
+    variantId: line.variant?.id ?? null,
+    label: line.variant ? `${line.product.title} · ${line.variant.label}` : line.product.title,
+  }));
+}
+
+/** Joins (or updates the vial offer of) a testing with this cart. */
+export async function addCartTesting(
+  db: Database,
+  shop: ShopRow,
+  userId: number,
+  testingId: string,
+  volunteer: boolean,
+  isVip = false,
+): Promise<Cart> {
+  const cart = await getOrCreateCart(db, shop.id, userId);
+  const current = await getCart(db, shop.id, userId, isVip);
+  await tickCartTesting(db, shop, cart.id, userId, testingId, volunteer, cartLinesForTesting(current.lines));
+  return getCart(db, shop.id, userId, isVip);
+}
+
+export async function removeCartTesting(
+  db: Database,
+  shopId: string,
+  userId: number,
+  testingId: string,
+  isVip = false,
+): Promise<Cart> {
+  const cart = await getOrCreateCart(db, shopId, userId);
+  await untickCartTesting(db, cart.id, testingId);
   return getCart(db, shopId, userId, isVip);
 }
 

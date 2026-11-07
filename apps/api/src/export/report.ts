@@ -65,6 +65,7 @@ const TEXT = {
     'col.units': 'Units',
     'col.products': 'Products',
     'col.shipping': 'Shipping',
+    'col.testing': 'Testing',
     'col.total': 'Total',
     'col.paid': 'Paid',
     'col.balance': 'Balance (+due / −refund)',
@@ -121,6 +122,7 @@ const TEXT = {
     'col.units': 'Unidades',
     'col.products': 'Productos',
     'col.shipping': 'Envío',
+    'col.testing': 'Testing',
     'col.total': 'Total',
     'col.paid': 'Pagado',
     'col.balance': 'Saldo (+pendiente / −devolver)',
@@ -177,6 +179,7 @@ const TEXT = {
     'col.units': 'Unità',
     'col.products': 'Prodotti',
     'col.shipping': 'Spedizione',
+    'col.testing': 'Testing',
     'col.total': 'Totale',
     'col.paid': 'Pagato',
     'col.balance': 'Saldo (+dovuto / −da rimborsare)',
@@ -233,6 +236,7 @@ const TEXT = {
     'col.units': 'Unidades',
     'col.products': 'Produtos',
     'col.shipping': 'Envio',
+    'col.testing': 'Testing',
     'col.total': 'Total',
     'col.paid': 'Pago',
     'col.balance': 'Saldo (+por pagar / −a reembolsar)',
@@ -334,6 +338,7 @@ function ordersSheet(input: ReportInput, orders: readonly Order[]): Sheet {
     L('col.products'),
     input.feeLabel,
     L('col.shipping'),
+    L('col.testing'),
     L('col.total'),
     L('col.paid'),
     L('col.balance'),
@@ -360,6 +365,7 @@ function ordersSheet(input: ReportInput, orders: readonly Order[]): Sheet {
       money(products),
       money(o.fee),
       money(o.shipping),
+      money(o.testing),
       money(o.total),
       money(o.amountPaid),
       money(o.amountDue),
@@ -470,7 +476,7 @@ function summarySheet(input: ReportInput, orders: readonly Order[], now: Date): 
   const L = labels(input);
   const byCurrency = new Map<
     string,
-    { orders: number; units: number; products: number; fees: number; shipping: number; total: number; paid: number }
+    { orders: number; units: number; products: number; fees: number; shipping: number; testing: number; total: number; paid: number }
   >();
   for (const o of orders) {
     const row = byCurrency.get(o.currency) ?? {
@@ -479,6 +485,7 @@ function summarySheet(input: ReportInput, orders: readonly Order[], now: Date): 
       products: 0,
       fees: 0,
       shipping: 0,
+      testing: 0,
       total: 0,
       paid: 0,
     };
@@ -487,6 +494,7 @@ function summarySheet(input: ReportInput, orders: readonly Order[], now: Date): 
     row.products += o.items.reduce((n, i) => n + i.subtotal, 0);
     row.fees += o.fee;
     row.shipping += o.shipping;
+    row.testing += o.testing;
     row.total += o.total;
     row.paid += o.amountPaid;
     byCurrency.set(o.currency, row);
@@ -500,6 +508,7 @@ function summarySheet(input: ReportInput, orders: readonly Order[], now: Date): 
       L('col.products'),
       input.feeLabel,
       L('col.shipping'),
+      L('col.testing'),
       L('col.total'),
       L('col.paid'),
     ],
@@ -510,6 +519,7 @@ function summarySheet(input: ReportInput, orders: readonly Order[], now: Date): 
       money(r.products),
       money(r.fees),
       money(r.shipping),
+      money(r.testing),
       money(r.total),
       money(r.paid),
     ]),

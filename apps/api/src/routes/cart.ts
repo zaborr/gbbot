@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { addToCartRequest, updateCartItemRequest } from '@tma-shop/shared';
+import { addToCartRequest, cartTestingRequest, updateCartItemRequest } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { requireAuth, requireTelegramUser } from '../auth/middleware.js';
-import { addItem, getCart, setItemQuantity } from '../services/cart.js';
+import { addCartTesting, addItem, getCart, removeCartTesting, setItemQuantity } from '../services/cart.js';
 import { assertOpen } from '../services/closing.js';
 
 /** A cart line id (older clients send a product id, also accepted). */
@@ -58,6 +58,26 @@ export function cartRoutes(): Hono<AppBindings> {
       await setItemQuantity(c.get('db'), c.get('shopId'), sub, lineId, 0, c.get('isVip')),
     );
   });
+
+  // Product testings joined with this cart (they go on the order).
+  app.post('/testings', zValidator('json', cartTestingRequest), async (c) => {
+    const { testingId, volunteer } = c.req.valid('json');
+    assertOpen(c.get('shop'));
+    return c.json(
+      await addCartTesting(c.get('db'), c.get('shop'), c.get('claims').sub, testingId, volunteer, c.get('isVip')),
+    );
+  });
+  app.delete('/testings/:testingId', zValidator('param', z.object({ testingId: z.uuid() })), async (c) =>
+    c.json(
+      await removeCartTesting(
+        c.get('db'),
+        c.get('shopId'),
+        c.get('claims').sub,
+        c.req.valid('param').testingId,
+        c.get('isVip'),
+      ),
+    ),
+  );
 
   return app;
 }

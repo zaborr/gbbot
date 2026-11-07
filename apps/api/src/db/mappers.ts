@@ -167,6 +167,7 @@ export function toShopSummaryDTO(
   activity: { cartItems: number; unpaidOrders: number } = { cartItems: 0, unpaidOrders: 0 },
   organizers: OrganizerTag[] = [],
   goal: GoalProgress | null = null,
+  testingOpen = false,
 ): ShopSummary {
   return {
     id: row.id,
@@ -188,6 +189,7 @@ export function toShopSummaryDTO(
     unpaidOrders: activity.unpaidOrders,
     organizers,
     goal,
+    testingOpen,
   };
 }
 
@@ -241,6 +243,7 @@ export function toOrderDTO(row: OrderRow, items: OrderItemRow[]): Order {
     total: row.total,
     fee: row.fee,
     shipping: row.shipping,
+    testing: row.testing,
     shippingZoneName: row.shippingZoneName,
     encryptedAddress: row.encryptedAddress,
     addressKeyFingerprint: row.addressKeyFingerprint,

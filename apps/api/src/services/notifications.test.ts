@@ -11,6 +11,7 @@ const base: Order = {
   total: 5490,
   fee: 0,
   shipping: 590,
+  testing: 0,
   shippingZoneName: 'Spain',
   encryptedAddress: null,
   addressKeyFingerprint: null,
