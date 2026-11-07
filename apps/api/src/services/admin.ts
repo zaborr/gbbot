@@ -4,6 +4,7 @@ import type { Database } from '../db/client.js';
 import { categories, orderItems, products } from '../db/schema.js';
 import { toCategoryDTO, toProductDTO } from '../db/mappers.js';
 import { loadVariants, syncVariants, validateVariants } from './variants.js';
+import { assertProductKeepsTestings } from './testing.js';
 import { ApiError } from '../lib/errors.js';
 import { optionalText } from './shop.js';
 
@@ -56,6 +57,8 @@ async function saveProduct(
   };
 
   return db.transaction(async (tx) => {
+    // A testing keeps its token and what it tests.
+    if (productId) await assertProductKeepsTestings(tx, productId, values.currency, options.length > 0);
     const [row] = productId
       ? await tx
           .update(products)

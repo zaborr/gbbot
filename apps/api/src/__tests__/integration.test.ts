@@ -22,6 +22,7 @@ import {
 import { runRetention } from '../services/retention.js';
 import { cancelExpiredOrders } from '../services/autoCancel.js';
 import { markOrderPaid } from '../services/orders.js';
+import { assertProductKeepsTestings } from '../services/testing.js';
 import { sendPaymentReminders } from '../services/reminders.js';
 import { resetMiniAppUrlCache } from '../services/bot.js';
 import { closeDueShops } from '../services/closing.js';
@@ -837,6 +838,76 @@ describeDb('API integration', () => {
       body: JSON.stringify({ who: String(CUSTOMER_ID) }),
     });
     expect(await sees()).toBe(true);
+  });
+
+  it('sets up product testings, shown only to the team for now', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const customer = { Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}` };
+    const body = {
+      productId,
+      variantId: null,
+      lab: 'Lab X',
+      contribution: 2000,
+      refundThreshold: 200,
+      tiers: [
+        { id: 'mp', name: 'M&P', cost: 20000, vials: 1 },
+        { id: 'endo', name: 'Endo', cost: 10000, vials: 0 },
+      ],
+    };
+    const create = (): Promise<Response> =>
+      Promise.resolve(
+        request('/api/admin/testings', { method: 'POST', headers: admin, body: JSON.stringify(body) }),
+      );
+    const toggle = (enabled: boolean): Promise<Response> =>
+      Promise.resolve(
+        request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled }) }),
+      );
+
+    // Off by default: nothing can be set up.
+    expect((await create()).status).toBe(409);
+    const on = await toggle(true);
+    expect(((await on.json()) as { testingEnabled: boolean }).testingEnabled).toBe(true);
+
+    const created = await create();
+    expect(created.status).toBe(201);
+    const testing = (await created.json()) as { id: string; currency: string; productTitle: string };
+    expect(testing).toMatchObject({ currency: 'USDC', productTitle: 'Sencha' });
+    // One per product (it has no variants), and a variant it does not have is refused.
+    expect((await create()).status).toBe(409);
+    const withVariant = await request('/api/admin/testings', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ ...body, variantId: '00000000-0000-4000-8000-000000000000' }),
+    });
+    expect(withVariant.status).toBe(400);
+
+    // Customers do not see it yet; the team does, as a preview.
+    const seen = await request(`/api/products/${productId}/testings`, { headers: customer });
+    expect(await seen.json()).toEqual([]);
+    const preview = await request(`/api/products/${productId}/testings`, { headers: admin });
+    expect(((await preview.json()) as unknown[]).length).toBe(1);
+
+    // The product keeps its token while it has a testing.
+    await expect(assertProductKeepsTestings(db, productId, 'EURC', false)).rejects.toThrow(/token/);
+    await expect(assertProductKeepsTestings(db, productId, 'USDC', true)).rejects.toThrow(/variants/);
+    await assertProductKeepsTestings(db, productId, 'USDC', false);
+
+    // Editing the tiers.
+    const edited = await request(`/api/admin/testings/${testing.id}`, {
+      method: 'PUT',
+      headers: admin,
+      body: JSON.stringify({ ...body, productId: undefined, variantId: undefined, lab: 'Lab Y' }),
+    });
+    expect(((await edited.json()) as { lab: string }).lab).toBe('Lab Y');
+
+    // Off only once its testings are finished (or deleted).
+    expect((await toggle(false)).status).toBe(409);
+    const removed = await request(`/api/admin/testings/${testing.id}`, { method: 'DELETE', headers: admin });
+    expect(removed.status).toBe(200);
+    expect((await toggle(false)).status).toBe(200);
   });
 
   it('lets administrators set the GB currency', async () => {

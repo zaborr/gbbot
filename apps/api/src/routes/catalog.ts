@@ -8,6 +8,7 @@ import { getShopConfig, teamIds } from '../services/shop.js';
 import { loadGoalProgress } from '../services/goal.js';
 import { loadPeople, organizerTags } from '../services/team.js';
 import { acceptDisclaimer } from '../services/disclaimer.js';
+import { listProductTestings } from '../services/testing.js';
 import { requireAuth, requireTelegramUser } from '../auth/middleware.js';
 import { ApiError } from '../lib/errors.js';
 
@@ -63,6 +64,13 @@ export function catalogRoutes(): Hono<AppBindings> {
     if (!product) throw ApiError.notFound('Product not found');
     return c.json(product);
   });
+
+  // The product's testings (lab tests paid between its buyers).
+  app.get('/products/:id/testings', zValidator('param', idParam), async (c) =>
+    c.json(
+      await listProductTestings(c.get('db'), c.get('shop'), c.req.valid('param').id, c.get('canManage')),
+    ),
+  );
 
   return app;
 }

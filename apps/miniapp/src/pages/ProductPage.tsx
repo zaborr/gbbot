@@ -22,6 +22,7 @@ import {
   vipPriceFor,
 } from '../lib/variants.js';
 import { ProductImage } from '../components/ProductImage.js';
+import { TestingCard } from '../components/TestingCard.js';
 import { useShop, useShopPath } from '../providers/ShopProvider.js';
 import { productDescription, productTitle } from '../lib/localize.js';
 import { t, tn } from '../i18n/index.js';
@@ -132,6 +133,12 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
     onClick: onAdd,
   });
 
+  // Its lab testings: the chosen variant's, or all of them until one is chosen.
+  const testings = useAsync(() => api.getProductTestings(product.id), [product.id]);
+  const shownTestings = (testings.data ?? []).filter(
+    (x) => !withVariants || variant === null || x.variantId === variant.id,
+  );
+
   const tiers = tierTable(product, variant, vip);
   const vipShown = variant ? vipPriceFor(product, variant, vip) !== null : hasVipPrice(product, vip);
 
@@ -217,6 +224,11 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
           ))}
         </Section>
       )}
+
+      {shownTestings.map((x) => (
+        // Only the team sees them for now (a preview).
+        <TestingCard key={x.id} testing={x} preview />
+      ))}
 
       {!outOfStock && (
         <Section header={t('product.quantity')}>

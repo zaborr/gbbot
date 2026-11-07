@@ -541,3 +541,69 @@ button.gb-banner {
 .tma-ios button.gb-banner {
   width: 100%;
 }
+
+/*
+ * Product testing: the lab, the contribution and one bar for the money raised,
+ * with a thin gap where each tier is reached (in the card's colour, so it
+ * works in both themes).
+ */
+.gb-testing-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 10px;
+}
+.gb-testing-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--tgui--secondary_fill, rgba(127, 127, 127, 0.18));
+}
+.gb-testing-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+}
+.gb-testing-bar-fill--pending {
+  opacity: 0.35;
+}
+.gb-testing-bar-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--tma-card);
+}
+.gb-testing-tier-icon {
+  display: inline-flex;
+  width: 28px;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+}
+.gb-testing-tier-cost {
+  font-weight: 600;
+  color: var(--tgui--text_color);
+}
+/* Tier rows being edited: the name on its own line, cost and vials below. */
+.gb-testing-tier-edit {
+  padding: 4px 0 8px;
+  border-bottom: 1px solid var(--tgui--divider);
+}
+.gb-testing-tier-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 0 8px;
+}
+/* Side by side, the fields keep the name field's left edge (16px). */
+.gb-testing-tier-row .tma-field-wrap {
+  padding-inline: 8px;
+}
+.gb-testing-tier-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+}

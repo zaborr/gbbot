@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { List } from '@telegram-apps/telegram-ui';
+import { Cell, List, Section } from '@telegram-apps/telegram-ui';
 import type { Product } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
@@ -7,7 +7,7 @@ import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { ProductForm } from './ProductForm.js';
 import { AdminOnly, TOKENS } from './common.js';
-import { useShopPath } from '../../providers/ShopProvider.js';
+import { useShop, useShopPath } from '../../providers/ShopProvider.js';
 import { t } from '../../i18n/index.js';
 
 /** `/admin/products/new` creates a product; `/admin/products/:id` edits one. */
@@ -56,6 +56,32 @@ function AdminProduct(): React.JSX.Element {
         onSaved={onSaved}
         onCancel={() => navigate(-1)}
       />
+      {product && <ProductTestings product={product} />}
     </List>
+  );
+}
+
+/** The product's testings (when the GB has testing on), and a way to add one. */
+function ProductTestings({ product }: { product: Product }): React.JSX.Element | null {
+  const navigate = useNavigate();
+  const { shop, to } = useShop();
+  const testings = useAsync(() => api.adminGetTestings(), [product.id]);
+  if (!shop.testingEnabled) return null;
+  const mine = (testings.data ?? []).filter((x) => x.productId === product.id);
+  // Without variants there is one testing at most; with them, one per variant.
+  const canAdd = product.variants.length > 0 ? mine.length < product.variants.length : mine.length === 0;
+  return (
+    <Section header={t('testing.title')} footer={t('testing.productFooter')}>
+      {mine.map((x) => (
+        <Cell key={x.id} onClick={() => navigate(to(`/admin/testings/${x.id}`))} after="›">
+          {x.variantLabel ? t('testing.ofVariant', { variant: x.variantLabel }) : t('testing.ofProduct')}
+        </Cell>
+      ))}
+      {canAdd && (
+        <Cell onClick={() => navigate(to(`/admin/testings/new?product=${product.id}`))}>
+          {t('testing.createForProduct')}
+        </Cell>
+      )}
+    </Section>
   );
 }
