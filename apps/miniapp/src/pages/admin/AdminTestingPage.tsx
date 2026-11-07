@@ -227,6 +227,7 @@ function TestingForm({
           raised: testing?.raised ?? 0,
           participants: testing?.participants ?? 0,
           pending: testing?.pending ?? 0,
+          joined: false,
         }
       : null;
 
