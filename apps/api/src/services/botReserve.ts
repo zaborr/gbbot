@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { and, asc, eq, inArray, isNotNull, ne } from 'drizzle-orm';
-import { LANGS, type BotInfo, type BotSettings, type Lang, type UpdateBotSettingsRequest } from '@tma-shop/shared';
+import { LANGS, type BotInfo, type BotSettings, type BotSwitchReason, type Lang, type UpdateBotSettingsRequest } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { botSettings, bots, creatorAccounts } from '../db/schema.js';
@@ -21,7 +21,7 @@ type BotRow = typeof bots.$inferSelect;
 const BOTS_PER_ACCOUNT = 20;
 const CHECK_EVERY_MS = 60 * 60 * 1000;
 
-async function settingsRow(db: Database): Promise<SettingsRow> {
+export async function settingsRow(db: Database): Promise<SettingsRow> {
   const row = await db.query.botSettings.findFirst();
   if (row) return row;
   const [created] = await db.insert(botSettings).values({ id: 1 }).onConflictDoNothing().returning();
@@ -36,6 +36,9 @@ const toSettings = (row: SettingsRow): BotSettings => ({
   photo: row.photo,
   reserveCount: row.reserveCount,
   reserveEveryDays: row.reserveEveryDays,
+  watchMinutes: row.watchMinutes,
+  userCheckMinutes: row.userCheckMinutes,
+  autoSwitch: row.autoSwitch,
   lastError: row.lastError,
   lastErrorAt: row.lastErrorAt?.toISOString() ?? null,
 });
@@ -69,6 +72,9 @@ export async function updateBotSettings(
       ...(input.photo !== undefined ? { photo: input.photo } : {}),
       reserveCount: input.reserveCount,
       reserveEveryDays: input.reserveEveryDays,
+      watchMinutes: input.watchMinutes,
+      userCheckMinutes: input.userCheckMinutes,
+      autoSwitch: input.autoSwitch,
       updatedAt: new Date(),
     })
     .where(eq(botSettings.id, 1))
@@ -280,12 +286,18 @@ export async function createReserve(
 }
 
 /** A spare takes over now. */
-export async function useReserve(db: Database, env: Env, botId: number, byUser: number | null): Promise<BotInfo> {
+export async function useReserve(
+  db: Database,
+  env: Env,
+  botId: number,
+  byUser: number | null,
+  reason: BotSwitchReason = 'manual',
+): Promise<BotInfo> {
   const row = await db.query.bots.findFirst({ where: and(eq(bots.id, botId), eq(bots.status, 'reserve')) });
   if (!row) throw ApiError.notFound('Spare bot not found');
   const token = tokenOf(env, row);
   if (!token) throw ApiError.conflict('bot_key', 'The bot token cannot be read');
-  return switchBot(db, env, token, 'manual', byUser, undefined, { fromReserve: true });
+  return switchBot(db, env, token, reason, byUser, undefined, { fromReserve: true });
 }
 
 /** Takes a spare out (and deletes it in @BotFather when an account of ours made it). */

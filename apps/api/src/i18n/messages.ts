@@ -171,6 +171,9 @@ const en = {
   'creator.needsLogin': '⚠️ The creator account {account} has to sign in again (Telegram asks for the code). Platform → 🤖 Bots → the account → Sign in again.',
   'creator.closed': '⛔ Telegram has closed the creator account {account}. Its bots may stop working: add another account.',
   'bots.reserveFailed': '⚠️ A spare bot could not be created: {error}',
+  'bots.downNoReserve': '🚨 {bot} is down ({reason}) and there is no spare bot. Change it from Platform → 🤖 Bots with a bot created in @BotFather.',
+  'bots.downSpareFailed': '🚨 {bot} is down ({reason}) and no spare bot could take over. Look at Platform → 🤖 Bots.',
+  'bots.downManual': '🚨 {bot} is down ({reason}). The automatic switch is off: use a spare from Platform → 🤖 Bots.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -334,6 +337,9 @@ const es: Record<BotMessageKey, string> = {
   'creator.needsLogin': '⚠️ La cuenta creadora {account} tiene que volver a iniciar sesión (Telegram pide el código). Plataforma → 🤖 Bots → la cuenta → Volver a iniciar sesión.',
   'creator.closed': '⛔ Telegram ha cerrado la cuenta creadora {account}. Sus bots pueden dejar de funcionar: añade otra cuenta.',
   'bots.reserveFailed': '⚠️ No se ha podido crear un bot de reserva: {error}',
+  'bots.downNoReserve': '🚨 {bot} ha caído ({reason}) y no hay bot de reserva. Cámbialo desde Plataforma → 🤖 Bots con un bot creado en @BotFather.',
+  'bots.downSpareFailed': '🚨 {bot} ha caído ({reason}) y ningún bot de reserva ha podido relevarlo. Revisa Plataforma → 🤖 Bots.',
+  'bots.downManual': '🚨 {bot} ha caído ({reason}). El relevo automático está apagado: usa una reserva desde Plataforma → 🤖 Bots.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -495,6 +501,9 @@ const it: Record<BotMessageKey, string> = {
   'creator.needsLogin': '⚠️ L\'account creatore {account} deve accedere di nuovo (Telegram chiede il codice). Piattaforma → 🤖 Bot → l\'account → Accedi di nuovo.',
   'creator.closed': '⛔ Telegram ha chiuso l\'account creatore {account}. I suoi bot potrebbero smettere di funzionare: aggiungi un altro account.',
   'bots.reserveFailed': '⚠️ Non è stato possibile creare un bot di riserva: {error}',
+  'bots.downNoReserve': '🚨 {bot} è caduto ({reason}) e non c\'è un bot di riserva. Cambialo da Piattaforma → 🤖 Bot con un bot creato in @BotFather.',
+  'bots.downSpareFailed': '🚨 {bot} è caduto ({reason}) e nessun bot di riserva è riuscito a subentrare. Controlla Piattaforma → 🤖 Bot.',
+  'bots.downManual': '🚨 {bot} è caduto ({reason}). Il cambio automatico è spento: usa una riserva da Piattaforma → 🤖 Bot.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -656,6 +665,9 @@ const pt: Record<BotMessageKey, string> = {
   'creator.needsLogin': '⚠️ A conta criadora {account} tem de voltar a iniciar sessão (o Telegram pede o código). Plataforma → 🤖 Bots → a conta → Voltar a iniciar sessão.',
   'creator.closed': '⛔ O Telegram fechou a conta criadora {account}. Os seus bots podem deixar de funcionar: adicione outra conta.',
   'bots.reserveFailed': '⚠️ Não foi possível criar um bot de reserva: {error}',
+  'bots.downNoReserve': '🚨 {bot} caiu ({reason}) e não há bot de reserva. Mude-o em Plataforma → 🤖 Bots com um bot criado no @BotFather.',
+  'bots.downSpareFailed': '🚨 {bot} caiu ({reason}) e nenhum bot de reserva o conseguiu substituir. Veja Plataforma → 🤖 Bots.',
+  'bots.downManual': '🚨 {bot} caiu ({reason}). A substituição automática está desligada: use uma reserva em Plataforma → 🤖 Bots.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

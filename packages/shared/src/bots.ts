@@ -34,6 +34,8 @@ export interface BotsOverview {
   active: BotInfo | null;
   /** Whether Telegram still answers as the active bot (checked just now). */
   working: boolean;
+  /** The last checks of the active bot (null: not yet since the server started). */
+  watch: { checkedAt: string | null; userCheckedAt: string | null; problem: string | null };
   /** Where the active bot's Mini App button opens (null: it has none). */
   menuUrl: string | null;
   bots: BotInfo[];
@@ -106,6 +108,9 @@ export interface BotSettings {
   reserveCount: number;
   /** At least this many days between two new spares. */
   reserveEveryDays: number;
+  watchMinutes: number;
+  userCheckMinutes: number;
+  autoSwitch: boolean;
   lastError: string | null;
   lastErrorAt: string | null;
 }
@@ -125,5 +130,8 @@ export const updateBotSettingsRequest = z.object({
   photo: z.string().max(1_500_000).nullable().optional(),
   reserveCount: z.number().int().min(0).max(5),
   reserveEveryDays: z.number().int().min(1).max(30),
+  watchMinutes: z.number().int().min(1).max(60),
+  userCheckMinutes: z.number().int().min(5).max(720),
+  autoSwitch: z.boolean(),
 });
 export type UpdateBotSettingsRequest = z.infer<typeof updateBotSettingsRequest>;

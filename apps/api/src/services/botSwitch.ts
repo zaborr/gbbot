@@ -31,7 +31,7 @@ export async function botsOverview(
   db: Database,
   env: Env,
   telegram = new TelegramApi(botToken(env)),
-): Promise<BotsOverview> {
+): Promise<Omit<BotsOverview, 'watch'>> {
   const rows = await db.select().from(bots).orderBy(desc(bots.createdAt));
   const active = rows.find((row) => row.status === 'active') ?? null;
   const switches = await db.select().from(botSwitches).orderBy(desc(botSwitches.at)).limit(30);
