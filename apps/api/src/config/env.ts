@@ -70,6 +70,8 @@ const envSchema = z.object({
    * access in the app. Unset = they ask the platform admin for it.
    */
   WEB_ONION_URL: optional(z.url()),
+  /** The creator service (see creator/README.md). */
+  CREATOR_URL: z.url().default('http://creator:3100'),
   /** Folder shared with the server for /update (see deploy/auto-update). */
   UPDATE_DIR: optional(z.string()),
 });
