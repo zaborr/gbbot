@@ -64,6 +64,8 @@ function BotsView({
   const actions = useAdminActions(onChanged);
   const tokenOk = BOT_TOKEN_RE.test(token.trim());
   const { active } = overview;
+  const spares = overview.bots.filter((bot) => bot.status === 'reserve');
+  const down = overview.bots.filter((bot) => bot.status === 'down');
 
   const change = (): void =>
     void actions.twoTap('switch', async () => {
@@ -119,20 +121,47 @@ function BotsView({
         </div>
       </Section>
 
-      {overview.bots.length > 0 && (
-        <Section header={t('bots.others')}>
-          {overview.bots.map((bot) => (
+      <Section header={t('bots.reserveTitle')} footer={t('bots.reserveFooter')}>
+        {spares.length === 0 && <Cell multiline>{t('bots.noReserve')}</Cell>}
+        {spares.map((bot) => (
+          <div key={bot.id} className="gb-bot-row">
+            <Cell subtitle={t('bots.createdAt', { date: formatDate(bot.createdAt) })} multiline>
+              {botName(bot)}
+            </Cell>
+            <div className="gb-bot-row-actions">
+              <Button size="s" mode="bezeled" onClick={() => void actions.twoTap(`use-${bot.id}`, () => api.platformUseReserve(bot.id))}>
+                {actions.tapLabel(`use-${bot.id}`, t('bots.useReserve'))}
+              </Button>
+              <Button
+                size="s"
+                mode="plain"
+                onClick={() => void actions.twoTap(`retire-${bot.id}`, () => api.platformRetireBot(bot.id))}
+              >
+                {actions.tapLabel(`retire-${bot.id}`, t('bots.retire'))}
+              </Button>
+            </div>
+          </div>
+        ))}
+        <Cell onClick={() => void actions.run(() => api.platformCreateReserve())}>{t('bots.createReserve')}</Cell>
+        <Cell onClick={() => navigate('/platform/bots/settings')} after="›">
+          {t('bots.settings')}
+        </Cell>
+      </Section>
+
+      {down.length > 0 && (
+        <Section header={t('bots.downTitle')}>
+          {down.map((bot) => (
             <Cell
               key={bot.id}
-              subtitle={
-                bot.status === 'down' && bot.downAt
-                  ? t('bots.downSince', { date: formatDate(bot.downAt) })
-                  : t('bots.createdAt', { date: formatDate(bot.createdAt) })
-              }
+              subtitle={bot.downAt ? t('bots.downSince', { date: formatDate(bot.downAt) }) : undefined}
               after={
-                <span className={`gb-chip ${bot.status === 'down' ? 'gb-chip--warn' : ''}`}>
-                  {bot.status === 'down' ? t('bots.statusDown') : t('bots.statusReserve')}
-                </span>
+                <Button
+                  size="s"
+                  mode="plain"
+                  onClick={() => void actions.twoTap(`retire-${bot.id}`, () => api.platformRetireBot(bot.id))}
+                >
+                  {actions.tapLabel(`retire-${bot.id}`, t('bots.forget'))}
+                </Button>
               }
             >
               {botName(bot)}

@@ -315,6 +315,7 @@ export async function keepReserve(
   env: Env,
   api: CreatorApi = creatorApi(env),
   now = new Date(),
+  telegramFor?: (token: string) => TelegramApi,
 ): Promise<BotInfo | null> {
   const settings = await settingsRow(db);
   const rows = await db.select().from(bots);
@@ -323,7 +324,7 @@ export async function keepReserve(
   const last = Math.max(0, ...rows.filter((row) => row.accountId !== null).map((row) => row.createdAt.getTime()));
   if (now.getTime() - last < settings.reserveEveryDays * 24 * 60 * 60 * 1000) return null;
   try {
-    return await createReserve(db, env, api);
+    return await createReserve(db, env, api, telegramFor);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (settings.lastError !== message) {

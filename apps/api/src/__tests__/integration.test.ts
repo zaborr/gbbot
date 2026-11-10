@@ -21,6 +21,7 @@ import {
   bots,
   botSwitches,
   creatorAccounts,
+  botSettings,
   users,
 } from '../db/schema.js';
 import { runRetention } from '../services/retention.js';
@@ -40,7 +41,8 @@ import {
   submitCreatorPassword,
 } from '../services/creatorAccounts.js';
 import { CreatorError, type CreatorApi } from '../services/creator.js';
-import { open as openSecret, secretKey } from '../lib/secretBox.js';
+import { createReserve, keepReserve, retireBot } from '../services/botReserve.js';
+import { open as openSecret, seal, secretKey } from '../lib/secretBox.js';
 import { sendPaymentReminders } from '../services/reminders.js';
 import { resetMiniAppUrlCache } from '../services/bot.js';
 import { closeDueShops } from '../services/closing.js';
@@ -1428,6 +1430,78 @@ describeDb('API integration', () => {
       expect(await listCreatorAccounts(db)).toEqual([]);
     } finally {
       await db.delete(creatorAccounts);
+    }
+  });
+
+  it('creates a spare bot with a creator account, keeps the pace and takes it out', async () => {
+    await db.delete(botSwitches);
+    await db.delete(bots);
+    await db.delete(creatorAccounts);
+    await db.delete(botSettings);
+    const SPARE = '777000333:SpareBotTokenForIntegrationTests_abcd';
+    const calls: string[] = [];
+    let taken = true;
+    const fake: CreatorApi = {
+      loginStart: async () => ({ loginId: 'x', viaApp: false }),
+      loginCode: async () => ({ password: true, hint: null }),
+      loginPassword: async () => {
+        throw new Error('not used');
+      },
+      me: async () => ({ user: { id: 1, username: null, firstName: null } }),
+      call: async <T,>(path: string, body: Record<string, unknown>): Promise<T> => {
+        calls.push(`${path} ${String(body.username ?? '')}`);
+        if (path === '/botfather/newbot') {
+          if (taken) {
+            taken = false;
+            throw new CreatorError('USERNAME_TAKEN');
+          }
+          return { token: SPARE } as T;
+        }
+        return { ok: true } as T;
+      },
+    };
+    const telegramFor = (token: string): TelegramApi =>
+      ({
+        getMe: async () => ({ id: 777000333, username: 'gb_spare_bot', first_name: 'GB' }),
+        getProfile: async () => ({ name: 'GB', description: '', shortDescription: '' }),
+        setProfile: async () => {
+          calls.push(`profile ${token === SPARE ? 'spare' : 'active'}`);
+        },
+        getMyCommands: async () => [{ command: 'start', description: 'Start' }],
+        setMyCommands: async () => true,
+        getChatMenuButton: async () => ({ type: 'web_app', text: 'Open', web_app: { url: 'https://gb.example/' } }),
+        setChatMenuButton: async () => true,
+      }) as unknown as TelegramApi;
+    try {
+      const key = secretKey(testEnv);
+      await db.insert(creatorAccounts).values({
+        phone: '+34600999888',
+        apiId: 1,
+        apiHash: seal(key, 'b'.repeat(32)),
+        session: seal(key, 'SESSION'),
+        status: 'ok',
+      });
+      await db.insert(botSettings).values({ id: 1, usernamePrefix: 'gbtest', photo: 'AAAA' });
+
+      const spare = await createReserve(db, testEnv, fake, telegramFor);
+      expect(spare).toMatchObject({ id: 777000333, status: 'reserve' });
+      expect(spare.accountId).not.toBeNull();
+      // The first @ was taken: another one was tried; then the photo went through @BotFather.
+      expect(calls.filter((c) => c.startsWith('/botfather/newbot'))).toHaveLength(2);
+      expect(calls.filter((c) => c.startsWith('/botfather/newbot'))[1]).toMatch(/^\/botfather\/newbot gbtest_[0-9a-f]{4}_bot$/);
+      expect(calls).toContain('/botfather/setuserpic gb_spare_bot');
+      expect(calls.filter((c) => c === 'profile spare')).toHaveLength(5);
+
+      // Two wanted, but the last one is too recent: none is created now.
+      expect(await keepReserve(db, testEnv, fake, new Date(), telegramFor)).toBeNull();
+
+      await retireBot(db, testEnv, 777000333, fake);
+      expect(calls).toContain('/botfather/deletebot gb_spare_bot');
+      expect(await db.select().from(bots).where(eq(bots.id, 777000333))).toEqual([]);
+    } finally {
+      await db.delete(bots);
+      await db.delete(creatorAccounts);
+      await db.delete(botSettings);
     }
   });
 
