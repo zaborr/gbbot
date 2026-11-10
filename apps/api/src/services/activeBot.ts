@@ -1,7 +1,8 @@
+import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
-import { botSwitches, bots } from '../db/schema.js';
+import { botSettings, botSwitches, bots } from '../db/schema.js';
 import { open, seal, secretKey } from '../lib/secretBox.js';
 import { TelegramApi } from '../telegram/api.js';
 
@@ -20,7 +21,7 @@ let active: ActiveBot | null = null;
 
 /** The token to talk to Telegram with. */
 export function botToken(env: Pick<Env, 'BOT_TOKEN'>): string {
-  return active?.token ?? env.BOT_TOKEN;
+  return active?.token ?? env.BOT_TOKEN ?? '';
 }
 
 /** The active bot's @ (without it), when known. */
@@ -56,25 +57,57 @@ async function whoIs(token: string, telegram: TelegramApi): Promise<{ id: number
   }
 }
 
+/** A fingerprint of a token (the token itself is never stored in clear). */
+const fingerprint = (token: string): string => createHash('sha256').update(`gb-env:${token}`).digest('hex');
+
 /**
  * Loads the active bot at startup.
  * - Nothing stored yet: BOT_TOKEN from .env becomes the active bot.
- * - BOT_TOKEN is a bot the table has never seen: it was changed by hand in
- *   .env, so it becomes the active bot (the previous one is kept as down).
- * - Otherwise the stored active bot wins (a switch made from the panel).
+ * - BOT_TOKEN changed in .env since the last start (changed by hand) and
+ *   Telegram accepts it: it becomes the active bot (the previous one is kept
+ *   as down). A token Telegram refuses never takes over.
+ * - Otherwise the stored active bot wins (a switch made from the panel), even
+ *   if the .env bot was forgotten in the panel.
  */
 export async function loadActiveBot(
   db: Database,
   env: Env,
-  telegram = new TelegramApi(env.BOT_TOKEN),
+  telegram = new TelegramApi(env.BOT_TOKEN ?? ''),
 ): Promise<void> {
   const key = secretKey(env);
-  const envId = tokenBotId(env.BOT_TOKEN);
-  const known = envId === null ? undefined : await db.query.bots.findFirst({ where: eq(bots.id, envId) });
   const stored = await db.query.bots.findFirst({ where: eq(bots.status, 'active') });
+  if (!env.BOT_TOKEN) {
+    // No token in .env: the stored active bot is the one (nothing to compare).
+    const token = stored ? open(key, stored.token) : null;
+    if (stored && token) useBot({ id: stored.id, username: stored.username, token });
+    else console.error('No bot: set BOT_TOKEN in .env for the first start (later the panel keeps it).');
+    return;
+  }
+  const envToken = env.BOT_TOKEN;
+  const envId = tokenBotId(envToken);
+  const settings =
+    (await db.query.botSettings.findFirst()) ??
+    (await db.insert(botSettings).values({ id: 1 }).onConflictDoNothing().returning())[0] ??
+    (await db.query.botSettings.findFirst());
+  const envHash = fingerprint(envToken);
+  const envChanged = settings?.envTokenHash !== envHash;
+  if (envChanged) await db.update(botSettings).set({ envTokenHash: envHash }).where(eq(botSettings.id, 1));
 
-  if (!known && envId !== null) {
-    const me = await whoIs(env.BOT_TOKEN, telegram);
+  let adopt = !stored && envId !== null;
+  let me: { id: number; username: string | null } | null = null;
+  if (!adopt && envChanged && envId !== null && envId !== stored?.id) {
+    // Only a token that works takes over.
+    try {
+      const answer = await telegram.getMe();
+      me = { id: answer.id, username: answer.username ?? null };
+      adopt = true;
+    } catch (error) {
+      console.warn('BOT_TOKEN in .env changed but Telegram does not accept it: the active bot stays.', error instanceof Error ? error.message : error);
+    }
+  }
+
+  if (adopt && envId !== null) {
+    me ??= await whoIs(envToken, telegram);
     const id = me?.id ?? envId;
     await db.transaction(async (tx) => {
       if (stored) {
@@ -85,11 +118,14 @@ export async function loadActiveBot(
       }
       await tx
         .insert(bots)
-        .values({ id, username: me?.username ?? null, token: seal(key, env.BOT_TOKEN), status: 'active', activatedAt: new Date() })
-        .onConflictDoNothing();
+        .values({ id, username: me?.username ?? null, token: seal(key, envToken), status: 'active', activatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: bots.id,
+          set: { token: seal(key, envToken), status: 'active', activatedAt: new Date(), downAt: null, downReason: null },
+        });
       await tx.insert(botSwitches).values({ fromBotId: stored?.id ?? null, toBotId: id, reason: 'env', byUser: null });
     });
-    useBot({ id, username: me?.username ?? null, token: env.BOT_TOKEN });
+    useBot({ id, username: me?.username ?? null, token: envToken });
     return;
   }
 
@@ -98,10 +134,10 @@ export async function loadActiveBot(
     useBot({ id: stored.id, username: stored.username, token });
     // Learn the @ if it was not known (Telegram unreachable the first time).
     if (!stored.username) {
-      const me = await whoIs(token, new TelegramApi(token));
-      if (me?.username) {
-        await db.update(bots).set({ username: me.username }).where(eq(bots.id, stored.id));
-        useBot({ id: stored.id, username: me.username, token });
+      const known = await whoIs(token, new TelegramApi(token));
+      if (known?.username) {
+        await db.update(bots).set({ username: known.username }).where(eq(bots.id, stored.id));
+        useBot({ id: stored.id, username: known.username, token });
       }
     }
     return;

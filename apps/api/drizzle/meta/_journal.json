@@ -400,6 +400,13 @@
       "when": 1794859200000,
       "tag": "0056_bots_notices",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1794945600000,
+      "tag": "0057_bots_env_token",
+      "breakpoints": true
     }
   ]
 }

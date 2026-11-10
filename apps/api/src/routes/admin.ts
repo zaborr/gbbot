@@ -143,7 +143,7 @@ export function manualMethodChanges(
  * a web administrator it comes back in the response.
  */
 async function deliverFile(
-  env: { BOT_TOKEN: string },
+  env: { BOT_TOKEN?: string | undefined },
   claims: SessionClaims,
   file: { fileName: string; data: Buffer; contentType: string; caption: string },
 ): Promise<{ file?: WebFile }> {

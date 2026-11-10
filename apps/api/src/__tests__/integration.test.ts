@@ -1302,7 +1302,10 @@ describeDb('API integration', () => {
   it('keeps the active bot in the database, and takes a new BOT_TOKEN put in .env by hand', async () => {
     await db.delete(botSwitches);
     await db.delete(bots);
+    await db.delete(botSettings);
     const offline = { getMe: () => Promise.reject(new Error('offline')) } as unknown as TelegramApi;
+    const works = (id: number) =>
+      ({ getMe: async () => ({ id, username: `bot${id}`, first_name: 'GB' }) }) as unknown as TelegramApi;
     try {
       // First start: BOT_TOKEN becomes the active bot, stored encrypted.
       await loadActiveBot(db, testEnv, offline);
@@ -1312,21 +1315,34 @@ describeDb('API integration', () => {
       expect(openSecret(secretKey(testEnv), first!.token)).toBe(BOT_TOKEN);
       expect(botToken(testEnv)).toBe(BOT_TOKEN);
 
-      // Another token in .env: it takes over, the previous one is kept as down.
+      // A token changed in .env that Telegram refuses never takes over.
+      const dead = { ...testEnv, BOT_TOKEN: '999000222:DeadBotTokenForTests_abcdefghijklmno' };
+      await loadActiveBot(db, dead, offline);
+      expect(botToken(testEnv)).toBe(BOT_TOKEN);
+
+      // Another token in .env that works: it takes over, the previous one is kept as down.
       const other = { ...testEnv, BOT_TOKEN: '999000111:OtherBotTokenForTests_abcdefghijklmn' };
-      await loadActiveBot(db, other, offline);
+      await loadActiveBot(db, other, works(999000111));
       const rows = await db.select().from(bots);
       expect(rows.find((r) => r.id === 999000111)?.status).toBe('active');
       expect(rows.find((r) => r.id === first!.id)?.status).toBe('down');
       expect(botToken(testEnv)).toBe(other.BOT_TOKEN);
 
-      // Back to the old token in .env: the stored active bot wins (a switch made in the panel).
-      await loadActiveBot(db, testEnv, offline);
-      expect(botToken(testEnv)).toBe(other.BOT_TOKEN);
+      // Same .env again after the panel switched (and the .env bot was forgotten): the stored one stays.
+      await db.delete(bots).where(eq(bots.id, 999000111));
+      await db.update(bots).set({ status: 'active' }).where(eq(bots.id, first!.id));
+      await loadActiveBot(db, other, works(999000111));
+      expect(botToken(testEnv)).toBe(BOT_TOKEN);
+
+      // No BOT_TOKEN in .env at all: the stored active bot.
+      useBot(null);
+      await loadActiveBot(db, { ...testEnv, BOT_TOKEN: undefined }, offline);
+      expect(botToken({ BOT_TOKEN: undefined })).toBe(BOT_TOKEN);
     } finally {
       useBot(null);
       await db.delete(botSwitches);
       await db.delete(bots);
+      await db.delete(botSettings);
     }
   });
 

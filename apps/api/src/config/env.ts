@@ -12,10 +12,10 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   /**
    * The first bot. Once the server has run, the active bot is kept in the
-   * database (it can be changed from the panel); a token here that the server
-   * has never seen becomes the active bot.
+   * database (it can be changed from the panel) and this can be removed. A
+   * token changed here by hand takes over if Telegram accepts it.
    */
-  BOT_TOKEN: z.string().min(1),
+  BOT_TOKEN: optional(z.string().min(1)),
   /**
    * Key for the secrets kept in the database (bot tokens). Unset = derived
    * from JWT_SECRET.
