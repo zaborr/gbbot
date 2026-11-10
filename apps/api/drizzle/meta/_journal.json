@@ -365,6 +365,13 @@
       "when": 1794427200000,
       "tag": "0051_bots",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1794513600000,
+      "tag": "0052_bot_switches",
+      "breakpoints": true
     }
   ]
 }

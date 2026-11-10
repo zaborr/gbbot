@@ -1,4 +1,6 @@
 import type {
+  BotInfo,
+  BotsOverview,
   AuthResponse,
   Cart,
   CatalogQuery,
@@ -388,6 +390,14 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify(input),
     });
+  }
+
+  platformGetBots(): Promise<BotsOverview> {
+    return this.request<BotsOverview>('/platform/bots');
+  }
+
+  platformSwitchBot(token: string): Promise<BotInfo> {
+    return this.request<BotInfo>('/platform/bots/switch', { method: 'POST', body: JSON.stringify({ token }) });
   }
 
   platformGetRetention(): Promise<RetentionStatus> {

@@ -59,6 +59,7 @@ function Platform(): React.JSX.Element {
         <Cell onClick={() => navigate('/platform/guests')}>{t('platform.guests')}</Cell>
         <Cell onClick={() => navigate('/platform/blacklist')}>{t('platform.blacklist')}</Cell>
         <Cell onClick={() => navigate('/platform/retention')}>{t('platform.retention')}</Cell>
+        <Cell onClick={() => navigate('/platform/bots')}>{t('platform.bots')}</Cell>
         {webRole === 'platform' && (
           <Cell onClick={() => navigate('/platform/web-accounts')}>{t('platform.webAccounts')}</Cell>
         )}
