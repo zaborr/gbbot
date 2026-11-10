@@ -8,6 +8,7 @@ import {
   platformShopInput,
   retentionSettings,
   switchBotRequest,
+  updateBotSettingsRequest,
   addCreatorAccountRequest,
   creatorCodeRequest,
   creatorPasswordRequest,
@@ -50,6 +51,7 @@ import {
 } from '../services/blacklist.js';
 import { tr } from '../i18n/messages.js';
 import { botsOverview, switchBot } from '../services/botSwitch.js';
+import { createReserve, getBotSettings, retireBot, updateBotSettings, useReserve } from '../services/botReserve.js';
 import {
   addCreatorAccount,
   listCreatorAccounts,
@@ -73,6 +75,21 @@ export function platformRoutes(): Hono<AppBindings> {
   app.post('/bots/switch', zValidator('json', switchBotRequest), async (c) =>
     c.json(await switchBot(c.get('db'), c.get('env'), c.req.valid('json').token, 'manual', c.get('claims').sub)),
   );
+
+  // How the bots look, the spares: create one now, use one, take one out.
+  const botParam = z.object({ id: z.coerce.number().int().positive() });
+  app.get('/bots/settings', async (c) => c.json(await getBotSettings(c.get('db'))));
+  app.put('/bots/settings', zValidator('json', updateBotSettingsRequest), async (c) =>
+    c.json(await updateBotSettings(c.get('db'), c.get('env'), c.req.valid('json'))),
+  );
+  app.post('/bots/reserve', async (c) => c.json(await createReserve(c.get('db'), c.get('env'))));
+  app.post('/bots/:id/use', zValidator('param', botParam), async (c) =>
+    c.json(await useReserve(c.get('db'), c.get('env'), c.req.valid('param').id, c.get('claims').sub)),
+  );
+  app.delete('/bots/:id', zValidator('param', botParam), async (c) => {
+    await retireBot(c.get('db'), c.get('env'), c.req.valid('param').id);
+    return c.json({ ok: true });
+  });
 
   // Creator accounts: Telegram user accounts the server acts as (see creator/).
   const accountParam = z.object({ id: z.coerce.number().int().positive() });

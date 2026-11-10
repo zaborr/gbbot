@@ -5,6 +5,7 @@ import { createApp } from './app.js';
 import { configureBot } from './services/bot.js';
 import { loadActiveBot } from './services/activeBot.js';
 import { scheduleCreatorChecks } from './services/creatorAccounts.js';
+import { scheduleReserve } from './services/botReserve.js';
 import { scheduleMaintenance } from './services/maintenance.js';
 import { scheduleDrawWatcher } from './services/testingDraw.js';
 import { resumePaymentChecks } from './services/paymentCheck.js';
@@ -32,6 +33,8 @@ scheduleMaintenance(db, env);
 scheduleDrawWatcher(db, env);
 // Every few hours: do the creator accounts still work?
 scheduleCreatorChecks(db, env);
+// Every hour: keep the spare bots (slowly: at most one every few days).
+scheduleReserve(db, env);
 
 // Payment checks that were running before a restart.
 resumePaymentChecks(db, env).catch((error: unknown) => {

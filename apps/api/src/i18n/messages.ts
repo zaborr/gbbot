@@ -170,6 +170,7 @@ const en = {
   'bots.reason.env': 'new token in .env',
   'creator.needsLogin': '⚠️ The creator account {account} has to sign in again (Telegram asks for the code). Platform → 🤖 Bots → the account → Sign in again.',
   'creator.closed': '⛔ Telegram has closed the creator account {account}. Its bots may stop working: add another account.',
+  'bots.reserveFailed': '⚠️ A spare bot could not be created: {error}',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -332,6 +333,7 @@ const es: Record<BotMessageKey, string> = {
   'bots.reason.env': 'token nuevo en el .env',
   'creator.needsLogin': '⚠️ La cuenta creadora {account} tiene que volver a iniciar sesión (Telegram pide el código). Plataforma → 🤖 Bots → la cuenta → Volver a iniciar sesión.',
   'creator.closed': '⛔ Telegram ha cerrado la cuenta creadora {account}. Sus bots pueden dejar de funcionar: añade otra cuenta.',
+  'bots.reserveFailed': '⚠️ No se ha podido crear un bot de reserva: {error}',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -492,6 +494,7 @@ const it: Record<BotMessageKey, string> = {
   'bots.reason.env': 'nuovo token nel .env',
   'creator.needsLogin': '⚠️ L\'account creatore {account} deve accedere di nuovo (Telegram chiede il codice). Piattaforma → 🤖 Bot → l\'account → Accedi di nuovo.',
   'creator.closed': '⛔ Telegram ha chiuso l\'account creatore {account}. I suoi bot potrebbero smettere di funzionare: aggiungi un altro account.',
+  'bots.reserveFailed': '⚠️ Non è stato possibile creare un bot di riserva: {error}',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -652,6 +655,7 @@ const pt: Record<BotMessageKey, string> = {
   'bots.reason.env': 'token novo no .env',
   'creator.needsLogin': '⚠️ A conta criadora {account} tem de voltar a iniciar sessão (o Telegram pede o código). Plataforma → 🤖 Bots → a conta → Voltar a iniciar sessão.',
   'creator.closed': '⛔ O Telegram fechou a conta criadora {account}. Os seus bots podem deixar de funcionar: adicione outra conta.',
+  'bots.reserveFailed': '⚠️ Não foi possível criar um bot de reserva: {error}',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };
