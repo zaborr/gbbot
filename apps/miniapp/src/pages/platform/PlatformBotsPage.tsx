@@ -94,6 +94,19 @@ function BotsView({
         ) : (
           <Cell multiline>{t('bots.noActive')}</Cell>
         )}
+        {overview.working && (
+          <Cell
+            multiline
+            subtitle={overview.menuUrl ?? t('bots.noMenu')}
+            after={
+              <Button size="s" mode="bezeled" onClick={() => void actions.run(() => api.platformSetMenuButton())}>
+                {overview.menuUrl ? t('bots.menuReset') : t('bots.menuSet')}
+              </Button>
+            }
+          >
+            {t('bots.menu')}
+          </Cell>
+        )}
       </Section>
 
       {switched && (

@@ -401,6 +401,10 @@ export class ApiClient {
     return this.request<BotsOverview>('/platform/bots');
   }
 
+  platformSetMenuButton(): Promise<{ menuUrl: string }> {
+    return this.request<{ menuUrl: string }>('/platform/bots/menu', { method: 'POST' });
+  }
+
   platformSwitchBot(token: string): Promise<BotInfo> {
     return this.request<BotInfo>('/platform/bots/switch', { method: 'POST', body: JSON.stringify({ token }) });
   }

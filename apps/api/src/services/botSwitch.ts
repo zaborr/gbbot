@@ -37,15 +37,19 @@ export async function botsOverview(
   const switches = await db.select().from(botSwitches).orderBy(desc(botSwitches.at)).limit(30);
   const name = (id: number): string | null => rows.find((row) => row.id === id)?.username ?? null;
   let working = false;
+  let menuUrl: string | null = null;
   try {
     await telegram.getMe();
     working = true;
+    const button = await telegram.getChatMenuButton();
+    menuUrl = button.type === 'web_app' ? (button.web_app?.url ?? null) : null;
   } catch {
     // Closed, or Telegram cannot be reached: either way it does not answer.
   }
   return {
     active: active ? toInfo(active) : null,
     working,
+    menuUrl,
     bots: rows.filter((row) => row.status !== 'active').map(toInfo),
     history: switches.map((entry) => ({
       id: entry.id,
@@ -55,6 +59,25 @@ export async function botsOverview(
       reason: entry.reason,
     })),
   };
+}
+
+/** Where the Mini App is served: this server's address. */
+export function miniAppAddress(env: Env): string | undefined {
+  const base = env.PUBLIC_URL ?? env.RENDER_EXTERNAL_URL;
+  return base ? `${base.replace(/\/+$/, '')}/` : undefined;
+}
+
+/** Puts the Mini App button on the active bot (this server's address). */
+export async function setMenuButton(env: Env, telegram = new TelegramApi(botToken(env))): Promise<{ menuUrl: string }> {
+  const url = miniAppAddress(env);
+  if (!url) throw ApiError.conflict('no_public_url', 'PUBLIC_URL is not set');
+  try {
+    await telegram.setChatMenuButton(tr('en', 'start.button'), url);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message.replace(/^Telegram \w+ failed: /, '') : String(error);
+    throw ApiError.badRequest('bot_setup', `Telegram did not accept the setup (${detail})`);
+  }
+  return { menuUrl: url };
 }
 
 /**
@@ -70,8 +93,7 @@ export async function prepareBot(env: Env, next: TelegramApi, old: TelegramApi |
   const current = await next.getChatMenuButton().catch(() => null);
   if (current?.type !== 'web_app') {
     const oldButton = old ? await old.getChatMenuButton().catch(() => null) : null;
-    const base = env.PUBLIC_URL ?? env.RENDER_EXTERNAL_URL;
-    const appUrl = oldButton?.type === 'web_app' ? oldButton.web_app?.url : base ? `${base.replace(/\/+$/, '')}/` : undefined;
+    const appUrl = oldButton?.type === 'web_app' ? oldButton.web_app?.url : miniAppAddress(env);
     if (appUrl) await next.setChatMenuButton(oldButton?.text ?? tr('en', 'start.button'), appUrl);
   }
   if (!old || !copyProfile) return;
@@ -116,7 +138,13 @@ export async function switchBot(
   }
   const key = secretKey(env);
   const oldToken = current ? open(key, current.token) : botToken(env);
-  await prepareBot(env, next, oldToken ? telegramFor(oldToken) : null, !fromReserve);
+  try {
+    await prepareBot(env, next, oldToken ? telegramFor(oldToken) : null, !fromReserve);
+  } catch (error) {
+    // Nothing was changed yet: the active bot stays as it was.
+    const detail = error instanceof Error ? error.message.replace(/^Telegram \w+ failed: /, '') : String(error);
+    throw ApiError.badRequest('bot_setup', `Telegram did not accept the setup (${detail})`);
+  }
 
   const now = new Date();
   const username = me.username ?? null;

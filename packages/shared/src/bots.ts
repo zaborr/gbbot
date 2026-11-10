@@ -34,6 +34,8 @@ export interface BotsOverview {
   active: BotInfo | null;
   /** Whether Telegram still answers as the active bot (checked just now). */
   working: boolean;
+  /** Where the active bot's Mini App button opens (null: it has none). */
+  menuUrl: string | null;
   bots: BotInfo[];
   history: BotSwitchEntry[];
 }
