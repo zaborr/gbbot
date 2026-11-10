@@ -30,18 +30,22 @@ const PREFIX_RE = /^[a-zA-Z][a-zA-Z0-9_]{2,20}$/;
 const CHANNEL_RE = /^(@[A-Za-z][A-Za-z0-9_]{3,31}|-100\d{5,})$/;
 const LANG_NAMES: Record<Lang, string> = { en: 'EN', es: 'ES', it: 'IT', pt: 'PT' };
 
-/** A square JPEG of at most 640 px, as base64: small enough for the database and @BotFather. */
-async function photoFrom(file: File): Promise<string> {
-  const bitmap = await createImageBitmap(file);
-  const side = Math.min(bitmap.width, bitmap.height);
-  const size = Math.min(side, 640);
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('canvas');
-  context.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, size, size);
-  return canvas.toDataURL('image/jpeg', 0.9).replace(/^data:image\/jpeg;base64,/, '');
+/** Largest photo accepted (it is kept in the database and sent to @BotFather). */
+const MAX_PHOTO_BYTES = 1024 * 1024;
+
+/**
+ * The file as base64, untouched. No canvas: Tor Browser blocks reading it and
+ * hands back noise instead of the picture. @BotFather crops it by itself.
+ */
+function photoFrom(file: File): Promise<string> {
+  if (!/^image\/(jpeg|png)$/.test(file.type)) return Promise.reject(new Error(t('botSettings.photoType')));
+  if (file.size > MAX_PHOTO_BYTES) return Promise.reject(new Error(t('botSettings.photoTooBig')));
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).replace(/^data:image\/\w+;base64,/, ''));
+    reader.onerror = () => reject(new Error(t('error.title')));
+    reader.readAsDataURL(file);
+  });
 }
 
 function SettingsForm({ settings, onSaved }: { settings: BotSettings; onSaved: () => void }): React.JSX.Element {
@@ -82,14 +86,16 @@ function SettingsForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
     daysNumber >= 1 &&
     daysNumber <= 30;
 
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const pick = (file: File | undefined): void => {
     if (!file) return;
+    setPhotoError(null);
     void photoFrom(file)
       .then((data) => {
         setPhoto(data);
         setPhotoChanged(true);
       })
-      .catch(() => undefined);
+      .catch((error: unknown) => setPhotoError(error instanceof Error ? error.message : t('error.title')));
   };
 
   const save = (): void =>
@@ -156,11 +162,11 @@ function SettingsForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
         />
       </Section>
 
-      <Section header={t('botSettings.photo')} footer={t('botSettings.photoFooter')}>
+      <Section header={t('botSettings.photo')} footer={photoError ?? t('botSettings.photoFooter')}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}>
           {photo ? (
             <img
-              src={`data:image/jpeg;base64,${photo}`}
+              src={`data:${photo.startsWith('iVBOR') ? 'image/png' : 'image/jpeg'};base64,${photo}`}
               alt=""
               style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', flex: 'none' }}
             />
