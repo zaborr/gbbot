@@ -117,4 +117,77 @@ export const actions = {
       }
     });
   },
+
+  /** A private message to someone (an administrator), by Telegram id or @. */
+  async '/dm'({ account, to, text }, { withAccount, CreatorError }) {
+    return withAccount(account, async (client) => {
+      try {
+        await client.sendMessage(to, { message: text });
+      } catch {
+        // The id is not known yet to this account: load its chats and contacts, then try again.
+        await client.getDialogs({ limit: 200 }).catch(() => undefined);
+        await client.invoke(new telegram.Api.contacts.GetContacts({ hash: telegram.helpers.returnBigInt(0) })).catch(() => undefined);
+        try {
+          await client.sendMessage(to, { message: text });
+        } catch (error) {
+          throw new CreatorError('DM_FAILED', { detail: error?.errorMessage ?? String(error?.message ?? error) });
+        }
+      }
+      return { ok: true };
+    });
+  },
+
+  /** Posts in the notices channel and makes the new bot an administrator there. */
+  async '/channel/announce'({ account, channel, text, bot }, { withAccount, Api }) {
+    return withAccount(account, async (client) => {
+      await client.getDialogs({ limit: 200 }).catch(() => undefined);
+      await client.sendMessage(channel, { message: text });
+      let botAdmin = true;
+      try {
+        await client.invoke(
+          new Api.channels.EditAdmin({
+            channel,
+            userId: bot,
+            adminRights: new Api.ChatAdminRights({ postMessages: true, editMessages: true }),
+            rank: '',
+          }),
+        );
+      } catch {
+        botAdmin = false;
+      }
+      return { ok: true, botAdmin };
+    });
+  },
+
+  /**
+   * Puts the bot in a group or channel of guests/VIPs, so it can see who is
+   * in it: as administrator in channels, as member in groups.
+   */
+  async '/group/addbot'({ account, chatId, bot }, { withAccount, Api, CreatorError }) {
+    return withAccount(account, async (client) => {
+      await client.getDialogs({ limit: 500 }).catch(() => undefined);
+      let entity;
+      try {
+        entity = await client.getEntity(chatId);
+      } catch {
+        throw new CreatorError('CHAT_NOT_JOINED');
+      }
+      if (entity instanceof Api.Chat) {
+        await client.invoke(new Api.messages.AddChatUser({ chatId: entity.id, userId: bot, fwdLimit: 0 }));
+        return { ok: true, as: 'member' };
+      }
+      if (entity.broadcast) {
+        await client.invoke(
+          new Api.channels.EditAdmin({ channel: entity, userId: bot, adminRights: new Api.ChatAdminRights({}), rank: '' }),
+        );
+        return { ok: true, as: 'admin' };
+      }
+      try {
+        await client.invoke(new Api.channels.InviteToChannel({ channel: entity, users: [bot] }));
+      } catch (error) {
+        if (error?.errorMessage !== 'USER_ALREADY_PARTICIPANT') throw error;
+      }
+      return { ok: true, as: 'member' };
+    });
+  },
 };

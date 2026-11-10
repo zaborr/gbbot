@@ -393,6 +393,13 @@
       "when": 1794772800000,
       "tag": "0055_bots_watch",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1794859200000,
+      "tag": "0056_bots_notices",
+      "breakpoints": true
     }
   ]
 }

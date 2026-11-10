@@ -16,6 +16,8 @@ import {
 import { relations } from 'drizzle-orm';
 import type {
   Blacklist,
+  BotGroupStatus,
+  BotSwitchNotices,
   Lang,
   BotStatus,
   BotSwitchReason,
@@ -638,6 +640,8 @@ export const botSwitches = pgTable(
     reason: text('reason').$type<BotSwitchReason>().notNull(),
     /** Who did it from the panel (null: done by the server). */
     byUser: bigint('by_user', { mode: 'number' }),
+    /** What the notices of this switch did (admins, channel, groups). */
+    notices: jsonb('notices').$type<BotSwitchNotices>(),
   },
   (table) => [index('bot_switches_at_idx').on(table.at)],
 );
@@ -678,6 +682,14 @@ export const botSettings = pgTable('bot_settings', {
   userCheckMinutes: integer('user_check_minutes').notNull().default(30),
   /** Whether a spare takes over by itself when the bot goes down. */
   autoSwitch: boolean('auto_switch').notNull().default(true),
+  /** The notices channel (@name or id) where the new bot is announced. */
+  noticesChannel: text('notices_channel'),
+  /** What is posted there ({bot} = the new @); empty: the default text. */
+  noticeText: text('notice_text').notNull().default(''),
+  /** Whether the creator account writes privately to the platform administrators. */
+  dmAdmins: boolean('dm_admins').notNull().default(true),
+  /** Whether the active bot could be put in each guests/VIP group, by chat id. */
+  groupStatus: jsonb('group_status').$type<Record<string, BotGroupStatus>>().notNull().default({}),
   lastError: text('last_error'),
   lastErrorAt: timestamp('last_error_at', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

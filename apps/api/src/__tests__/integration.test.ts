@@ -44,6 +44,7 @@ import {
 import { CreatorError, type CreatorApi } from '../services/creator.js';
 import { createReserve, keepReserve, retireBot } from '../services/botReserve.js';
 import { resetWatch, watchBot, watchStatus } from '../services/botWatch.js';
+import { announceSwitch } from '../services/botNotices.js';
 import { open as openSecret, seal, secretKey } from '../lib/secretBox.js';
 import { sendPaymentReminders } from '../services/reminders.js';
 import { resetMiniAppUrlCache } from '../services/bot.js';
@@ -1547,6 +1548,65 @@ describeDb('API integration', () => {
     } finally {
       resetWatch();
       useBot(null);
+      await db.delete(botSettings);
+    }
+  });
+
+  it('announces a new bot: privately to the admins, in the channel and in the groups', async () => {
+    await db.delete(botSwitches);
+    await db.delete(creatorAccounts);
+    await db.delete(botSettings);
+    const calls: Array<{ path: string; body: Record<string, unknown> }> = [];
+    const fake: CreatorApi = {
+      loginStart: async () => ({ loginId: 'x', viaApp: false }),
+      loginCode: async () => ({ password: true, hint: null }),
+      loginPassword: async () => {
+        throw new Error('not used');
+      },
+      me: async () => ({ user: { id: 1, username: null, firstName: null } }),
+      call: async <T,>(path: string, body: Record<string, unknown>): Promise<T> => {
+        calls.push({ path, body });
+        if (path === '/group/addbot') throw new CreatorError('CHAT_NOT_JOINED');
+        return { ok: true, botAdmin: true } as T;
+      },
+    };
+    const [shopBefore] = await db.select().from(shops).where(eq(shops.id, shopId));
+    try {
+      const key = secretKey(testEnv);
+      await db.insert(creatorAccounts).values({
+        phone: '+34600777666',
+        apiId: 1,
+        apiHash: seal(key, 'c'.repeat(32)),
+        session: seal(key, 'SESSION'),
+        status: 'ok',
+      });
+      await db.insert(botSettings).values({ id: 1, noticesChannel: '@gb_notices', noticeText: 'Bot: {bot}' });
+      await db
+        .update(shops)
+        .set({ vipClub: { groups: [{ chatId: -1001234567, title: 'VIP' }], userIds: [], usernames: [] } })
+        .where(eq(shops.id, shopId));
+      await db.insert(botSwitches).values({ toBotId: 1, reason: 'closed' });
+
+      const notices = await announceSwitch(db, testEnv, 'gb_new_bot', 'closed', fake);
+      expect(notices).toEqual({
+        admins: { sent: 1, failed: 0 },
+        channel: { ok: true, botAdmin: true },
+        groups: { ok: 0, failed: 1 },
+      });
+      expect(calls.find((c) => c.path === '/dm')?.body).toMatchObject({ to: ADMIN_ID });
+      expect(calls.find((c) => c.path === '/channel/announce')?.body).toMatchObject({
+        channel: '@gb_notices',
+        text: 'Bot: @gb_new_bot',
+        bot: '@gb_new_bot',
+      });
+      const [settings] = await db.select().from(botSettings);
+      expect(settings?.groupStatus['-1001234567']).toMatchObject({ ok: false, error: 'CHAT_NOT_JOINED' });
+      const [entry] = await db.select().from(botSwitches);
+      expect(entry?.notices).toEqual(notices);
+    } finally {
+      await db.update(shops).set({ vipClub: shopBefore!.vipClub }).where(eq(shops.id, shopId));
+      await db.delete(botSwitches);
+      await db.delete(creatorAccounts);
       await db.delete(botSettings);
     }
   });

@@ -28,6 +28,24 @@ export interface BotSwitchEntry {
   from: { id: number; username: string | null } | null;
   to: { id: number; username: string | null };
   reason: BotSwitchReason;
+  notices: BotSwitchNotices | null;
+}
+
+/** Whether the bot is in a guests/VIP group (so it can see who is in it). */
+export interface BotGroupStatus {
+  title: string;
+  ok: boolean;
+  at: string;
+  error?: string;
+}
+
+/** What the notices of a switch did. */
+export interface BotSwitchNotices {
+  /** Administrators written to privately / who could not be. */
+  admins: { sent: number; failed: number };
+  /** Posted in the channel (null: no channel set). */
+  channel: { ok: boolean; botAdmin?: boolean; error?: string } | null;
+  groups: { ok: number; failed: number };
 }
 
 export interface BotsOverview {
@@ -111,6 +129,10 @@ export interface BotSettings {
   watchMinutes: number;
   userCheckMinutes: number;
   autoSwitch: boolean;
+  noticesChannel: string | null;
+  noticeText: string;
+  dmAdmins: boolean;
+  groups: Array<{ chatId: number } & BotGroupStatus>;
   lastError: string | null;
   lastErrorAt: string | null;
 }
@@ -133,5 +155,12 @@ export const updateBotSettingsRequest = z.object({
   watchMinutes: z.number().int().min(1).max(60),
   userCheckMinutes: z.number().int().min(5).max(720),
   autoSwitch: z.boolean(),
+  noticesChannel: z
+    .string()
+    .trim()
+    .regex(/^(@[A-Za-z][A-Za-z0-9_]{3,31}|-100\d{5,})$/, 'Channel: @name or its id (-100…)')
+    .nullable(),
+  noticeText: z.string().trim().max(1000),
+  dmAdmins: z.boolean(),
 });
 export type UpdateBotSettingsRequest = z.infer<typeof updateBotSettingsRequest>;

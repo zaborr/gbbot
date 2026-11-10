@@ -397,6 +397,15 @@ export class ApiClient {
     });
   }
 
+  /** The bot the platform answers as now (public). */
+  getActiveBot(): Promise<{ username: string | null }> {
+    return this.request<{ username: string | null }>('/bot');
+  }
+
+  platformRetryBotGroups(): Promise<{ ok: number; failed: number }> {
+    return this.request<{ ok: number; failed: number }>('/platform/bots/groups', { method: 'POST' });
+  }
+
   platformGetBots(): Promise<BotsOverview> {
     return this.request<BotsOverview>('/platform/bots');
   }

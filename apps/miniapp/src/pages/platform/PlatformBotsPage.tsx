@@ -220,7 +220,17 @@ function BotsView({
           overview.history.map((entry: BotSwitchEntry) => (
             <Cell
               key={entry.id}
-              subtitle={`${formatDate(entry.at)} · ${t(`bots.reason.${entry.reason}`)}`}
+              subtitle={[
+                `${formatDate(entry.at)} · ${t(`bots.reason.${entry.reason}`)}`,
+                entry.notices &&
+                  t('bots.noticesSummary', {
+                    admins: entry.notices.admins.sent,
+                    channel: entry.notices.channel ? (entry.notices.channel.ok ? '✅' : '❌') : '—',
+                    groups: `${entry.notices.groups.ok}/${entry.notices.groups.ok + entry.notices.groups.failed}`,
+                  }),
+              ]
+                .filter(Boolean)
+                .join(' · ')}
               multiline
             >
               {entry.from ? `${botName(entry.from)} → ${botName(entry.to)}` : botName(entry.to)}

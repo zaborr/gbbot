@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Button, List, Section } from '@telegram-apps/telegram-ui';
+import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import { useSession } from '../providers/SessionProvider.js';
 import { onNoticesSeen, useWebButton } from '../lib/web.js';
 import { Input } from './Field.js';
 import { PageTitle } from './PageTitle.js';
 import { api, ApiClientError } from '../api/client.js';
+import { useAsync } from '../hooks/useAsync.js';
 import { t } from '../i18n/index.js';
 
 const SHOP_ROOT = /^\/s\/[^/]+\/?$/;
@@ -131,6 +132,7 @@ export function WebSignIn(): React.JSX.Element {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const bot = useAsync(() => api.getActiveBot(), []);
 
   const submit = async (): Promise<void> => {
     setBusy(true);
@@ -190,6 +192,21 @@ export function WebSignIn(): React.JSX.Element {
           </div>
         </Section>
       </form>
+      {bot.data?.username && (
+        <Section>
+          <Cell
+            multiline
+            subtitle={t('web.officialBotHint')}
+            after={
+              <a href={`https://t.me/${bot.data.username}`} target="_blank" rel="noreferrer">
+                @{bot.data.username}
+              </a>
+            }
+          >
+            {t('web.officialBot')}
+          </Cell>
+        </Section>
+      )}
     </List>
   );
 }
