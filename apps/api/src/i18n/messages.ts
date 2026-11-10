@@ -163,6 +163,11 @@ const en = {
   'testing.reportAsk': '📄 {shop}: send me the lab report of {product} ({lab}) as a reply to this message (PDF or picture). I will send it to the participants and donors.',
   'testing.reportCaption': '📄 {shop}: lab report of {product} ({lab}).',
   'testing.reportSent': '✅ Report sent to {count} people.',
+  'bots.switched': '🔄 The platform now answers as {bot} ({reason}). Orders, GBs and customers are unchanged: share the new bot so customers open it.',
+  'bots.reason.manual': 'changed from the panel',
+  'bots.reason.closed': 'Telegram closed the previous one',
+  'bots.reason.restricted': 'Telegram restricted the previous one',
+  'bots.reason.env': 'new token in .env',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -318,6 +323,11 @@ const es: Record<BotMessageKey, string> = {
   'testing.reportAsk': '📄 {shop}: envíame el informe del laboratorio de {product} ({lab}) respondiendo a este mensaje (PDF o imagen). Lo enviaré a los participantes y donantes.',
   'testing.reportCaption': '📄 {shop}: informe del laboratorio de {product} ({lab}).',
   'testing.reportSent': '✅ Informe enviado a {count} personas.',
+  'bots.switched': '🔄 La plataforma responde ahora como {bot} ({reason}). Pedidos, GBs y clientes siguen igual: comparte el bot nuevo para que los clientes lo abran.',
+  'bots.reason.manual': 'cambiado desde el panel',
+  'bots.reason.closed': 'Telegram cerró el anterior',
+  'bots.reason.restricted': 'Telegram restringió el anterior',
+  'bots.reason.env': 'token nuevo en el .env',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -471,6 +481,11 @@ const it: Record<BotMessageKey, string> = {
   'testing.reportAsk': '📄 {shop}: inviami il referto del laboratorio di {product} ({lab}) rispondendo a questo messaggio (PDF o immagine). Lo invierò ai partecipanti e ai donatori.',
   'testing.reportCaption': '📄 {shop}: referto del laboratorio di {product} ({lab}).',
   'testing.reportSent': '✅ Referto inviato a {count} persone.',
+  'bots.switched': '🔄 La piattaforma ora risponde come {bot} ({reason}). Ordini, GB e clienti restano uguali: condividi il nuovo bot perché i clienti lo aprano.',
+  'bots.reason.manual': 'cambiato dal pannello',
+  'bots.reason.closed': 'Telegram ha chiuso il precedente',
+  'bots.reason.restricted': 'Telegram ha limitato il precedente',
+  'bots.reason.env': 'nuovo token nel .env',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -624,6 +639,11 @@ const pt: Record<BotMessageKey, string> = {
   'testing.reportAsk': '📄 {shop}: envie-me o relatório do laboratório de {product} ({lab}) respondendo a esta mensagem (PDF ou imagem). Envio-o aos participantes e doadores.',
   'testing.reportCaption': '📄 {shop}: relatório do laboratório de {product} ({lab}).',
   'testing.reportSent': '✅ Relatório enviado a {count} pessoas.',
+  'bots.switched': '🔄 A plataforma responde agora como {bot} ({reason}). Encomendas, GBs e clientes ficam iguais: partilhe o bot novo para que os clientes o abram.',
+  'bots.reason.manual': 'mudado no painel',
+  'bots.reason.closed': 'o Telegram fechou o anterior',
+  'bots.reason.restricted': 'o Telegram restringiu o anterior',
+  'bots.reason.env': 'token novo no .env',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
-import { bots } from '../db/schema.js';
+import { botSwitches, bots } from '../db/schema.js';
 import { open, seal, secretKey } from '../lib/secretBox.js';
 import { TelegramApi } from '../telegram/api.js';
 
@@ -87,6 +87,7 @@ export async function loadActiveBot(
         .insert(bots)
         .values({ id, username: me?.username ?? null, token: seal(key, env.BOT_TOKEN), status: 'active', activatedAt: new Date() })
         .onConflictDoNothing();
+      await tx.insert(botSwitches).values({ fromBotId: stored?.id ?? null, toBotId: id, reason: 'env', byUser: null });
     });
     useBot({ id, username: me?.username ?? null, token: env.BOT_TOKEN });
     return;

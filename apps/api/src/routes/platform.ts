@@ -7,6 +7,7 @@ import {
   langFrom,
   platformShopInput,
   retentionSettings,
+  switchBotRequest,
   updateOrganizersRequest,
   updateVipClubRequest,
 } from '@tma-shop/shared';
@@ -45,6 +46,7 @@ import {
   removeFromPlatformBlacklist,
 } from '../services/blacklist.js';
 import { tr } from '../i18n/messages.js';
+import { botsOverview, switchBot } from '../services/botSwitch.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -54,6 +56,12 @@ export function platformRoutes(): Hono<AppBindings> {
   app.use('*', requireAuth, requireSuperAdmin);
 
   app.get('/shops', async (c) => c.json(await listAllShops(c.get('db'))));
+
+  // The bot the platform answers as, the others, and switching to another one.
+  app.get('/bots', async (c) => c.json(await botsOverview(c.get('db'), c.get('env'))));
+  app.post('/bots/switch', zValidator('json', switchBotRequest), async (c) =>
+    c.json(await switchBot(c.get('db'), c.get('env'), c.req.valid('json').token, 'manual', c.get('claims').sub)),
+  );
 
   // Platform blacklist: for those in it no GB exists.
   app.get('/blacklist', async (c) => c.json(await platformBlacklistView(c.get('db'))));

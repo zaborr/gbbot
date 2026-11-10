@@ -16,6 +16,8 @@ import {
 import { relations } from 'drizzle-orm';
 import type {
   Blacklist,
+  BotStatus,
+  BotSwitchReason,
   OrderChangeRequest,
   PaymentLogEntry,
   PriceTier,
@@ -618,4 +620,18 @@ export const bots = pgTable(
   (table) => [index('bots_status_idx').on(table.status)],
 );
 
-export type BotStatus = 'active' | 'reserve' | 'down';
+
+/** Each time another bot took over: when, which ones, why and who did it. */
+export const botSwitches = pgTable(
+  'bot_switches',
+  {
+    id: serial('id').primaryKey(),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+    fromBotId: bigint('from_bot_id', { mode: 'number' }),
+    toBotId: bigint('to_bot_id', { mode: 'number' }).notNull(),
+    reason: text('reason').$type<BotSwitchReason>().notNull(),
+    /** Who did it from the panel (null: done by the server). */
+    byUser: bigint('by_user', { mode: 'number' }),
+  },
+  (table) => [index('bot_switches_at_idx').on(table.at)],
+);

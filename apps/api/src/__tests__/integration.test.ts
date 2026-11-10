@@ -19,6 +19,7 @@ import {
   shops,
   testings,
   bots,
+  botSwitches,
   users,
 } from '../db/schema.js';
 import { runRetention } from '../services/retention.js';
@@ -28,6 +29,7 @@ import { assertProductKeepsTestings, dropUnpaidTesting } from '../services/testi
 import { goalTotals } from '../services/goal.js';
 import { cancelDrawsOnReopen, finishDraw, launchDraw } from '../services/testingDraw.js';
 import { botToken, loadActiveBot, useBot } from '../services/activeBot.js';
+import { switchBot } from '../services/botSwitch.js';
 import { open as openSecret, secretKey } from '../lib/secretBox.js';
 import { sendPaymentReminders } from '../services/reminders.js';
 import { resetMiniAppUrlCache } from '../services/bot.js';
@@ -1283,6 +1285,7 @@ describeDb('API integration', () => {
   });
 
   it('keeps the active bot in the database, and takes a new BOT_TOKEN put in .env by hand', async () => {
+    await db.delete(botSwitches);
     await db.delete(bots);
     const offline = { getMe: () => Promise.reject(new Error('offline')) } as unknown as TelegramApi;
     try {
@@ -1307,6 +1310,65 @@ describeDb('API integration', () => {
       expect(botToken(testEnv)).toBe(other.BOT_TOKEN);
     } finally {
       useBot(null);
+      await db.delete(botSwitches);
+      await db.delete(bots);
+    }
+  });
+
+  it('switches to another bot from the panel and keeps the old one as down', async () => {
+    await db.delete(botSwitches);
+    await db.delete(bots);
+    const offline = { getMe: () => Promise.reject(new Error('offline')) } as unknown as TelegramApi;
+    const NEW = '888000222:NewBotTokenForIntegrationTests_abcdef';
+    const calls: string[] = [];
+    const fake = (token: string): TelegramApi =>
+      ({
+        getMe: async () => {
+          if (token !== NEW) throw new Error('closed');
+          return { id: 888000222, username: 'gb_new_bot', first_name: 'GB' };
+        },
+        setWebhook: async () => {
+          calls.push('webhook');
+          return true;
+        },
+        getChatMenuButton: async () => ({ type: 'default' }),
+        setChatMenuButton: async (_text: string, url: string) => {
+          calls.push(`menu ${url}`);
+          return true;
+        },
+        getProfile: async () => {
+          throw new Error('closed');
+        },
+        sendMessage: async () => ({ message_id: 1 }),
+      }) as unknown as TelegramApi;
+    try {
+      await loadActiveBot(db, testEnv, offline);
+      const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`, 'content-type': 'application/json' };
+      // A token Telegram does not accept is refused before anything changes.
+      const bad = await request('/api/platform/bots/switch', {
+        method: 'POST',
+        headers: admin,
+        body: JSON.stringify({ token: 'not-a-token' }),
+      });
+      expect(bad.status).toBe(400);
+
+      const info = await switchBot(db, { ...testEnv, PUBLIC_URL: 'https://gb.example' }, NEW, 'manual', ADMIN_ID, fake);
+      expect(info).toMatchObject({ id: 888000222, username: 'gb_new_bot', status: 'active' });
+      expect(calls).toEqual(['webhook', 'menu https://gb.example/']);
+      expect(botToken(testEnv)).toBe(NEW);
+      await expect(switchBot(db, testEnv, NEW, 'manual', ADMIN_ID, fake)).rejects.toMatchObject({ code: 'bot_same' });
+
+      const overview = (await (await request('/api/platform/bots', { headers: admin })).json()) as {
+        active: { id: number };
+        bots: Array<{ id: number; status: string }>;
+        history: Array<{ reason: string; to: { username: string } }>;
+      };
+      expect(overview.active.id).toBe(888000222);
+      expect(overview.bots).toEqual([expect.objectContaining({ id: Number(BOT_TOKEN.split(':')[0]), status: 'down' })]);
+      expect(overview.history[0]).toMatchObject({ reason: 'manual', to: { username: 'gb_new_bot' } });
+    } finally {
+      useBot(null);
+      await db.delete(botSwitches);
       await db.delete(bots);
     }
   });
