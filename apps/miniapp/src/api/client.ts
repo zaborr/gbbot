@@ -402,6 +402,10 @@ export class ApiClient {
     return this.request<{ username: string | null }>('/bot');
   }
 
+  platformClearBotHistory(): Promise<{ ok: true }> {
+    return this.request<{ ok: true }>('/platform/bots/history', { method: 'DELETE' });
+  }
+
   platformRetryBotGroups(): Promise<{ ok: number; failed: number }> {
     return this.request<{ ok: number; failed: number }>('/platform/bots/groups', { method: 'POST' });
   }

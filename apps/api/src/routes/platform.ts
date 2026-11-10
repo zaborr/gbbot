@@ -32,7 +32,7 @@ import { getRetention, runRetention, updateRetention } from '../services/retenti
 import { getPlatformClub, getPlatformVipClub, updatePlatformClub, updatePlatformVipClub } from '../services/vip.js';
 import { getOrganizers, getShopTeam, updateOrganizers } from '../services/team.js';
 import { ApiError } from '../lib/errors.js';
-import { shops } from '../db/schema.js';
+import { botSwitches, shops } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import type { SessionClaims } from '../auth/jwt.js';
 import {
@@ -76,6 +76,10 @@ export function platformRoutes(): Hono<AppBindings> {
   // The bot the platform answers as, the others, and switching to another one.
   app.get('/bots', async (c) => c.json({ ...(await botsOverview(c.get('db'), c.get('env'))), watch: watchStatus() }));
   app.post('/bots/menu', async (c) => c.json(await setMenuButton(c.get('env'))));
+  app.delete('/bots/history', async (c) => {
+    await c.get('db').delete(botSwitches);
+    return c.json({ ok: true });
+  });
   app.post('/bots/switch', zValidator('json', switchBotRequest), async (c) =>
     c.json(await switchBot(c.get('db'), c.get('env'), c.req.valid('json').token, 'manual', c.get('claims').sub)),
   );

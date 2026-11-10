@@ -1,9 +1,10 @@
 // What the creator accounts do besides signing in. Each action gets the JSON
 // body (with the account: apiId, apiHash, session) and some helpers.
 
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import telegram from 'telegram';
-
-const { CustomFile } = telegram.client.uploads;
 
 const BOTFATHER = 'BotFather';
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -67,9 +68,18 @@ export const actions = {
       let text = await say(client, CreatorError, `@${username}`);
       if (/invalid bot|not found/i.test(text)) throw new CreatorError('BOT_NOT_OWNED');
       const data = Buffer.from(photo, 'base64');
-      text = await ask(client, CreatorError, () =>
-        client.sendFile(BOTFATHER, { file: new CustomFile('photo.jpg', data.length, '', data) }),
-      );
+      const jpeg = data[0] === 0xff && data[1] === 0xd8;
+      const png = data.subarray(0, 4).toString('hex') === '89504e47';
+      if (!jpeg && !png) throw new CreatorError('BAD_PHOTO');
+      // Sent from a file on disk: uploading straight from memory garbled the image.
+      const dir = await mkdtemp(join(tmpdir(), 'gb-photo-'));
+      const file = join(dir, jpeg ? 'photo.jpg' : 'photo.png');
+      try {
+        await writeFile(file, data);
+        text = await ask(client, CreatorError, () => client.sendFile(BOTFATHER, { file, forceDocument: false }));
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
       if (!/success|updated/i.test(text)) {
         await reset(client, CreatorError);
         throw new CreatorError('BOTFATHER_UNEXPECTED', { text: text.slice(0, 300) });
