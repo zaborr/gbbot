@@ -62,6 +62,17 @@ services:
       # /update in the bot leaves its request here (see deploy/auto-update).
       - ./deploy/runtime:/run/gb-update
 
+  # Acts as the creator accounts (@BotFather, notices channel, groups).
+  # Internal: no ports; only the API reaches it (http://creator:3100).
+  creator:
+    build:
+      context: .
+      dockerfile: creator/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+
   miniapp:
     build:
       context: .

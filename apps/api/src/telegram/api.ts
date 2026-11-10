@@ -27,6 +27,22 @@ interface TelegramResponse<T> {
   error_code?: number;
 }
 
+/** A call Telegram refused; `code` is its error_code (401: the token no longer works). */
+export class TelegramError extends Error {
+  constructor(
+    message: string,
+    readonly code: number | undefined,
+  ) {
+    super(message);
+    this.name = 'TelegramError';
+  }
+}
+
+export interface BotCommand {
+  command: string;
+  description: string;
+}
+
 export class TelegramApi {
   constructor(
     private readonly botToken: string,
@@ -47,7 +63,7 @@ export class TelegramApi {
     });
     const data = (await res.json()) as TelegramResponse<T>;
     if (!data.ok || data.result === undefined) {
-      throw new Error(`Telegram ${method} failed: ${data.description ?? res.statusText}`);
+      throw new TelegramError(`Telegram ${method} failed: ${data.description ?? res.statusText}`, data.error_code ?? res.status);
     }
     return data.result;
   }
@@ -155,6 +171,37 @@ export class TelegramApi {
   /** Who the bot is; fails when the token no longer works. */
   getMe(): Promise<{ id: number; username?: string; first_name: string }> {
     return this.call('getMe', {});
+  }
+
+  /** The button next to the message box; a web_app one opens the Mini App. */
+  setChatMenuButton(text: string, url: string): Promise<true> {
+    return this.call('setChatMenuButton', { menu_button: { type: 'web_app', text, web_app: { url } } });
+  }
+
+  /** The bot's profile texts, per language ('' = the default one). */
+  async getProfile(lang: string): Promise<{ name: string; description: string; shortDescription: string }> {
+    const scope = lang ? { language_code: lang } : {};
+    const [name, description, short] = await Promise.all([
+      this.call<{ name: string }>('getMyName', scope),
+      this.call<{ description: string }>('getMyDescription', scope),
+      this.call<{ short_description: string }>('getMyShortDescription', scope),
+    ]);
+    return { name: name.name, description: description.description, shortDescription: short.short_description };
+  }
+
+  async setProfile(lang: string, profile: { name: string; description: string; shortDescription: string }): Promise<void> {
+    const scope = lang ? { language_code: lang } : {};
+    await this.call('setMyName', { ...scope, name: profile.name });
+    await this.call('setMyDescription', { ...scope, description: profile.description });
+    await this.call('setMyShortDescription', { ...scope, short_description: profile.shortDescription });
+  }
+
+  getMyCommands(lang: string): Promise<BotCommand[]> {
+    return this.call('getMyCommands', lang ? { language_code: lang } : {});
+  }
+
+  setMyCommands(lang: string, commands: BotCommand[]): Promise<true> {
+    return this.call('setMyCommands', { commands, ...(lang ? { language_code: lang } : {}) });
   }
 
   getChatMenuButton(): Promise<{ type: string; text?: string; web_app?: { url: string } }> {

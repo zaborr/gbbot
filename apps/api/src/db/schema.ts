@@ -16,6 +16,9 @@ import {
 import { relations } from 'drizzle-orm';
 import type {
   Blacklist,
+  BotStatus,
+  BotSwitchReason,
+  CreatorAccountStatus,
   OrderChangeRequest,
   PaymentLogEntry,
   PriceTier,
@@ -618,4 +621,37 @@ export const bots = pgTable(
   (table) => [index('bots_status_idx').on(table.status)],
 );
 
-export type BotStatus = 'active' | 'reserve' | 'down';
+
+/** Each time another bot took over: when, which ones, why and who did it. */
+export const botSwitches = pgTable(
+  'bot_switches',
+  {
+    id: serial('id').primaryKey(),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+    fromBotId: bigint('from_bot_id', { mode: 'number' }),
+    toBotId: bigint('to_bot_id', { mode: 'number' }).notNull(),
+    reason: text('reason').$type<BotSwitchReason>().notNull(),
+    /** Who did it from the panel (null: done by the server). */
+    byUser: bigint('by_user', { mode: 'number' }),
+  },
+  (table) => [index('bot_switches_at_idx').on(table.at)],
+);
+
+/**
+ * Telegram user accounts the server acts as (through the creator service) to
+ * create bots and post the notices. api_hash and session are encrypted.
+ */
+export const creatorAccounts = pgTable('creator_accounts', {
+  id: serial('id').primaryKey(),
+  phone: text('phone').notNull(),
+  apiId: integer('api_id').notNull(),
+  apiHash: text('api_hash').notNull(),
+  session: text('session'),
+  status: text('status').$type<CreatorAccountStatus>().notNull(),
+  telegramId: bigint('telegram_id', { mode: 'number' }),
+  username: text('username'),
+  firstName: text('first_name'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  checkedAt: timestamp('checked_at', { withTimezone: true }),
+  lastError: text('last_error'),
+});

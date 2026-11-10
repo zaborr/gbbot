@@ -50,6 +50,8 @@ say "Building the API"
 docker compose build api
 say "Building the Mini App"
 docker compose build miniapp
+say "Building the creator service"
+docker compose build creator
 
 say "Restarting"
 mkdir -p deploy/runtime

@@ -7,6 +7,10 @@ import {
   langFrom,
   platformShopInput,
   retentionSettings,
+  switchBotRequest,
+  addCreatorAccountRequest,
+  creatorCodeRequest,
+  creatorPasswordRequest,
   updateOrganizersRequest,
   updateVipClubRequest,
 } from '@tma-shop/shared';
@@ -45,6 +49,15 @@ import {
   removeFromPlatformBlacklist,
 } from '../services/blacklist.js';
 import { tr } from '../i18n/messages.js';
+import { botsOverview, switchBot } from '../services/botSwitch.js';
+import {
+  addCreatorAccount,
+  listCreatorAccounts,
+  reloginCreatorAccount,
+  removeCreatorAccount,
+  submitCreatorCode,
+  submitCreatorPassword,
+} from '../services/creatorAccounts.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -54,6 +67,42 @@ export function platformRoutes(): Hono<AppBindings> {
   app.use('*', requireAuth, requireSuperAdmin);
 
   app.get('/shops', async (c) => c.json(await listAllShops(c.get('db'))));
+
+  // The bot the platform answers as, the others, and switching to another one.
+  app.get('/bots', async (c) => c.json(await botsOverview(c.get('db'), c.get('env'))));
+  app.post('/bots/switch', zValidator('json', switchBotRequest), async (c) =>
+    c.json(await switchBot(c.get('db'), c.get('env'), c.req.valid('json').token, 'manual', c.get('claims').sub)),
+  );
+
+  // Creator accounts: Telegram user accounts the server acts as (see creator/).
+  const accountParam = z.object({ id: z.coerce.number().int().positive() });
+  app.get('/creator-accounts', async (c) => c.json(await listCreatorAccounts(c.get('db'))));
+  app.post('/creator-accounts', zValidator('json', addCreatorAccountRequest), async (c) =>
+    c.json(await addCreatorAccount(c.get('db'), c.get('env'), c.req.valid('json'))),
+  );
+  app.post('/creator-accounts/:id/relogin', zValidator('param', accountParam), async (c) =>
+    c.json(await reloginCreatorAccount(c.get('db'), c.get('env'), c.req.valid('param').id)),
+  );
+  app.post(
+    '/creator-accounts/:id/code',
+    zValidator('param', accountParam),
+    zValidator('json', creatorCodeRequest),
+    async (c) =>
+      c.json(await submitCreatorCode(c.get('db'), c.get('env'), c.req.valid('param').id, c.req.valid('json').code)),
+  );
+  app.post(
+    '/creator-accounts/:id/password',
+    zValidator('param', accountParam),
+    zValidator('json', creatorPasswordRequest),
+    async (c) =>
+      c.json(
+        await submitCreatorPassword(c.get('db'), c.get('env'), c.req.valid('param').id, c.req.valid('json').password),
+      ),
+  );
+  app.delete('/creator-accounts/:id', zValidator('param', accountParam), async (c) => {
+    await removeCreatorAccount(c.get('db'), c.req.valid('param').id);
+    return c.json({ ok: true });
+  });
 
   // Platform blacklist: for those in it no GB exists.
   app.get('/blacklist', async (c) => c.json(await platformBlacklistView(c.get('db'))));

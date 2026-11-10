@@ -19,6 +19,8 @@ import {
   shops,
   testings,
   bots,
+  botSwitches,
+  creatorAccounts,
   users,
 } from '../db/schema.js';
 import { runRetention } from '../services/retention.js';
@@ -28,6 +30,16 @@ import { assertProductKeepsTestings, dropUnpaidTesting } from '../services/testi
 import { goalTotals } from '../services/goal.js';
 import { cancelDrawsOnReopen, finishDraw, launchDraw } from '../services/testingDraw.js';
 import { botToken, loadActiveBot, useBot } from '../services/activeBot.js';
+import { switchBot } from '../services/botSwitch.js';
+import {
+  addCreatorAccount,
+  checkCreatorAccounts,
+  listCreatorAccounts,
+  removeCreatorAccount,
+  submitCreatorCode,
+  submitCreatorPassword,
+} from '../services/creatorAccounts.js';
+import { CreatorError, type CreatorApi } from '../services/creator.js';
 import { open as openSecret, secretKey } from '../lib/secretBox.js';
 import { sendPaymentReminders } from '../services/reminders.js';
 import { resetMiniAppUrlCache } from '../services/bot.js';
@@ -1283,6 +1295,7 @@ describeDb('API integration', () => {
   });
 
   it('keeps the active bot in the database, and takes a new BOT_TOKEN put in .env by hand', async () => {
+    await db.delete(botSwitches);
     await db.delete(bots);
     const offline = { getMe: () => Promise.reject(new Error('offline')) } as unknown as TelegramApi;
     try {
@@ -1307,7 +1320,114 @@ describeDb('API integration', () => {
       expect(botToken(testEnv)).toBe(other.BOT_TOKEN);
     } finally {
       useBot(null);
+      await db.delete(botSwitches);
       await db.delete(bots);
+    }
+  });
+
+  it('switches to another bot from the panel and keeps the old one as down', async () => {
+    await db.delete(botSwitches);
+    await db.delete(bots);
+    const offline = { getMe: () => Promise.reject(new Error('offline')) } as unknown as TelegramApi;
+    const NEW = '888000222:NewBotTokenForIntegrationTests_abcdef';
+    const calls: string[] = [];
+    const fake = (token: string): TelegramApi =>
+      ({
+        getMe: async () => {
+          if (token !== NEW) throw new Error('closed');
+          return { id: 888000222, username: 'gb_new_bot', first_name: 'GB' };
+        },
+        setWebhook: async () => {
+          calls.push('webhook');
+          return true;
+        },
+        getChatMenuButton: async () => ({ type: 'default' }),
+        setChatMenuButton: async (_text: string, url: string) => {
+          calls.push(`menu ${url}`);
+          return true;
+        },
+        getProfile: async () => {
+          throw new Error('closed');
+        },
+        sendMessage: async () => ({ message_id: 1 }),
+      }) as unknown as TelegramApi;
+    try {
+      await loadActiveBot(db, testEnv, offline);
+      const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`, 'content-type': 'application/json' };
+      // A token Telegram does not accept is refused before anything changes.
+      const bad = await request('/api/platform/bots/switch', {
+        method: 'POST',
+        headers: admin,
+        body: JSON.stringify({ token: 'not-a-token' }),
+      });
+      expect(bad.status).toBe(400);
+
+      const info = await switchBot(db, { ...testEnv, PUBLIC_URL: 'https://gb.example' }, NEW, 'manual', ADMIN_ID, fake);
+      expect(info).toMatchObject({ id: 888000222, username: 'gb_new_bot', status: 'active' });
+      expect(calls).toEqual(['webhook', 'menu https://gb.example/']);
+      expect(botToken(testEnv)).toBe(NEW);
+      await expect(switchBot(db, testEnv, NEW, 'manual', ADMIN_ID, fake)).rejects.toMatchObject({ code: 'bot_same' });
+
+      const overview = (await (await request('/api/platform/bots', { headers: admin })).json()) as {
+        active: { id: number };
+        bots: Array<{ id: number; status: string }>;
+        history: Array<{ reason: string; to: { username: string } }>;
+      };
+      expect(overview.active.id).toBe(888000222);
+      expect(overview.bots).toEqual([expect.objectContaining({ id: Number(BOT_TOKEN.split(':')[0]), status: 'down' })]);
+      expect(overview.history[0]).toMatchObject({ reason: 'manual', to: { username: 'gb_new_bot' } });
+    } finally {
+      useBot(null);
+      await db.delete(botSwitches);
+      await db.delete(bots);
+    }
+  });
+
+  it('signs a creator account in (code, then password) and notices when Telegram asks again', async () => {
+    await db.delete(creatorAccounts);
+    let meFails = false;
+    const fake: CreatorApi = {
+      loginStart: async () => ({ loginId: 'L1', viaApp: true }),
+      loginCode: async (_id, code) => {
+        if (code !== '12345') throw new CreatorError('PHONE_CODE_INVALID');
+        return { password: true, hint: 'pet' };
+      },
+      loginPassword: async () => ({ done: true, session: 'SESSION-STRING', user: { id: 4242, username: 'gb_maker', firstName: 'Maker' } }),
+      me: async () => {
+        if (meFails) throw new CreatorError('AUTH_KEY_UNREGISTERED');
+        return { user: { id: 4242, username: 'gb_maker', firstName: 'Maker' } };
+      },
+      call: async () => {
+        throw new Error('not used');
+      },
+    };
+    try {
+      const first = await addCreatorAccount(db, testEnv, { phone: '+34600111222', apiId: 123, apiHash: 'a'.repeat(32) }, fake);
+      expect(first).toMatchObject({ step: 'code', viaApp: true });
+      await expect(submitCreatorCode(db, testEnv, first.id, '00000', fake)).rejects.toMatchObject({ code: 'creator_code' });
+      expect(await submitCreatorCode(db, testEnv, first.id, '12345', fake)).toMatchObject({ step: 'password', hint: 'pet' });
+      expect(await submitCreatorPassword(db, testEnv, first.id, 'secret', fake)).toMatchObject({ step: 'done' });
+
+      const [row] = await db.select().from(creatorAccounts);
+      expect(row?.session).not.toContain('SESSION-STRING');
+      expect(row?.apiHash).not.toContain('aaaa');
+      expect(await listCreatorAccounts(db)).toEqual([
+        expect.objectContaining({ status: 'ok', username: 'gb_maker', telegramId: 4242, phone: '•••222' }),
+      ]);
+      // The same number twice is refused.
+      await expect(
+        addCreatorAccount(db, testEnv, { phone: '+34600111222', apiId: 123, apiHash: 'a'.repeat(32) }, fake),
+      ).rejects.toMatchObject({ code: 'creator_exists' });
+
+      // Telegram no longer takes the session: it has to sign in again.
+      meFails = true;
+      await checkCreatorAccounts(db, testEnv, fake);
+      expect((await listCreatorAccounts(db))[0]).toMatchObject({ status: 'login', lastError: 'AUTH_KEY_UNREGISTERED' });
+
+      await removeCreatorAccount(db, first.id);
+      expect(await listCreatorAccounts(db)).toEqual([]);
+    } finally {
+      await db.delete(creatorAccounts);
     }
   });
 
