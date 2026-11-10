@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LANGS, type Lang } from './i18n.js';
 
 /** A bot of the platform: the one answering, a spare, or one Telegram closed. */
 export type BotStatus = 'active' | 'reserve' | 'down';
@@ -17,6 +18,8 @@ export interface BotInfo {
   activatedAt: string | null;
   downAt: string | null;
   downReason: string | null;
+  /** The creator account that made it (null: created by hand). */
+  accountId: number | null;
 }
 
 export interface BotSwitchEntry {
@@ -87,3 +90,38 @@ export interface CreatorLoginStep {
   /** The two-step password hint, if any. */
   hint?: string | null;
 }
+
+/** How the bots look and how many spares are kept ready. */
+export interface BotSettings {
+  /** The @ of new bots: `<prefix>_<random>_bot`. */
+  usernamePrefix: string;
+  /** Visible name (empty: the active bot's). */
+  name: string;
+  descriptions: Partial<Record<Lang, string>>;
+  shortDescriptions: Partial<Record<Lang, string>>;
+  /** Profile photo, base64 (null: none). */
+  photo: string | null;
+  reserveCount: number;
+  /** At least this many days between two new spares. */
+  reserveEveryDays: number;
+  lastError: string | null;
+  lastErrorAt: string | null;
+}
+
+const perLang = (max: number) =>
+  z.partialRecord(z.enum(LANGS), z.string().trim().max(max));
+
+export const updateBotSettingsRequest = z.object({
+  usernamePrefix: z
+    .string()
+    .trim()
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]{2,20}$/, 'Prefix: 3 to 21 letters, numbers or "_", starting with a letter'),
+  name: z.string().trim().max(64),
+  descriptions: perLang(512),
+  shortDescriptions: perLang(120),
+  /** New photo (base64), null to remove it, absent to keep it. */
+  photo: z.string().max(1_500_000).nullable().optional(),
+  reserveCount: z.number().int().min(0).max(5),
+  reserveEveryDays: z.number().int().min(1).max(30),
+});
+export type UpdateBotSettingsRequest = z.infer<typeof updateBotSettingsRequest>;

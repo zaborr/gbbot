@@ -607,3 +607,10 @@ button.gb-banner {
   gap: 4px;
   padding: 0 8px;
 }
+
+/* A spare bot in the panel: its name, then what can be done with it. */
+.gb-bot-row-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 12px;
+}

@@ -15,7 +15,7 @@ import { webhookUrl } from './bot.js';
 
 type BotRow = typeof bots.$inferSelect;
 
-const toInfo = (row: BotRow): BotInfo => ({
+export const toInfo = (row: BotRow): BotInfo => ({
   id: row.id,
   username: row.username,
   status: row.status,
@@ -23,6 +23,7 @@ const toInfo = (row: BotRow): BotInfo => ({
   activatedAt: row.activatedAt?.toISOString() ?? null,
   downAt: row.downAt?.toISOString() ?? null,
   downReason: row.downReason,
+  accountId: row.accountId,
 });
 
 /** The bots, the last switches and whether the active bot still answers. */
@@ -60,7 +61,7 @@ export async function botsOverview(
  * Puts a new bot ready to work: webhook, the Mini App button and, if the old
  * bot still answers, its name, descriptions and commands.
  */
-async function prepareBot(env: Env, next: TelegramApi, old: TelegramApi | null): Promise<void> {
+export async function prepareBot(env: Env, next: TelegramApi, old: TelegramApi | null, copyProfile = true): Promise<void> {
   const url = webhookUrl(env);
   if (url && env.TELEGRAM_WEBHOOK_SECRET) {
     await next.setWebhook(url, env.TELEGRAM_WEBHOOK_SECRET, ['message', 'my_chat_member', 'callback_query']);
@@ -73,7 +74,7 @@ async function prepareBot(env: Env, next: TelegramApi, old: TelegramApi | null):
     const appUrl = oldButton?.type === 'web_app' ? oldButton.web_app?.url : base ? `${base.replace(/\/+$/, '')}/` : undefined;
     if (appUrl) await next.setChatMenuButton(oldButton?.text ?? tr('en', 'start.button'), appUrl);
   }
-  if (!old) return;
+  if (!old || !copyProfile) return;
   for (const lang of ['', ...LANGS]) {
     try {
       const profile = await old.getProfile(lang);
@@ -99,6 +100,8 @@ export async function switchBot(
   reason: BotSwitchReason,
   byUser: number | null,
   telegramFor: (token: string) => TelegramApi = (t) => new TelegramApi(t),
+  /** A spare already has its name, descriptions and photo: nothing to copy. */
+  { fromReserve = false }: { fromReserve?: boolean } = {},
 ): Promise<BotInfo> {
   const next = telegramFor(token);
   let me: { id: number; username?: string };
@@ -113,7 +116,7 @@ export async function switchBot(
   }
   const key = secretKey(env);
   const oldToken = current ? open(key, current.token) : botToken(env);
-  await prepareBot(env, next, oldToken ? telegramFor(oldToken) : null);
+  await prepareBot(env, next, oldToken ? telegramFor(oldToken) : null, !fromReserve);
 
   const now = new Date();
   const username = me.username ?? null;

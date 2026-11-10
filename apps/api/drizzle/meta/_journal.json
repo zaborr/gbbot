@@ -379,6 +379,13 @@
       "when": 1794600000000,
       "tag": "0053_creator_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1794686400000,
+      "tag": "0054_bots_reserve",
+      "breakpoints": true
     }
   ]
 }

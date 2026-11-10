@@ -1,9 +1,11 @@
 import type {
   AddCreatorAccountRequest,
   BotInfo,
+  BotSettings,
   BotsOverview,
   CreatorAccountInfo,
   CreatorLoginStep,
+  UpdateBotSettingsRequest,
   AuthResponse,
   Cart,
   CatalogQuery,
@@ -401,6 +403,26 @@ export class ApiClient {
 
   platformSwitchBot(token: string): Promise<BotInfo> {
     return this.request<BotInfo>('/platform/bots/switch', { method: 'POST', body: JSON.stringify({ token }) });
+  }
+
+  platformBotSettings(): Promise<BotSettings> {
+    return this.request<BotSettings>('/platform/bots/settings');
+  }
+
+  platformUpdateBotSettings(input: UpdateBotSettingsRequest): Promise<BotSettings> {
+    return this.request<BotSettings>('/platform/bots/settings', { method: 'PUT', body: JSON.stringify(input) });
+  }
+
+  platformCreateReserve(): Promise<BotInfo> {
+    return this.request<BotInfo>('/platform/bots/reserve', { method: 'POST' });
+  }
+
+  platformUseReserve(id: number): Promise<BotInfo> {
+    return this.request<BotInfo>(`/platform/bots/${id}/use`, { method: 'POST' });
+  }
+
+  platformRetireBot(id: number): Promise<{ ok: true }> {
+    return this.request<{ ok: true }>(`/platform/bots/${id}`, { method: 'DELETE' });
   }
 
   platformCreatorAccounts(): Promise<CreatorAccountInfo[]> {

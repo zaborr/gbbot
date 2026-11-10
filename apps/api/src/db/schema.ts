@@ -16,6 +16,7 @@ import {
 import { relations } from 'drizzle-orm';
 import type {
   Blacklist,
+  Lang,
   BotStatus,
   BotSwitchReason,
   CreatorAccountStatus,
@@ -617,6 +618,10 @@ export const bots = pgTable(
     activatedAt: timestamp('activated_at', { withTimezone: true }),
     downAt: timestamp('down_at', { withTimezone: true }),
     downReason: text('down_reason'),
+    /** The creator account that made it (null: created by hand). */
+    accountId: integer('account_id').references(() => creatorAccounts.id, { onDelete: 'set null' }),
+    /** When the name, descriptions and photo were last put on it. */
+    appearanceAt: timestamp('appearance_at', { withTimezone: true }),
   },
   (table) => [index('bots_status_idx').on(table.status)],
 );
@@ -654,4 +659,20 @@ export const creatorAccounts = pgTable('creator_accounts', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   checkedAt: timestamp('checked_at', { withTimezone: true }),
   lastError: text('last_error'),
+});
+
+/** How the bots look (name, descriptions, photo) and how many spares to keep. One row. */
+export const botSettings = pgTable('bot_settings', {
+  id: integer('id').primaryKey().default(1),
+  usernamePrefix: text('username_prefix').notNull().default('gb'),
+  name: text('name').notNull().default(''),
+  descriptions: jsonb('descriptions').$type<Partial<Record<Lang, string>>>().notNull().default({}),
+  shortDescriptions: jsonb('short_descriptions').$type<Partial<Record<Lang, string>>>().notNull().default({}),
+  /** Profile photo, base64 JPEG/PNG. */
+  photo: text('photo'),
+  reserveCount: integer('reserve_count').notNull().default(2),
+  reserveEveryDays: integer('reserve_every_days').notNull().default(3),
+  lastError: text('last_error'),
+  lastErrorAt: timestamp('last_error_at', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
