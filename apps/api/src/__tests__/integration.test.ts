@@ -18,6 +18,7 @@ import {
   products,
   shops,
   testings,
+  bots,
   users,
 } from '../db/schema.js';
 import { runRetention } from '../services/retention.js';
@@ -26,6 +27,8 @@ import { markOrderPaid } from '../services/orders.js';
 import { assertProductKeepsTestings, dropUnpaidTesting } from '../services/testing.js';
 import { goalTotals } from '../services/goal.js';
 import { cancelDrawsOnReopen, finishDraw, launchDraw } from '../services/testingDraw.js';
+import { botToken, loadActiveBot, useBot } from '../services/activeBot.js';
+import { open as openSecret, secretKey } from '../lib/secretBox.js';
 import { sendPaymentReminders } from '../services/reminders.js';
 import { resetMiniAppUrlCache } from '../services/bot.js';
 import { closeDueShops } from '../services/closing.js';
@@ -1277,6 +1280,35 @@ describeDb('API integration', () => {
     await db.delete(orders).where(eq(orders.id, orderId));
     await db.delete(testings).where(eq(testings.id, testingId));
     await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
+  });
+
+  it('keeps the active bot in the database, and takes a new BOT_TOKEN put in .env by hand', async () => {
+    await db.delete(bots);
+    const offline = { getMe: () => Promise.reject(new Error('offline')) } as unknown as TelegramApi;
+    try {
+      // First start: BOT_TOKEN becomes the active bot, stored encrypted.
+      await loadActiveBot(db, testEnv, offline);
+      const [first] = await db.select().from(bots);
+      expect(first).toMatchObject({ id: Number(BOT_TOKEN.split(':')[0]), status: 'active' });
+      expect(first?.token).not.toContain(BOT_TOKEN);
+      expect(openSecret(secretKey(testEnv), first!.token)).toBe(BOT_TOKEN);
+      expect(botToken(testEnv)).toBe(BOT_TOKEN);
+
+      // Another token in .env: it takes over, the previous one is kept as down.
+      const other = { ...testEnv, BOT_TOKEN: '999000111:OtherBotTokenForTests_abcdefghijklmn' };
+      await loadActiveBot(db, other, offline);
+      const rows = await db.select().from(bots);
+      expect(rows.find((r) => r.id === 999000111)?.status).toBe('active');
+      expect(rows.find((r) => r.id === first!.id)?.status).toBe('down');
+      expect(botToken(testEnv)).toBe(other.BOT_TOKEN);
+
+      // Back to the old token in .env: the stored active bot wins (a switch made in the panel).
+      await loadActiveBot(db, testEnv, offline);
+      expect(botToken(testEnv)).toBe(other.BOT_TOKEN);
+    } finally {
+      useBot(null);
+      await db.delete(bots);
+    }
   });
 
   it('lets administrators set the GB currency', async () => {

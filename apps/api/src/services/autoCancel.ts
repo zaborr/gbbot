@@ -6,6 +6,7 @@ import { ApiError } from '../lib/errors.js';
 import { buildStatusMessage, languagesOf, notifyChats } from './notifications.js';
 import { tr } from '../i18n/messages.js';
 import { changeOrderStatus } from './orders.js';
+import { botToken } from './activeBot.js';
 
 /**
  * Cancels unpaid orders that went `autoCancelHours` (per shop) without any
@@ -49,7 +50,7 @@ export async function cancelExpiredOrders(db: Database, env: Env): Promise<numbe
       cancelled += 1;
       if (order.userId !== null) {
         await notifyChats(
-          env.BOT_TOKEN,
+          botToken(env),
           [order.userId],
           buildStatusMessage(lang, row.shopName, order, 'pending'),
         );

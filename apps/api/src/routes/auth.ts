@@ -10,6 +10,7 @@ import { claimBlacklisted } from '../services/blacklist.js';
 import { toSessionUserDTO } from '../db/mappers.js';
 import { ApiError } from '../lib/errors.js';
 import { signInWebAdmin, webSessionId } from '../services/webAdmins.js';
+import { botToken } from '../services/activeBot.js';
 
 export function authRoutes(): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
@@ -19,7 +20,7 @@ export function authRoutes(): Hono<AppBindings> {
     const env = c.get('env');
     const db = c.get('db');
 
-    const result = validateInitData(initData, env.BOT_TOKEN, {
+    const result = validateInitData(initData, botToken(env), {
       maxAgeSeconds: env.INITDATA_MAX_AGE_SECONDS,
     });
     if (!result.ok) {

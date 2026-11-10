@@ -12,6 +12,7 @@ import { platformSettings, shops, users } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 import { TelegramApi, type TelegramChatMember } from '../telegram/api.js';
 import type { ShopRow } from './shop.js';
+import { botToken } from './activeBot.js';
 
 /** How long a group membership answer is trusted. */
 const MEMBER_TTL_MS = 6 * 60 * 60 * 1000;
@@ -149,7 +150,7 @@ export function createClubChecker(
   env: Env,
   userId: number,
   kind: ClubKind,
-  telegram = new TelegramApi(env.BOT_TOKEN),
+  telegram = new TelegramApi(botToken(env)),
 ): (shop: ShopRow) => Promise<boolean> {
   let context: Promise<{ username: string | null; platform: VipClub }> | null = null;
   const load = (): Promise<{ username: string | null; platform: VipClub }> => {
@@ -196,7 +197,7 @@ export function createVipChecker(
   db: Database,
   env: Env,
   userId: number,
-  telegram = new TelegramApi(env.BOT_TOKEN),
+  telegram = new TelegramApi(botToken(env)),
 ): (shop: ShopRow) => Promise<boolean> {
   return createClubChecker(db, env, userId, 'vip', telegram);
 }
@@ -271,7 +272,7 @@ async function clubFromRequest(
   telegram: TelegramApi,
 ): Promise<VipClub> {
   return {
-    groups: await resolveGroups(telegram, env.BOT_TOKEN, input.groups, current.groups),
+    groups: await resolveGroups(telegram, botToken(env), input.groups, current.groups),
     userIds: [...new Set(input.userIds)],
     usernames: [...new Set(input.usernames.map((u) => u.toLowerCase()))],
   };
@@ -282,7 +283,7 @@ export async function updatePlatformClub(
   env: Env,
   input: UpdateVipClubRequest,
   kind: ClubKind,
-  telegram = new TelegramApi(env.BOT_TOKEN),
+  telegram = new TelegramApi(botToken(env)),
 ): Promise<VipClub> {
   const club = await clubFromRequest(env, input, await getPlatformClub(db, kind), telegram);
   await savePlatformClub(db, club, kind);
@@ -293,7 +294,7 @@ export function updatePlatformVipClub(
   db: Database,
   env: Env,
   input: UpdateVipClubRequest,
-  telegram = new TelegramApi(env.BOT_TOKEN),
+  telegram = new TelegramApi(botToken(env)),
 ): Promise<VipClub> {
   return updatePlatformClub(db, env, input, 'vip', telegram);
 }
@@ -304,7 +305,7 @@ export async function updateShopClub(
   shop: ShopRow,
   input: UpdateVipClubRequest,
   kind: ClubKind,
-  telegram = new TelegramApi(env.BOT_TOKEN),
+  telegram = new TelegramApi(botToken(env)),
 ): Promise<ShopVipClub> {
   const club = await clubFromRequest(env, input, ownClub(shop, kind), telegram);
   const useGlobal = input.useGlobalClub ?? usesPlatformClub(shop, kind);
@@ -322,7 +323,7 @@ export function updateShopVipClub(
   env: Env,
   shop: ShopRow,
   input: UpdateVipClubRequest,
-  telegram = new TelegramApi(env.BOT_TOKEN),
+  telegram = new TelegramApi(botToken(env)),
 ): Promise<ShopVipClub> {
   return updateShopClub(db, env, shop, input, 'vip', telegram);
 }

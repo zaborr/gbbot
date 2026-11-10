@@ -12,6 +12,7 @@ import type { ShopRow } from './shop.js';
 import { withoutBlocked } from './blacklist.js';
 import { notifyShopTeam } from './webNotices.js';
 import { goalTotals, missedGoalText } from './goal.js';
+import { botToken } from './activeBot.js';
 
 /** Refuses anything that would create or grow an order in a closed GB. */
 export function assertOpen(shop: ShopRow, now = new Date()): void {
@@ -77,7 +78,7 @@ async function cleanUpClosed(db: Database, env: Env, shop: ShopRow): Promise<voi
     if (row.userId === null) continue;
     const order = toOrderDTO(row, []);
     const chat = await withoutBlocked(db, env, shop, [row.userId]);
-    await notifyUsers(db, env.BOT_TOKEN, chat, (lang) =>
+    await notifyUsers(db, botToken(env), chat, (lang) =>
       buildChangeDecisionMessage(lang, order, false),
     );
   }

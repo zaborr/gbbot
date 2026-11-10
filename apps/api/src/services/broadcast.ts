@@ -11,6 +11,7 @@ import { shopLink } from './reminders.js';
 import type { ShopRow } from './shop.js';
 import { describeUser } from './team.js';
 import { withoutBlocked } from './blacklist.js';
+import { botToken } from './activeBot.js';
 
 /** Pause between messages: Telegram allows about 30 per second. */
 const SEND_GAP_MS = 40;
@@ -157,7 +158,7 @@ export async function startBroadcast(
     shop,
     row,
     ids,
-    options.telegram ?? new TelegramApi(env.BOT_TOKEN),
+    options.telegram ?? new TelegramApi(botToken(env)),
     options.gapMs ?? SEND_GAP_MS,
   ).catch((error: unknown) => console.error(`Broadcast ${row.id} crashed:`, error));
   if (options.wait) await run;

@@ -17,6 +17,7 @@ import { ApiError } from '../lib/errors.js';
 import { withoutBlocked } from './blacklist.js';
 import { notifyUsers } from './notifications.js';
 import type { ShopRow } from './shop.js';
+import { botToken } from './activeBot.js';
 
 /**
  * The draw of donors for a testing: the organiser launches it once the GB is
@@ -207,7 +208,7 @@ export async function launchDraw(
     candidates.map((c) => c.orderId),
   );
   const refs = candidates.map((c) => `#${c.ref}${c.volunteer ? ' 🙋' : ''}`).join(', ');
-  await notifyUsers(db, env.BOT_TOKEN, ids, (lang: Lang) =>
+  await notifyUsers(db, botToken(env), ids, (lang: Lang) =>
     tr(lang, 'testing.drawAnnounced', {
       shop: shop.name,
       product: what,
@@ -279,7 +280,7 @@ export async function finishDraw(
   const link = `https://mempool.space/block/${hash}`;
   await notifyUsers(
     db,
-    env.BOT_TOKEN,
+    botToken(env),
     ids.filter((id) => !donorIds.has(id)),
     (lang) =>
       tr(lang, 'testing.drawResult', {
@@ -291,7 +292,7 @@ export async function finishDraw(
         link,
       }),
   );
-  await notifyUsers(db, env.BOT_TOKEN, [...donorIds], (lang) =>
+  await notifyUsers(db, botToken(env), [...donorIds], (lang) =>
     tr(lang, 'testing.drawDonor', { shop: shop.name, product: what, height: draw.height, link }),
   );
   return true;
@@ -381,7 +382,7 @@ export async function substituteDonor(
   if (inn) {
     const ids = await audience(db, env, shop, [inn.orderId]);
     const link = `https://mempool.space/block/${draw.hash}`;
-    await notifyUsers(db, env.BOT_TOKEN, ids, (lang) =>
+    await notifyUsers(db, botToken(env), ids, (lang) =>
       tr(lang, 'testing.drawDonor', { shop: shop.name, product: what, height: draw.height, link }),
     );
   }
@@ -430,7 +431,7 @@ export async function cancelDrawsOnReopen(db: Database, env: Env, shop: ShopRow)
       shop,
       draw.candidates.map((c) => c.orderId),
     );
-    await notifyUsers(db, env.BOT_TOKEN, ids, (lang) =>
+    await notifyUsers(db, botToken(env), ids, (lang) =>
       tr(lang, 'testing.drawCancelled', { shop: shop.name, product: what }),
     );
   }

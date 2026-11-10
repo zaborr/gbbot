@@ -597,3 +597,25 @@ export const webNotices = pgTable(
   },
   (table) => [index('web_notices_created_at_idx').on(table.createdAt)],
 );
+
+/**
+ * The Telegram bots the platform answers as: the active one, spares ready to
+ * take over and the ones Telegram closed. The token is stored encrypted.
+ */
+export const bots = pgTable(
+  'bots',
+  {
+    /** Telegram's id for the bot (the number before ":" in its token). */
+    id: bigint('id', { mode: 'number' }).primaryKey(),
+    username: text('username'),
+    token: text('token').notNull(),
+    status: text('status').$type<BotStatus>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    activatedAt: timestamp('activated_at', { withTimezone: true }),
+    downAt: timestamp('down_at', { withTimezone: true }),
+    downReason: text('down_reason'),
+  },
+  (table) => [index('bots_status_idx').on(table.status)],
+);
+
+export type BotStatus = 'active' | 'reserve' | 'down';

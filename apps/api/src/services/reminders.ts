@@ -7,6 +7,7 @@ import { TelegramApi } from '../telegram/api.js';
 import { miniAppUrl } from './bot.js';
 import { languagesOf } from './notifications.js';
 import { withoutBlockedIn } from './blacklist.js';
+import { botToken } from './activeBot.js';
 
 /** Without automatic cancellation, the reminder goes out after this long. */
 export const DEFAULT_REMINDER_HOURS = 24;
@@ -48,7 +49,7 @@ export function hoursLeft(
 export async function sendPaymentReminders(
   db: Database,
   env: Env,
-  telegram = new TelegramApi(env.BOT_TOKEN),
+  telegram = new TelegramApi(botToken(env)),
   now = new Date(),
 ): Promise<number> {
   const due = await db
