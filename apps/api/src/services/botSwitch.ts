@@ -12,6 +12,7 @@ import { languagesOf } from './notifications.js';
 import { notifyPlatform } from './webNotices.js';
 import { testedLabel } from './testingDraw.js';
 import { webhookUrl } from './bot.js';
+import { announceSwitch } from './botNotices.js';
 
 type BotRow = typeof bots.$inferSelect;
 
@@ -57,6 +58,7 @@ export async function botsOverview(
       from: entry.fromBotId === null ? null : { id: entry.fromBotId, username: name(entry.fromBotId) },
       to: { id: entry.toBotId, username: name(entry.toBotId) },
       reason: entry.reason,
+      notices: entry.notices ?? null,
     })),
   };
 }
@@ -172,6 +174,12 @@ export async function switchBot(
   await notifyPlatform(db, env, (lang) =>
     tr(lang, 'bots.switched', { bot: username ? `@${username}` : String(me.id), reason: tr(lang, `bots.reason.${reason}`) }),
   ).catch((error: unknown) => console.error('Could not tell about the new bot:', error));
+  // Privately to the administrators, the channel and the groups: slow, so in the background.
+  if (username) {
+    void announceSwitch(db, env, username, reason).catch((error: unknown) =>
+      console.error('Could not announce the new bot:', error),
+    );
+  }
   return toInfo(row);
 }
 

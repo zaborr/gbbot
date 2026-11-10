@@ -11,6 +11,7 @@ import { catalogRoutes } from './routes/catalog.js';
 import { cartRoutes } from './routes/cart.js';
 import { orderRoutes } from './routes/orders.js';
 import { adminRoutes } from './routes/admin.js';
+import { botUsername } from './services/activeBot.js';
 import { webhookRoutes } from './routes/webhook.js';
 import { shopsRoutes } from './routes/shops.js';
 import { platformRoutes } from './routes/platform.js';
@@ -64,6 +65,8 @@ export function createApp(deps: AppDeps): Hono<AppBindings> {
   const api = new Hono<AppBindings>();
 
   // Not tied to a shop.
+  // The bot the platform answers as now (shown on the web sign-in, so people find it after a switch).
+  api.get('/bot', (c) => c.json({ username: botUsername() }));
   api.route('/auth', authRoutes());
   api.route('/shops', shopsRoutes());
   api.route('/platform', platformRoutes());

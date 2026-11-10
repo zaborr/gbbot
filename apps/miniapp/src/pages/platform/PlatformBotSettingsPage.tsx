@@ -27,6 +27,7 @@ function Settings(): React.JSX.Element {
 }
 
 const PREFIX_RE = /^[a-zA-Z][a-zA-Z0-9_]{2,20}$/;
+const CHANNEL_RE = /^(@[A-Za-z][A-Za-z0-9_]{3,31}|-100\d{5,})$/;
 const LANG_NAMES: Record<Lang, string> = { en: 'EN', es: 'ES', it: 'IT', pt: 'PT' };
 
 /** A square JPEG of at most 640 px, as base64: small enough for the database and @BotFather. */
@@ -57,6 +58,9 @@ function SettingsForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
   const [watch, setWatch] = useState(String(settings.watchMinutes));
   const [userCheck, setUserCheck] = useState(String(settings.userCheckMinutes));
   const [autoSwitch, setAutoSwitch] = useState(settings.autoSwitch);
+  const [channel, setChannel] = useState(settings.noticesChannel ?? '');
+  const [noticeText, setNoticeText] = useState(settings.noticeText);
+  const [dmAdmins, setDmAdmins] = useState(settings.dmAdmins);
   const [saved, setSaved] = useState(false);
 
   const countNumber = Number(count);
@@ -65,7 +69,9 @@ function SettingsForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
   const userCheckNumber = Number(userCheck);
   const watchOk = Number.isInteger(watchNumber) && watchNumber >= 1 && watchNumber <= 60;
   const userCheckOk = Number.isInteger(userCheckNumber) && userCheckNumber >= 5 && userCheckNumber <= 720;
+  const channelOk = channel.trim() === '' || CHANNEL_RE.test(channel.trim());
   const valid =
+    channelOk &&
     watchOk &&
     userCheckOk &&
     PREFIX_RE.test(prefix.trim()) &&
@@ -99,6 +105,9 @@ function SettingsForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
         watchMinutes: watchNumber,
         userCheckMinutes: userCheckNumber,
         autoSwitch,
+        noticesChannel: channel.trim() || null,
+        noticeText: noticeText.trim(),
+        dmAdmins,
       });
       setSaved(true);
       setPhotoChanged(false);
@@ -217,6 +226,56 @@ function SettingsForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
           {t('botSettings.autoSwitch')}
         </Cell>
       </Section>
+
+      <Section header={t('botSettings.notices')} footer={t('botSettings.noticesFooter')}>
+        <Input
+          header={t('botSettings.channel')}
+          placeholder="@canal"
+          autoComplete="off"
+          value={channel}
+          status={channelOk ? 'default' : 'error'}
+          onChange={(e) => setChannel(e.target.value)}
+        />
+        <Textarea
+          header={t('botSettings.noticeText')}
+          placeholder={t('botSettings.noticeTextPlaceholder')}
+          value={noticeText}
+          onChange={(e) => setNoticeText(e.target.value)}
+        />
+        <Cell
+          Component="label"
+          multiline
+          subtitle={t('botSettings.dmAdminsHint')}
+          after={<Switch checked={dmAdmins} onChange={(e) => setDmAdmins(e.target.checked)} />}
+        >
+          {t('botSettings.dmAdmins')}
+        </Cell>
+      </Section>
+
+      {settings.groups.length > 0 && (
+        <Section header={t('botSettings.groups')} footer={t('botSettings.groupsFooter')}>
+          {settings.groups.map((group) => (
+            <Cell
+              key={group.chatId}
+              multiline
+              subtitle={group.at ? (group.ok ? formatDate(group.at) : (group.error ?? '')) : t('botSettings.groupNotYet')}
+              after={
+                <span className={`gb-chip ${group.ok ? 'gb-chip--info' : group.at ? 'gb-chip--warn' : ''}`}>
+                  {group.ok ? t('botSettings.groupOk') : group.at ? t('botSettings.groupFailed') : '—'}
+                </span>
+              }
+            >
+              {group.title || String(group.chatId)}
+            </Cell>
+          ))}
+          <Cell onClick={() => void actions.run(async () => {
+            await api.platformRetryBotGroups();
+            onSaved();
+          })}>
+            {t('botSettings.groupsRetry')}
+          </Cell>
+        </Section>
+      )}
 
       {settings.lastError && (
         <Section header={t('botSettings.lastError')}>

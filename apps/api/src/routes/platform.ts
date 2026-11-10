@@ -52,6 +52,8 @@ import {
 import { tr } from '../i18n/messages.js';
 import { botsOverview, setMenuButton, switchBot } from '../services/botSwitch.js';
 import { watchStatus } from '../services/botWatch.js';
+import { addBotToGroups } from '../services/botNotices.js';
+import { botUsername } from '../services/activeBot.js';
 import { createReserve, getBotSettings, retireBot, updateBotSettings, useReserve } from '../services/botReserve.js';
 import {
   addCreatorAccount,
@@ -85,6 +87,11 @@ export function platformRoutes(): Hono<AppBindings> {
     c.json(await updateBotSettings(c.get('db'), c.get('env'), c.req.valid('json'))),
   );
   app.post('/bots/reserve', async (c) => c.json(await createReserve(c.get('db'), c.get('env'))));
+  app.post('/bots/groups', async (c) => {
+    const bot = botUsername();
+    if (!bot) throw ApiError.conflict('bot_unknown', 'The active bot @ is not known yet');
+    return c.json(await addBotToGroups(c.get('db'), c.get('env'), bot));
+  });
   app.post('/bots/:id/use', zValidator('param', botParam), async (c) =>
     c.json(await useReserve(c.get('db'), c.get('env'), c.req.valid('param').id, c.get('claims').sub)),
   );

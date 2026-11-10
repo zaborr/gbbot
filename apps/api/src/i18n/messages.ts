@@ -174,6 +174,7 @@ const en = {
   'bots.downNoReserve': '🚨 {bot} is down ({reason}) and there is no spare bot. Change it from Platform → 🤖 Bots with a bot created in @BotFather.',
   'bots.downSpareFailed': '🚨 {bot} is down ({reason}) and no spare bot could take over. Look at Platform → 🤖 Bots.',
   'bots.downManual': '🚨 {bot} is down ({reason}). The automatic switch is off: use a spare from Platform → 🤖 Bots.',
+  'bots.channelNotice': '🔄 New official bot: {bot}',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -340,6 +341,7 @@ const es: Record<BotMessageKey, string> = {
   'bots.downNoReserve': '🚨 {bot} ha caído ({reason}) y no hay bot de reserva. Cámbialo desde Plataforma → 🤖 Bots con un bot creado en @BotFather.',
   'bots.downSpareFailed': '🚨 {bot} ha caído ({reason}) y ningún bot de reserva ha podido relevarlo. Revisa Plataforma → 🤖 Bots.',
   'bots.downManual': '🚨 {bot} ha caído ({reason}). El relevo automático está apagado: usa una reserva desde Plataforma → 🤖 Bots.',
+  'bots.channelNotice': '🔄 Nuevo bot oficial: {bot}',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -504,6 +506,7 @@ const it: Record<BotMessageKey, string> = {
   'bots.downNoReserve': '🚨 {bot} è caduto ({reason}) e non c\'è un bot di riserva. Cambialo da Piattaforma → 🤖 Bot con un bot creato in @BotFather.',
   'bots.downSpareFailed': '🚨 {bot} è caduto ({reason}) e nessun bot di riserva è riuscito a subentrare. Controlla Piattaforma → 🤖 Bot.',
   'bots.downManual': '🚨 {bot} è caduto ({reason}). Il cambio automatico è spento: usa una riserva da Piattaforma → 🤖 Bot.',
+  'bots.channelNotice': '🔄 Nuovo bot ufficiale: {bot}',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -668,6 +671,7 @@ const pt: Record<BotMessageKey, string> = {
   'bots.downNoReserve': '🚨 {bot} caiu ({reason}) e não há bot de reserva. Mude-o em Plataforma → 🤖 Bots com um bot criado no @BotFather.',
   'bots.downSpareFailed': '🚨 {bot} caiu ({reason}) e nenhum bot de reserva o conseguiu substituir. Veja Plataforma → 🤖 Bots.',
   'bots.downManual': '🚨 {bot} caiu ({reason}). A substituição automática está desligada: use uma reserva em Plataforma → 🤖 Bots.',
+  'bots.channelNotice': '🔄 Novo bot oficial: {bot}',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

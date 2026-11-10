@@ -13,6 +13,7 @@ import { switchBot, toInfo } from './botSwitch.js';
 import { CreatorError, creatorApi, type CreatorApi, type CreatorCredentials } from './creator.js';
 import { accountFailed, credentialsOf } from './creatorAccounts.js';
 import { notifyPlatform } from './webNotices.js';
+import { allGroups } from './botNotices.js';
 
 type SettingsRow = typeof botSettings.$inferSelect;
 type BotRow = typeof bots.$inferSelect;
@@ -39,12 +40,22 @@ const toSettings = (row: SettingsRow): BotSettings => ({
   watchMinutes: row.watchMinutes,
   userCheckMinutes: row.userCheckMinutes,
   autoSwitch: row.autoSwitch,
+  noticesChannel: row.noticesChannel,
+  noticeText: row.noticeText,
+  dmAdmins: row.dmAdmins,
+  groups: [],
   lastError: row.lastError,
   lastErrorAt: row.lastErrorAt?.toISOString() ?? null,
 });
 
 export async function getBotSettings(db: Database): Promise<BotSettings> {
-  return toSettings(await settingsRow(db));
+  const row = await settingsRow(db);
+  const groups = (await allGroups(db)).map((group) => ({
+    chatId: group.chatId,
+    ...(row.groupStatus[String(group.chatId)] ?? { title: group.title, ok: false, at: '' }),
+    title: group.title,
+  }));
+  return { ...toSettings(row), groups };
 }
 
 async function noteError(db: Database, message: string | null): Promise<void> {
@@ -75,6 +86,9 @@ export async function updateBotSettings(
       watchMinutes: input.watchMinutes,
       userCheckMinutes: input.userCheckMinutes,
       autoSwitch: input.autoSwitch,
+      noticesChannel: input.noticesChannel,
+      noticeText: input.noticeText,
+      dmAdmins: input.dmAdmins,
       updatedAt: new Date(),
     })
     .where(eq(botSettings.id, 1))
@@ -83,7 +97,7 @@ export async function updateBotSettings(
   void applyAppearance(db, env, api, input.photo !== undefined).catch((error: unknown) =>
     console.error('Could not apply the bot appearance:', error),
   );
-  return toSettings(row!);
+  return { ...toSettings(row!), groups: (await getBotSettings(db)).groups };
 }
 
 /** Name and descriptions for a language ('' = the default one, in English). */
