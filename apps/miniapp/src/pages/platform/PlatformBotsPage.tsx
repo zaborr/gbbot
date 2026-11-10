@@ -94,6 +94,18 @@ function BotsView({
         ) : (
           <Cell multiline>{t('bots.noActive')}</Cell>
         )}
+        <Cell
+          multiline
+          subtitle={
+            overview.watch.problem
+              ? t('bots.watchProblem', { problem: overview.watch.problem })
+              : overview.watch.checkedAt
+                ? t('bots.watchLast', { date: formatDate(overview.watch.checkedAt) })
+                : t('bots.watchNotYet')
+          }
+        >
+          {t('bots.watch')}
+        </Cell>
         {overview.working && (
           <Cell
             multiline

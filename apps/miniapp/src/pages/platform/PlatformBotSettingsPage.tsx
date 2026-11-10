@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
+import { Button, Cell, List, Section, Switch } from '@telegram-apps/telegram-ui';
 import { LANGS, type BotSettings, type Lang } from '@tma-shop/shared';
 import { Input, Textarea } from '../../components/Field.js';
 import { api } from '../../api/client.js';
@@ -54,11 +54,20 @@ function SettingsForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
   const [photoChanged, setPhotoChanged] = useState(false);
   const [count, setCount] = useState(String(settings.reserveCount));
   const [days, setDays] = useState(String(settings.reserveEveryDays));
+  const [watch, setWatch] = useState(String(settings.watchMinutes));
+  const [userCheck, setUserCheck] = useState(String(settings.userCheckMinutes));
+  const [autoSwitch, setAutoSwitch] = useState(settings.autoSwitch);
   const [saved, setSaved] = useState(false);
 
   const countNumber = Number(count);
   const daysNumber = Number(days);
+  const watchNumber = Number(watch);
+  const userCheckNumber = Number(userCheck);
+  const watchOk = Number.isInteger(watchNumber) && watchNumber >= 1 && watchNumber <= 60;
+  const userCheckOk = Number.isInteger(userCheckNumber) && userCheckNumber >= 5 && userCheckNumber <= 720;
   const valid =
+    watchOk &&
+    userCheckOk &&
     PREFIX_RE.test(prefix.trim()) &&
     Number.isInteger(countNumber) &&
     countNumber >= 0 &&
@@ -87,6 +96,9 @@ function SettingsForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
         ...(photoChanged ? { photo } : {}),
         reserveCount: countNumber,
         reserveEveryDays: daysNumber,
+        watchMinutes: watchNumber,
+        userCheckMinutes: userCheckNumber,
+        autoSwitch,
       });
       setSaved(true);
       setPhotoChanged(false);
@@ -179,6 +191,31 @@ function SettingsForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
           status={Number.isInteger(daysNumber) && daysNumber >= 1 && daysNumber <= 30 ? 'default' : 'error'}
           onChange={(e) => setDays(e.target.value)}
         />
+      </Section>
+
+      <Section header={t('botSettings.watch')} footer={t('botSettings.watchFooter')}>
+        <Input
+          header={t('botSettings.watchMinutes')}
+          inputMode="numeric"
+          value={watch}
+          status={watchOk ? 'default' : 'error'}
+          onChange={(e) => setWatch(e.target.value)}
+        />
+        <Input
+          header={t('botSettings.userCheckMinutes')}
+          inputMode="numeric"
+          value={userCheck}
+          status={userCheckOk ? 'default' : 'error'}
+          onChange={(e) => setUserCheck(e.target.value)}
+        />
+        <Cell
+          Component="label"
+          multiline
+          subtitle={t('botSettings.autoSwitchHint')}
+          after={<Switch checked={autoSwitch} onChange={(e) => setAutoSwitch(e.target.checked)} />}
+        >
+          {t('botSettings.autoSwitch')}
+        </Cell>
       </Section>
 
       {settings.lastError && (

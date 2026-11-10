@@ -51,6 +51,7 @@ import {
 } from '../services/blacklist.js';
 import { tr } from '../i18n/messages.js';
 import { botsOverview, setMenuButton, switchBot } from '../services/botSwitch.js';
+import { watchStatus } from '../services/botWatch.js';
 import { createReserve, getBotSettings, retireBot, updateBotSettings, useReserve } from '../services/botReserve.js';
 import {
   addCreatorAccount,
@@ -71,7 +72,7 @@ export function platformRoutes(): Hono<AppBindings> {
   app.get('/shops', async (c) => c.json(await listAllShops(c.get('db'))));
 
   // The bot the platform answers as, the others, and switching to another one.
-  app.get('/bots', async (c) => c.json(await botsOverview(c.get('db'), c.get('env'))));
+  app.get('/bots', async (c) => c.json({ ...(await botsOverview(c.get('db'), c.get('env'))), watch: watchStatus() }));
   app.post('/bots/menu', async (c) => c.json(await setMenuButton(c.get('env'))));
   app.post('/bots/switch', zValidator('json', switchBotRequest), async (c) =>
     c.json(await switchBot(c.get('db'), c.get('env'), c.req.valid('json').token, 'manual', c.get('claims').sub)),

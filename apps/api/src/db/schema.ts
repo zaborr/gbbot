@@ -672,6 +672,12 @@ export const botSettings = pgTable('bot_settings', {
   photo: text('photo'),
   reserveCount: integer('reserve_count').notNull().default(2),
   reserveEveryDays: integer('reserve_every_days').notNull().default(3),
+  /** How often to ask Telegram whether the active bot still works. */
+  watchMinutes: integer('watch_minutes').notNull().default(5),
+  /** How often a creator account looks at the bot as users see it (restricted, scam…). */
+  userCheckMinutes: integer('user_check_minutes').notNull().default(30),
+  /** Whether a spare takes over by itself when the bot goes down. */
+  autoSwitch: boolean('auto_switch').notNull().default(true),
   lastError: text('last_error'),
   lastErrorAt: timestamp('last_error_at', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

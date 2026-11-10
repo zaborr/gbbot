@@ -22,6 +22,7 @@ import {
   botSwitches,
   creatorAccounts,
   botSettings,
+  webNotices,
   users,
 } from '../db/schema.js';
 import { runRetention } from '../services/retention.js';
@@ -42,12 +43,13 @@ import {
 } from '../services/creatorAccounts.js';
 import { CreatorError, type CreatorApi } from '../services/creator.js';
 import { createReserve, keepReserve, retireBot } from '../services/botReserve.js';
+import { resetWatch, watchBot, watchStatus } from '../services/botWatch.js';
 import { open as openSecret, seal, secretKey } from '../lib/secretBox.js';
 import { sendPaymentReminders } from '../services/reminders.js';
 import { resetMiniAppUrlCache } from '../services/bot.js';
 import { closeDueShops } from '../services/closing.js';
 import { deleteExpiredMessages } from '../services/expiringMessages.js';
-import { TelegramApi } from '../telegram/api.js';
+import { TelegramApi, TelegramError } from '../telegram/api.js';
 
 /**
  * Full-stack integration test against a real Postgres. Skipped automatically
@@ -1501,6 +1503,50 @@ describeDb('API integration', () => {
     } finally {
       await db.delete(bots);
       await db.delete(creatorAccounts);
+      await db.delete(botSettings);
+    }
+  });
+
+  it('watches the active bot: three refusals in a row with no spare tell the administrators once', async () => {
+    await db.delete(botSwitches);
+    await db.delete(bots);
+    await db.delete(botSettings);
+    await db.delete(creatorAccounts);
+    resetWatch();
+    const before = (await db.select().from(webNotices)).length;
+    const closed = {
+      getMe: async () => {
+        throw new TelegramError('Telegram getMe failed: Unauthorized', 401);
+      },
+    } as unknown as TelegramApi;
+    const noCreator: CreatorApi = {
+      loginStart: async () => ({ loginId: 'x', viaApp: false }),
+      loginCode: async () => ({ password: true, hint: null }),
+      loginPassword: async () => {
+        throw new Error('not used');
+      },
+      me: async () => ({ user: { id: 1, username: null, firstName: null } }),
+      call: async () => {
+        throw new Error('not used');
+      },
+    };
+    try {
+      useBot({ id: 7654321, username: 'gb_test_bot', token: BOT_TOKEN });
+      const t0 = new Date('2026-11-10T10:00:00Z');
+      for (let i = 0; i < 4; i++) {
+        await watchBot(db, testEnv, new Date(t0.getTime() + i * 60_000), noCreator, closed);
+      }
+      expect(watchStatus().problem).toContain('Unauthorized');
+      // Told once, not on every check.
+      expect((await db.select().from(webNotices)).length).toBe(before + 1);
+
+      // Back to normal: a check that works clears the problem.
+      const fine = { getMe: async () => ({ id: 7654321, first_name: 'GB' }) } as unknown as TelegramApi;
+      await watchBot(db, testEnv, new Date(t0.getTime() + 10 * 60_000), noCreator, fine);
+      expect(watchStatus().problem).toBeNull();
+    } finally {
+      resetWatch();
+      useBot(null);
       await db.delete(botSettings);
     }
   });

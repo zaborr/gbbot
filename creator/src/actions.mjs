@@ -93,4 +93,28 @@ export const actions = {
       return { ok: true };
     });
   },
+
+  /** How users see a bot: gone, restricted, marked as scam or fake. */
+  async '/resolve'({ account, username }, { withAccount, Api }) {
+    return withAccount(account, async (client) => {
+      try {
+        const result = await client.invoke(new Api.contacts.ResolveUsername({ username }));
+        const user =
+          result.users.find((u) => (u.username ?? '').toLowerCase() === String(username).toLowerCase()) ??
+          result.users[0];
+        if (!user) return { found: false };
+        return {
+          found: true,
+          deleted: Boolean(user.deleted),
+          restricted: Boolean(user.restricted),
+          scam: Boolean(user.scam),
+          fake: Boolean(user.fake),
+          reasons: (user.restrictionReason ?? []).map((r) => `${r.platform}: ${r.reason}`),
+        };
+      } catch (error) {
+        if (error?.errorMessage === 'USERNAME_NOT_OCCUPIED') return { found: false };
+        throw error;
+      }
+    });
+  },
 };
