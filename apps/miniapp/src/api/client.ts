@@ -1,6 +1,9 @@
 import type {
+  AddCreatorAccountRequest,
   BotInfo,
   BotsOverview,
+  CreatorAccountInfo,
+  CreatorLoginStep,
   AuthResponse,
   Cart,
   CatalogQuery,
@@ -398,6 +401,36 @@ export class ApiClient {
 
   platformSwitchBot(token: string): Promise<BotInfo> {
     return this.request<BotInfo>('/platform/bots/switch', { method: 'POST', body: JSON.stringify({ token }) });
+  }
+
+  platformCreatorAccounts(): Promise<CreatorAccountInfo[]> {
+    return this.request<CreatorAccountInfo[]>('/platform/creator-accounts');
+  }
+
+  platformAddCreatorAccount(input: AddCreatorAccountRequest): Promise<CreatorLoginStep> {
+    return this.request<CreatorLoginStep>('/platform/creator-accounts', { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  platformCreatorRelogin(id: number): Promise<CreatorLoginStep> {
+    return this.request<CreatorLoginStep>(`/platform/creator-accounts/${id}/relogin`, { method: 'POST' });
+  }
+
+  platformCreatorCode(id: number, code: string): Promise<CreatorLoginStep> {
+    return this.request<CreatorLoginStep>(`/platform/creator-accounts/${id}/code`, {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  }
+
+  platformCreatorPassword(id: number, password: string): Promise<CreatorLoginStep> {
+    return this.request<CreatorLoginStep>(`/platform/creator-accounts/${id}/password`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
+  }
+
+  platformRemoveCreatorAccount(id: number): Promise<{ ok: true }> {
+    return this.request<{ ok: true }>(`/platform/creator-accounts/${id}`, { method: 'DELETE' });
   }
 
   platformGetRetention(): Promise<RetentionStatus> {

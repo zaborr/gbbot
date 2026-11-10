@@ -168,6 +168,8 @@ const en = {
   'bots.reason.closed': 'Telegram closed the previous one',
   'bots.reason.restricted': 'Telegram restricted the previous one',
   'bots.reason.env': 'new token in .env',
+  'creator.needsLogin': '⚠️ The creator account {account} has to sign in again (Telegram asks for the code). Platform → 🤖 Bots → the account → Sign in again.',
+  'creator.closed': '⛔ Telegram has closed the creator account {account}. Its bots may stop working: add another account.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -328,6 +330,8 @@ const es: Record<BotMessageKey, string> = {
   'bots.reason.closed': 'Telegram cerró el anterior',
   'bots.reason.restricted': 'Telegram restringió el anterior',
   'bots.reason.env': 'token nuevo en el .env',
+  'creator.needsLogin': '⚠️ La cuenta creadora {account} tiene que volver a iniciar sesión (Telegram pide el código). Plataforma → 🤖 Bots → la cuenta → Volver a iniciar sesión.',
+  'creator.closed': '⛔ Telegram ha cerrado la cuenta creadora {account}. Sus bots pueden dejar de funcionar: añade otra cuenta.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -486,6 +490,8 @@ const it: Record<BotMessageKey, string> = {
   'bots.reason.closed': 'Telegram ha chiuso il precedente',
   'bots.reason.restricted': 'Telegram ha limitato il precedente',
   'bots.reason.env': 'nuovo token nel .env',
+  'creator.needsLogin': '⚠️ L\'account creatore {account} deve accedere di nuovo (Telegram chiede il codice). Piattaforma → 🤖 Bot → l\'account → Accedi di nuovo.',
+  'creator.closed': '⛔ Telegram ha chiuso l\'account creatore {account}. I suoi bot potrebbero smettere di funzionare: aggiungi un altro account.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -644,6 +650,8 @@ const pt: Record<BotMessageKey, string> = {
   'bots.reason.closed': 'o Telegram fechou o anterior',
   'bots.reason.restricted': 'o Telegram restringiu o anterior',
   'bots.reason.env': 'token novo no .env',
+  'creator.needsLogin': '⚠️ A conta criadora {account} tem de voltar a iniciar sessão (o Telegram pede o código). Plataforma → 🤖 Bots → a conta → Voltar a iniciar sessão.',
+  'creator.closed': '⛔ O Telegram fechou a conta criadora {account}. Os seus bots podem deixar de funcionar: adicione outra conta.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

@@ -26,6 +26,20 @@ export default tseslint.config(
     },
   },
   {
+    // The creator service is plain JavaScript run by Node.
+    files: ['creator/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        Buffer: 'readonly',
+        setInterval: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+      },
+    },
+  },
+  {
     files: ['apps/miniapp/**/*.{ts,tsx}'],
     plugins: { 'react-hooks': reactHooks },
     rules: {

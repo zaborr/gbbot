@@ -18,6 +18,7 @@ import type {
   Blacklist,
   BotStatus,
   BotSwitchReason,
+  CreatorAccountStatus,
   OrderChangeRequest,
   PaymentLogEntry,
   PriceTier,
@@ -635,3 +636,22 @@ export const botSwitches = pgTable(
   },
   (table) => [index('bot_switches_at_idx').on(table.at)],
 );
+
+/**
+ * Telegram user accounts the server acts as (through the creator service) to
+ * create bots and post the notices. api_hash and session are encrypted.
+ */
+export const creatorAccounts = pgTable('creator_accounts', {
+  id: serial('id').primaryKey(),
+  phone: text('phone').notNull(),
+  apiId: integer('api_id').notNull(),
+  apiHash: text('api_hash').notNull(),
+  session: text('session'),
+  status: text('status').$type<CreatorAccountStatus>().notNull(),
+  telegramId: bigint('telegram_id', { mode: 'number' }),
+  username: text('username'),
+  firstName: text('first_name'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  checkedAt: timestamp('checked_at', { withTimezone: true }),
+  lastError: text('last_error'),
+});
