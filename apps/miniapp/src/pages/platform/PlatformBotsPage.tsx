@@ -61,6 +61,7 @@ function BotsView({
   const navigate = useNavigate();
   const [token, setToken] = useState('');
   const [switched, setSwitched] = useState<BotInfo | null>(null);
+  const [menuSet, setMenuSet] = useState<string | null>(null);
   const actions = useAdminActions(onChanged);
   const tokenOk = BOT_TOKEN_RE.test(token.trim());
   const { active } = overview;
@@ -109,9 +110,17 @@ function BotsView({
         {overview.working && (
           <Cell
             multiline
-            subtitle={overview.menuUrl ?? t('bots.noMenu')}
+            subtitle={
+              menuSet && menuSet !== overview.menuUrl
+                ? t('bots.menuDone', { url: menuSet })
+                : (overview.menuUrl ?? t('bots.noMenu'))
+            }
             after={
-              <Button size="s" mode="bezeled" onClick={() => void actions.run(() => api.platformSetMenuButton())}>
+              <Button
+                size="s"
+                mode="bezeled"
+                onClick={() => void actions.run(async () => setMenuSet((await api.platformSetMenuButton()).menuUrl))}
+              >
                 {overview.menuUrl ? t('bots.menuReset') : t('bots.menuSet')}
               </Button>
             }
@@ -236,6 +245,13 @@ function BotsView({
               {entry.from ? `${botName(entry.from)} → ${botName(entry.to)}` : botName(entry.to)}
             </Cell>
           ))
+        )}
+        {overview.history.length > 0 && (
+          <Cell onClick={() => void actions.twoTap('clear-history', () => api.platformClearBotHistory())}>
+            <span style={{ color: 'var(--tgui--destructive_text_color, #e53935)' }}>
+              {actions.tapLabel('clear-history', t('bots.clearHistory'))}
+            </span>
+          </Cell>
         )}
       </Section>
     </List>
