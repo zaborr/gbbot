@@ -689,6 +689,8 @@ export const botSettings = pgTable('bot_settings', {
   /** Whether the creator account writes privately to the platform administrators. */
   dmAdmins: boolean('dm_admins').notNull().default(true),
   /** Whether the active bot could be put in each guests/VIP group, by chat id. */
+  /** Fingerprint of the BOT_TOKEN last seen in .env: a different one means it was changed by hand. */
+  envTokenHash: text('env_token_hash'),
   groupStatus: jsonb('group_status').$type<Record<string, BotGroupStatus>>().notNull().default({}),
   lastError: text('last_error'),
   lastErrorAt: timestamp('last_error_at', { withTimezone: true }),
