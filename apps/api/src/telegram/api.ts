@@ -25,6 +25,7 @@ interface TelegramResponse<T> {
   result?: T;
   description?: string;
   error_code?: number;
+  parameters?: { retry_after?: number };
 }
 
 /** A call Telegram refused; `code` is its error_code (401: the token no longer works). */
@@ -55,13 +56,19 @@ export class TelegramApi {
     return this.botToken.split(':')[0] ?? '';
   }
 
-  private async call<T>(method: string, body: unknown): Promise<T> {
+  private async call<T>(method: string, body: unknown, attempt = 0): Promise<T> {
     const res = await this.fetchImpl(`${this.baseUrl}/bot${this.botToken}/${method}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
     const data = (await res.json()) as TelegramResponse<T>;
+    // "Too Many Requests: retry after N": wait and try again when it is short.
+    const wait = data.parameters?.retry_after;
+    if (!data.ok && data.error_code === 429 && wait !== undefined && wait <= 10 && attempt < 2) {
+      await new Promise((resolve) => setTimeout(resolve, wait * 1000 + 200));
+      return this.call<T>(method, body, attempt + 1);
+    }
     if (!data.ok || data.result === undefined) {
       throw new TelegramError(`Telegram ${method} failed: ${data.description ?? res.statusText}`, data.error_code ?? res.status);
     }

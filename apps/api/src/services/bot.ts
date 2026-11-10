@@ -3,7 +3,7 @@ import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { languagesOf } from './notifications.js';
 import { tr } from '../i18n/messages.js';
-import { TelegramApi, type InlineKeyboard } from '../telegram/api.js';
+import { TelegramApi, TelegramError, type InlineKeyboard } from '../telegram/api.js';
 import type { TelegramUpdate } from '../telegram/types.js';
 import { handleUploadChoice, handleUploadedFile } from './uploads.js';
 import { handleUpdateButton, isUpdateCommand, updateReply } from './serverUpdate.js';
@@ -130,7 +130,7 @@ const sleep = (ms: number): Promise<void> =>
  */
 export async function configureBot(
   env: Env,
-  telegram = new TelegramApi(botToken(env)),
+  telegram?: TelegramApi,
   wait: (ms: number) => Promise<void> = sleep,
 ): Promise<boolean> {
   const url = webhookUrl(env);
@@ -143,7 +143,8 @@ export async function configureBot(
   }
   for (let attempt = 0; ; attempt++) {
     try {
-      await telegram.setWebhook(url, env.TELEGRAM_WEBHOOK_SECRET, [
+      // The active bot at each try: it may have changed meanwhile (panel).
+      await (telegram ?? new TelegramApi(botToken(env))).setWebhook(url, env.TELEGRAM_WEBHOOK_SECRET, [
         'message',
         'my_chat_member',
         'callback_query',
@@ -151,6 +152,11 @@ export async function configureBot(
       console.log(`Telegram webhook set to ${url}`);
       return true;
     } catch (error) {
+      // The token no longer works (closed or revoked): trying again will not help.
+      if (error instanceof TelegramError && error.code === 401) {
+        console.error('Could not set the Telegram webhook: the bot token no longer works. Change the bot in the panel.');
+        return false;
+      }
       const delay = WEBHOOK_RETRY_DELAYS_MS[attempt];
       if (delay === undefined) {
         console.error('Could not set the Telegram webhook, giving up:', error);
