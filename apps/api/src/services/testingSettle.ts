@@ -9,6 +9,7 @@ import { TelegramApi } from '../telegram/api.js';
 import { languagesOf, notifyUsers } from './notifications.js';
 import type { ShopRow } from './shop.js';
 import { audience, testedLabel } from './testingDraw.js';
+import { botToken } from './activeBot.js';
 
 /**
  * The end of a testing: working out the money (what each participant gets
@@ -149,7 +150,7 @@ export async function settleTesting(
     const back = refunds.get(order.id) ?? 0;
     const [chat] = await audience(db, env, shop, [order.id]);
     if (chat === undefined) continue;
-    await notifyUsers(db, env.BOT_TOKEN, [chat], (lang: Lang) =>
+    await notifyUsers(db, botToken(env), [chat], (lang: Lang) =>
       back > 0
         ? tr(lang, 'testing.settledRefund', {
             shop: shop.name,
@@ -212,7 +213,7 @@ export async function cancelTesting(db: Database, env: Env, shop: ShopRow, id: s
     shop,
     rows.map((r) => r.order.id),
   );
-  await notifyUsers(db, env.BOT_TOKEN, ids, (lang) => tr(lang, 'testing.cancelled', { shop: shop.name, product: what }));
+  await notifyUsers(db, botToken(env), ids, (lang) => tr(lang, 'testing.cancelled', { shop: shop.name, product: what }));
   return row;
 }
 
@@ -234,7 +235,7 @@ export async function requestReport(
   id: string,
   organiserId: number,
   lang: Lang,
-  telegram = new TelegramApi(env.BOT_TOKEN),
+  telegram = new TelegramApi(botToken(env)),
 ): Promise<void> {
   const testing = await findTesting(db, shop.id, id);
   if (testing.status !== 'drawn' && testing.status !== 'settled') {

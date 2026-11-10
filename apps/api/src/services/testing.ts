@@ -28,6 +28,7 @@ import { tr } from '../i18n/messages.js';
 import { notifyUsers } from './notifications.js';
 import { withoutBlocked } from './blacklist.js';
 import type { ShopRow } from './shop.js';
+import { botToken } from './activeBot.js';
 
 /**
  * Collective lab testing of a product or variant (see packages/shared/src/testing.ts).
@@ -571,7 +572,7 @@ export async function announceTestingTiers(db: Database, env: Env, shopId: strin
     const dto = labels.find((l) => l.id === row.id);
     const what = dto?.variantLabel ? `${dto.productTitle} · ${dto.variantLabel}` : (dto?.productTitle ?? '');
     const newly = row.tiers.slice(row.notifiedTiers, reached).map((tier) => tier.name).join(', ');
-    await notifyUsers(db, env.BOT_TOKEN, ids, (lang) =>
+    await notifyUsers(db, botToken(env), ids, (lang) =>
       tr(lang, 'testing.tierReached', { shop: shop.name, product: what, tiers: newly }),
     );
   }

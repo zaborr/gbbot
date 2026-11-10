@@ -7,6 +7,7 @@ import { tr } from '../i18n/messages.js';
 import { notifyUsers } from './notifications.js';
 import type { ShopRow } from './shop.js';
 import { withoutBlocked } from './blacklist.js';
+import { botToken } from './activeBot.js';
 
 /**
  * A GB's minimum: what its orders add up to (products only, cancelled ones
@@ -150,7 +151,7 @@ export async function announceGoalMilestones(db: Database, env: Env, shopId: str
     milestone === 100
       ? tr(lang, shop.goalShowAmount ? 'goal.reachedAmount' : 'goal.reached', vars)
       : tr(lang, shop.goalShowAmount ? 'goal.progressAmount' : 'goal.progress', vars);
-  await notifyUsers(db, env.BOT_TOKEN, ids, text);
+  await notifyUsers(db, botToken(env), ids, text);
 }
 
 /** Text for the team when a GB closes on its date without its minimum. */

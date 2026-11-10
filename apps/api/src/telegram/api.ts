@@ -34,6 +34,11 @@ export class TelegramApi {
     private readonly fetchImpl: typeof fetch = fetch,
   ) {}
 
+  /** The bot's id (the number before ":" in its token). */
+  get botId(): string {
+    return this.botToken.split(':')[0] ?? '';
+  }
+
   private async call<T>(method: string, body: unknown): Promise<T> {
     const res = await this.fetchImpl(`${this.baseUrl}/bot${this.botToken}/${method}`, {
       method: 'POST',
@@ -147,6 +152,11 @@ export class TelegramApi {
   }
 
   /** The bot's default menu button, as set up in @BotFather. */
+  /** Who the bot is; fails when the token no longer works. */
+  getMe(): Promise<{ id: number; username?: string; first_name: string }> {
+    return this.call('getMe', {});
+  }
+
   getChatMenuButton(): Promise<{ type: string; text?: string; web_app?: { url: string } }> {
     return this.call('getChatMenuButton', {});
   }

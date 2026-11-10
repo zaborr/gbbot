@@ -3,6 +3,7 @@ import { loadEnv } from './config/env.js';
 import { createDb, createPool } from './db/client.js';
 import { createApp } from './app.js';
 import { configureBot } from './services/bot.js';
+import { loadActiveBot } from './services/activeBot.js';
 import { scheduleMaintenance } from './services/maintenance.js';
 import { scheduleDrawWatcher } from './services/testingDraw.js';
 import { resumePaymentChecks } from './services/paymentCheck.js';
@@ -17,7 +18,11 @@ const pool = createPool(env.DATABASE_URL);
 const db = createDb(pool);
 const app = createApp({ env, db });
 
-// Webhook (so the bot answers /start) and the chat's menu button.
+// The bot to answer as (stored in the database; BOT_TOKEN the first time),
+// then its webhook (so it answers /start).
+await loadActiveBot(db, env).catch((error: unknown) => {
+  console.error('Could not load the active bot, using BOT_TOKEN:', error);
+});
 void configureBot(env);
 
 // Every 3 hours (and now): cancel unpaid orders past their deadline, then

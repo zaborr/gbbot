@@ -9,6 +9,7 @@ import { handleUploadChoice, handleUploadedFile } from './uploads.js';
 import { handleUpdateButton, isUpdateCommand, updateReply } from './serverUpdate.js';
 import { handleReportReply } from './testingSettle.js';
 import { isSuperAdmin } from './shop.js';
+import { botToken } from './activeBot.js';
 
 const MENU_CACHE_MS = 60 * 60 * 1000;
 
@@ -19,14 +20,15 @@ export function webhookUrl(env: Env): string | null {
   return `${base.replace(/\/+$/, '')}/webhook/telegram`;
 }
 
-let menuCache: { url: string | null; at: number } | null = null;
+let menuCache: { bot: string; url: string | null; at: number } | null = null;
 
 /**
  * The Mini App URL, read from the bot's menu button (set up in @BotFather), so
  * there is nothing else to configure. Cached for an hour.
  */
 export async function miniAppUrl(telegram: TelegramApi, now = Date.now()): Promise<string | null> {
-  if (menuCache && now - menuCache.at < MENU_CACHE_MS) return menuCache.url;
+  // Per bot: a new active bot has its own menu button.
+  if (menuCache && menuCache.bot === telegram.botId && now - menuCache.at < MENU_CACHE_MS) return menuCache.url;
   let url: string | null = null;
   try {
     const button = await telegram.getChatMenuButton();
@@ -34,7 +36,7 @@ export async function miniAppUrl(telegram: TelegramApi, now = Date.now()): Promi
   } catch (error) {
     console.error('Could not read the bot menu button:', error);
   }
-  menuCache = { url, at: now };
+  menuCache = { bot: telegram.botId, url, at: now };
   return url;
 }
 
@@ -68,7 +70,7 @@ export function buildStartReply(
 export async function handleBotMessage(
   env: Env,
   update: TelegramUpdate,
-  telegram = new TelegramApi(env.BOT_TOKEN),
+  telegram = new TelegramApi(botToken(env)),
   db?: Database,
 ): Promise<void> {
   if (update.my_chat_member) {
@@ -128,7 +130,7 @@ const sleep = (ms: number): Promise<void> =>
  */
 export async function configureBot(
   env: Env,
-  telegram = new TelegramApi(env.BOT_TOKEN),
+  telegram = new TelegramApi(botToken(env)),
   wait: (ms: number) => Promise<void> = sleep,
 ): Promise<boolean> {
   const url = webhookUrl(env);

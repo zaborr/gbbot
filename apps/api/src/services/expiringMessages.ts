@@ -3,6 +3,7 @@ import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { expiringBotMessages } from '../db/schema.js';
 import { TelegramApi } from '../telegram/api.js';
+import { botToken } from './activeBot.js';
 
 /** The bot deletes these after this long (Telegram lets it for 48 hours). */
 export const SHIPPING_LIST_TTL_MS = 24 * 60 * 60 * 1000;
@@ -23,7 +24,7 @@ export async function deleteLater(
 export async function deleteExpiredMessages(
   db: Database,
   env: Env,
-  telegram = new TelegramApi(env.BOT_TOKEN),
+  telegram = new TelegramApi(botToken(env)),
   now = new Date(),
 ): Promise<number> {
   const due = await db

@@ -358,6 +358,13 @@
       "when": 1794340800000,
       "tag": "0050_testing_settle",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1794427200000,
+      "tag": "0051_bots",
+      "breakpoints": true
     }
   ]
 }

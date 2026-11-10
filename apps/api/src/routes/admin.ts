@@ -113,6 +113,7 @@ import {
   importProductsCsv,
   previewProductsCsv,
 } from '../services/productsCsv.js';
+import { botToken } from '../services/activeBot.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -156,7 +157,7 @@ async function deliverFile(
     };
   }
   try {
-    const telegram = new TelegramApi(env.BOT_TOKEN);
+    const telegram = new TelegramApi(botToken(env));
     await telegram.sendDocument(
       claims.sub,
       file.fileName,
@@ -254,7 +255,7 @@ export function adminRoutes(): Hono<AppBindings> {
       if (isWebSession(c.get('claims'))) throw ApiError.forbidden('Only available in Telegram');
       let sent: unknown;
       try {
-        sent = await new TelegramApi(c.get('env').BOT_TOKEN).sendDocument(
+        sent = await new TelegramApi(botToken(c.get('env'))).sendDocument(
           sub,
           fileName,
           Buffer.from(csv, 'utf8'),
@@ -325,7 +326,7 @@ export function adminRoutes(): Hono<AppBindings> {
       const owners = list([...team.owners.map(name), ...team.pendingOwnerUsernames.map((u) => `@${u}`)]);
       const managers = list([...team.admins.map(name), ...team.pendingUsernames.map((u) => `@${u}`)]);
       const recipients = [...new Set([...before.ownerIds, ...after.ownerIds])];
-      await notifyUsers(db, env.BOT_TOKEN, recipients, (lang) =>
+      await notifyUsers(db, botToken(env), recipients, (lang) =>
         [
           tr(lang, 'team.changed', { shop: after.name, who }),
           '',
@@ -693,7 +694,7 @@ export function adminRoutes(): Hono<AppBindings> {
       );
       // The customer hears about it from the bot (best effort).
       if (order.status !== previous) {
-        await notifyUsers(c.get('db'), c.get('env').BOT_TOKEN, await customerChat(c, order), (lang) =>
+        await notifyUsers(c.get('db'), botToken(c.get('env')), await customerChat(c, order), (lang) =>
           buildStatusMessage(lang, shop.name, order, previous),
         );
         // A confirmed payment may pass a milestone of the GB's minimum.
@@ -752,14 +753,14 @@ export function adminRoutes(): Hono<AppBindings> {
   // Customer change requests: approve (apply + tell them what to pay) or reject.
   app.post('/orders/:id/change/approve', zValidator('param', idParam), async (c) => {
     const order = await approveOrderChange(c.get('db'), c.get('shopId'), c.req.valid('param').id);
-    await notifyUsers(c.get('db'), c.get('env').BOT_TOKEN, await customerChat(c, order), (lang) =>
+    await notifyUsers(c.get('db'), botToken(c.get('env')), await customerChat(c, order), (lang) =>
       buildChangeDecisionMessage(lang, order, true),
     );
     return c.json(order);
   });
   app.post('/orders/:id/change/reject', zValidator('param', idParam), async (c) => {
     const order = await clearOrderChange(c.get('db'), c.get('shopId'), c.req.valid('param').id);
-    await notifyUsers(c.get('db'), c.get('env').BOT_TOKEN, await customerChat(c, order), (lang) =>
+    await notifyUsers(c.get('db'), botToken(c.get('env')), await customerChat(c, order), (lang) =>
       buildChangeDecisionMessage(lang, order, false),
     );
     return c.json(order);

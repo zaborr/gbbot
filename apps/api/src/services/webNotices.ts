@@ -5,6 +5,7 @@ import type { Database } from '../db/client.js';
 import { shops, webAdmins, webNotices } from '../db/schema.js';
 import { notifyUsers } from './notifications.js';
 import { teamIds, type ShopRow } from './shop.js';
+import { botToken } from './activeBot.js';
 
 /** Notices older than this leave the inbox. */
 const KEEP_DAYS = 90;
@@ -33,7 +34,7 @@ export async function notifyPlatform(
   build: (lang: Lang) => string,
   shopId: string | null = null,
 ): Promise<void> {
-  await notifyUsers(db, env.BOT_TOKEN, [...env.ADMIN_TELEGRAM_IDS], build);
+  await notifyUsers(db, botToken(env), [...env.ADMIN_TELEGRAM_IDS], build);
   await addWebNotice(db, build, shopId);
 }
 
@@ -52,7 +53,7 @@ export async function notifyShopTeam(
   const team = teamIds(shop);
   const toPlatform = platformToo || team.length === 0;
   const chats = toPlatform ? [...new Set([...team, ...env.ADMIN_TELEGRAM_IDS])] : team;
-  await notifyUsers(db, env.BOT_TOKEN, chats, build);
+  await notifyUsers(db, botToken(env), chats, build);
   if (toPlatform) await addWebNotice(db, build, shop.id);
 }
 

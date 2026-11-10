@@ -10,7 +10,17 @@ const optional = <T extends z.ZodType>(schema: T) =>
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().min(1),
+  /**
+   * The first bot. Once the server has run, the active bot is kept in the
+   * database (it can be changed from the panel); a token here that the server
+   * has never seen becomes the active bot.
+   */
   BOT_TOKEN: z.string().min(1),
+  /**
+   * Key for the secrets kept in the database (bot tokens). Unset = derived
+   * from JWT_SECRET.
+   */
+  BOTS_KEY: optional(z.string().min(16)),
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
   JWT_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
   INITDATA_MAX_AGE_SECONDS: z.coerce.number().int().positive().default(86_400),
