@@ -1,6 +1,13 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
-import { BOT_TOKEN_RE, type BotInfo, type BotSwitchEntry, type BotsOverview } from '@tma-shop/shared';
+import {
+  BOT_TOKEN_RE,
+  type BotInfo,
+  type BotSwitchEntry,
+  type BotsOverview,
+  type CreatorAccountInfo,
+} from '@tma-shop/shared';
 import { Input } from '../../components/Field.js';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
@@ -23,13 +30,35 @@ const botName = (bot: { id: number; username: string | null }): string =>
 function Bots(): React.JSX.Element {
   const [reloadKey, setReloadKey] = useState(0);
   const overview = useAsync(() => api.platformGetBots(), [reloadKey]);
+  const accounts = useAsync(() => api.platformCreatorAccounts(), [reloadKey]);
   if (overview.loading && !overview.data) return <Loader />;
   if (overview.error) return <ErrorView message={overview.error} />;
   if (!overview.data) return <Loader />;
-  return <BotsView overview={overview.data} onChanged={() => setReloadKey((k) => k + 1)} />;
+  return (
+    <BotsView
+      overview={overview.data}
+      accounts={accounts.data ?? []}
+      onChanged={() => setReloadKey((k) => k + 1)}
+    />
+  );
 }
 
-function BotsView({ overview, onChanged }: { overview: BotsOverview; onChanged: () => void }): React.JSX.Element {
+export const ACCOUNT_CHIP: Record<CreatorAccountInfo['status'], { className: string; key: 'creator.statusOk' | 'creator.statusLogin' | 'creator.statusClosed' }> = {
+  ok: { className: 'gb-chip--info', key: 'creator.statusOk' },
+  login: { className: 'gb-chip--warn', key: 'creator.statusLogin' },
+  closed: { className: 'gb-chip--warn', key: 'creator.statusClosed' },
+};
+
+function BotsView({
+  overview,
+  accounts,
+  onChanged,
+}: {
+  overview: BotsOverview;
+  accounts: CreatorAccountInfo[];
+  onChanged: () => void;
+}): React.JSX.Element {
+  const navigate = useNavigate();
   const [token, setToken] = useState('');
   const [switched, setSwitched] = useState<BotInfo | null>(null);
   const actions = useAdminActions(onChanged);
@@ -111,6 +140,24 @@ function BotsView({ overview, onChanged }: { overview: BotsOverview; onChanged: 
           ))}
         </Section>
       )}
+
+      <Section header={t('creator.title')} footer={t('creator.footer')}>
+        {accounts.map((account) => (
+          <Cell
+            key={account.id}
+            onClick={() => navigate(`/platform/bots/accounts/${account.id}`)}
+            subtitle={account.phone}
+            after={
+              <span className={`gb-chip ${ACCOUNT_CHIP[account.status].className}`}>
+                {t(ACCOUNT_CHIP[account.status].key)}
+              </span>
+            }
+          >
+            {account.username ? `@${account.username}` : (account.firstName ?? t('creator.unnamed'))}
+          </Cell>
+        ))}
+        <Cell onClick={() => navigate('/platform/bots/accounts/new')}>{t('creator.add')}</Cell>
+      </Section>
 
       <Section header={t('bots.history')}>
         {overview.history.length === 0 ? (

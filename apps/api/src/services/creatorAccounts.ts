@@ -58,12 +58,7 @@ export function credentialsOf(env: Env, row: AccountRow): CreatorCredentials | n
   return apiHash && session ? { apiId: row.apiId, apiHash, session } : null;
 }
 
-async function startLogin(
-  db: Database,
-  env: Env,
-  row: AccountRow,
-  api: CreatorApi,
-): Promise<CreatorLoginStep> {
+async function startLogin(env: Env, row: AccountRow, api: CreatorApi): Promise<CreatorLoginStep> {
   const apiHash = open(secretKey(env), row.apiHash);
   if (!apiHash) throw ApiError.conflict('creator_key', 'The account data cannot be read: remove it and add it again');
   try {
@@ -89,7 +84,7 @@ export async function addCreatorAccount(
     .values({ phone: input.phone, apiId: input.apiId, apiHash: seal(secretKey(env), input.apiHash), status: 'login' })
     .returning();
   try {
-    return await startLogin(db, env, row!, api);
+    return await startLogin(env, row!, api);
   } catch (error) {
     // Nothing worked (wrong number, wrong api_id…): do not keep it.
     await db.delete(creatorAccounts).where(eq(creatorAccounts.id, row!.id));
@@ -104,7 +99,7 @@ export async function reloginCreatorAccount(
   id: number,
   api: CreatorApi = creatorApi(env),
 ): Promise<CreatorLoginStep> {
-  return startLogin(db, env, await findAccount(db, id), api);
+  return startLogin(env, await findAccount(db, id), api);
 }
 
 async function signedIn(db: Database, env: Env, id: number, session: string, user: CreatorUser): Promise<CreatorLoginStep> {
