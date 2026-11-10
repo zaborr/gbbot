@@ -137,7 +137,7 @@ export async function switchBot(
   });
   useBot({ id: me.id, username, token });
 
-  await reaskReports(db, env, next).catch((error: unknown) => console.error('Could not ask for the reports again:', error));
+  await reaskReports(db, next).catch((error: unknown) => console.error('Could not ask for the reports again:', error));
   await notifyPlatform(db, env, (lang) =>
     tr(lang, 'bots.switched', { bot: username ? `@${username}` : String(me.id), reason: tr(lang, `bots.reason.${reason}`) }),
   ).catch((error: unknown) => console.error('Could not tell about the new bot:', error));
@@ -148,7 +148,7 @@ export async function switchBot(
  * Lab reports asked for by the old bot: the organiser would reply to a bot
  * that is gone, so the new one asks again.
  */
-async function reaskReports(db: Database, env: Env, telegram: TelegramApi): Promise<void> {
+async function reaskReports(db: Database, telegram: TelegramApi): Promise<void> {
   const pending = await db
     .select()
     .from(testings)
