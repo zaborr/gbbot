@@ -7,6 +7,8 @@ import { api, ApiClientError } from '../api/client.js';
 import { useCart } from '../providers/CartProvider.js';
 import { useSession } from '../providers/SessionProvider.js';
 import { useMainButton } from '../hooks/useMainButton.js';
+import { useSecurityPhrase } from '../lib/securityPhrase.js';
+import { SecurityPhraseSetup } from '../components/SecurityPhrase.js';
 import { formatPrice } from '../lib/format.js';
 import { convertedPrice, otherPayment } from '../lib/exchange.js';
 import { lineName } from '../lib/variants.js';
@@ -125,7 +127,14 @@ export function CartPage(): React.JSX.Element {
     ) : (
       ''
     );
+  const { phrase } = useSecurityPhrase();
   const checkout = useCallback(async (force = false) => {
+    // A security phrase first (asked once): how the customer tells our bot from a fake one.
+    if (phrase === null) {
+      setError(t('phrase.neededToOrder'));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     if (!force && !duplicateOk && unpaid.length > 0) {
       setDuplicateWarning(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -195,6 +204,7 @@ export function CartPage(): React.JSX.Element {
       setBusy(false);
     }
   }, [
+    phrase,
     navigate,
     to,
     refresh,
@@ -260,6 +270,7 @@ export function CartPage(): React.JSX.Element {
 
   return (
     <List>
+      {phrase === null && <SecurityPhraseSetup required onSaved={() => setError(null)} />}
       {duplicateWarning && firstUnpaid && (
         <Section header={t('cart.duplicateTitle')}>
           <Cell multiline>

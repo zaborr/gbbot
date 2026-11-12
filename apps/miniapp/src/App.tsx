@@ -54,6 +54,7 @@ import { PlatformNoticesPage } from './pages/platform/PlatformNoticesPage.js';
 import { PlatformBotsPage } from './pages/platform/PlatformBotsPage.js';
 import { PlatformCreatorAccountPage } from './pages/platform/PlatformCreatorAccountPage.js';
 import { PlatformBotSettingsPage } from './pages/platform/PlatformBotSettingsPage.js';
+import { SecurityPhrasePage } from './pages/SecurityPhrasePage.js';
 import { WebAccessPage } from './pages/WebAccessPage.js';
 import { WebPasswordPage } from './pages/WebPasswordPage.js';
 import {
@@ -112,6 +113,7 @@ function Shell(): React.JSX.Element {
       <Route path="/platform/notices" element={<PlatformNoticesPage />} />
       <Route path="/platform/blacklist" element={<PlatformBlacklistPage />} />
       <Route path="/web-access" element={<WebAccessPage />} />
+      <Route path="/security-phrase" element={<SecurityPhrasePage />} />
       <Route path="/web-password" element={<WebPasswordPage />} />
       <Route path="/platform/web-accounts" element={<PlatformWebAccountsPage />} />
       <Route path="/platform/web-accounts/:id" element={<PlatformWebAccountPage />} />

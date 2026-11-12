@@ -214,6 +214,11 @@ export const users = pgTable('users', {
   lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
   /** Closed the "how it works" sheet (kept here so it shows once on every device). */
   howToSeen: boolean('how_to_seen').notNull().default(false),
+  /**
+   * Their security phrase (encrypted): the official bot shows it in the app
+   * and when paying, so a fake bot is told apart. Needed before ordering.
+   */
+  securityPhrase: text('security_phrase'),
 });
 
 export const carts = pgTable(

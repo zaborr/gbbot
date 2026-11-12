@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
   createWebAccessRequest,
+  securityPhraseRequest,
   updateLanguageRequest,
   type WebAccessStatus,
   type WebCredentials,
@@ -15,6 +16,7 @@ import { toSessionUserDTO } from '../db/mappers.js';
 import { eq } from 'drizzle-orm';
 import { users } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
+import { open, seal, secretKey } from '../lib/secretBox.js';
 import { tr, type BotMessageKey } from '../i18n/messages.js';
 import { describeUser, managesSomething } from '../services/team.js';
 import { notifyPlatform } from '../services/webNotices.js';
@@ -35,6 +37,22 @@ export function meRoutes(): Hono<AppBindings> {
     const { sub, role } = c.get('claims');
     const row = await setPreferredLanguage(c.get('db'), sub, c.req.valid('json').language);
     return c.json(toSessionUserDTO(row, role));
+  });
+
+  // Security phrase: only its owner reads it (shown in the app and when paying).
+  app.get('/security-phrase', async (c) => {
+    const row = await c.get('db').query.users.findFirst({ where: eq(users.telegramId, c.get('claims').sub) });
+    const phrase = row?.securityPhrase ? open(secretKey(c.get('env')), row.securityPhrase) : null;
+    return c.json({ phrase });
+  });
+  app.put('/security-phrase', zValidator('json', securityPhraseRequest), async (c) => {
+    const { phrase } = c.req.valid('json');
+    await c
+      .get('db')
+      .update(users)
+      .set({ securityPhrase: seal(secretKey(c.get('env')), phrase) })
+      .where(eq(users.telegramId, c.get('claims').sub));
+    return c.json({ phrase });
   });
 
   // Closed "how it works": not shown again on any device.
