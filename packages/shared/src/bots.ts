@@ -164,3 +164,8 @@ export const updateBotSettingsRequest = z.object({
   dmAdmins: z.boolean(),
 });
 export type UpdateBotSettingsRequest = z.infer<typeof updateBotSettingsRequest>;
+
+/** The customer's security phrase: the official bot shows it, a fake one cannot. */
+export const securityPhraseRequest = z.object({
+  phrase: z.string().trim().min(3, 'At least 3 characters').max(40, 'At most 40 characters'),
+});

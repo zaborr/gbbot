@@ -244,6 +244,14 @@ export class ApiClient {
     });
   }
 
+  getSecurityPhrase(): Promise<{ phrase: string | null }> {
+    return this.request<{ phrase: string | null }>('/me/security-phrase');
+  }
+
+  setSecurityPhrase(phrase: string): Promise<{ phrase: string }> {
+    return this.request<{ phrase: string }>('/me/security-phrase', { method: 'PUT', body: JSON.stringify({ phrase }) });
+  }
+
   /** Closed "how it works": not shown again on any device. */
   markHowToSeen(): Promise<{ ok: boolean }> {
     return this.request<{ ok: boolean }>('/me/how-to-seen', { method: 'POST' });

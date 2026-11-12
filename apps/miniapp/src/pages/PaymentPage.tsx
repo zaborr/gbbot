@@ -28,6 +28,7 @@ import { ErrorView } from '../components/ErrorView.js';
 import { useShopPath } from '../providers/ShopProvider.js';
 import { TrackingText } from '../components/TrackingText.js';
 import { locale, t } from '../i18n/index.js';
+import { SecurityPhraseBadge } from '../components/SecurityPhrase.js';
 import { OrderStatusChip, OrderTracker } from '../components/OrderStatus.js';
 
 const breakAll: React.CSSProperties = { wordBreak: 'break-all', whiteSpace: 'normal' };
@@ -99,6 +100,8 @@ export function PaymentPage(): React.JSX.Element {
     <List>
       {done && <DoneSection kind={done} onShop={() => navigate(to('/'))} onOrders={() => navigate(to('/orders'))} />}
 
+      {/* The official bot shows the customer's phrase: a fake one cannot. */}
+      <SecurityPhraseBadge paying />
       {/* Where the order is, at a glance. */}
       <OrderTracker order={current} />
       <Section

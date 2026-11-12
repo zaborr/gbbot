@@ -7,6 +7,7 @@ import { useAsync } from '../hooks/useAsync.js';
 import { shopPath } from '../providers/ShopProvider.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
+import { SecurityPhraseBadge } from '../components/SecurityPhrase.js';
 import { t, tn } from '../i18n/index.js';
 import { LanguagePicker } from '../components/LanguagePicker.js';
 import { isWebMode } from '../lib/web.js';
@@ -86,6 +87,7 @@ export function ShopsPage(): React.JSX.Element {
             </Title>
             <span className="gb-hint">{t('shops.pickHint')}</span>
           </div>
+          <SecurityPhraseBadge />
           {!isWebMode() && result.data?.showHowTo && <HowItWorks />}
           {/* Something to do first: orders still to pay. */}
           {shops
@@ -131,6 +133,12 @@ export function ShopsPage(): React.JSX.Element {
           <Cell onClick={() => navigate('/web-password')}>{t('webPassword.title')}</Cell>
         </Section>
       )}
+
+      <Section>
+        <Cell onClick={() => navigate('/security-phrase')} subtitle={t('phrase.menuHint')}>
+          {t('phrase.menu')}
+        </Cell>
+      </Section>
 
       {result.data?.canUseWeb && !isWebMode() && (
         <Section>

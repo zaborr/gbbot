@@ -31,6 +31,8 @@ import { EVM_TX_RE } from '../chain/evm.js';
 import { SOLANA_SIGNATURE_RE } from '../chain/solana.js';
 import { paymentMethodLabel } from '../config/payment-methods.js';
 import { notifyShopTeam } from '../services/webNotices.js';
+import { eq } from 'drizzle-orm';
+import { users } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 import { assertOpen } from '../services/closing.js';
 import { joinTestingWithOrder } from '../services/testing.js';
@@ -45,6 +47,11 @@ export function orderRoutes(): Hono<AppBindings> {
     const { sub } = c.get('claims');
     const { contactUsername, shippingZoneId, encryptedAddress } = c.req.valid('json');
     assertOpen(c.get('shop'));
+    // A security phrase first: it is how the customer tells the official bot from a fake one.
+    const customer = await c.get('db').query.users.findFirst({ where: eq(users.telegramId, sub) });
+    if (!customer?.securityPhrase) {
+      throw ApiError.conflict('security_phrase', 'Choose your security phrase before ordering');
+    }
     const order = await createOrderFromCart(
       c.get('db'),
       c.get('shopId'),

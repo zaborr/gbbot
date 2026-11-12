@@ -7,7 +7,7 @@ import { base32Decode, createWebAdmin, removeWebAdmin, resetWebAdmin, totpCode }
 import { addWebNotice } from '../services/webNotices.js';
 import type { Env } from '../config/env.js';
 import { createDb, createPool, type Database } from '../db/client.js';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import {
   cartItems,
   carts,
@@ -150,7 +150,12 @@ describeDb('API integration', () => {
     return app.request(path, { ...init, headers });
   }
 
-  async function authToken(userId: number, name: string, username?: string): Promise<string> {
+  async function authToken(
+    userId: number,
+    name: string,
+    username?: string,
+    { withPhrase = true }: { withPhrase?: boolean } = {},
+  ): Promise<string> {
     const res = await request('/api/auth', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -158,6 +163,13 @@ describeDb('API integration', () => {
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { token: string };
+    // Ordering needs a security phrase: test users have one unless a test says otherwise.
+    if (withPhrase) {
+      await db
+        .update(users)
+        .set({ securityPhrase: seal(secretKey(testEnv), 'test phrase') })
+        .where(and(eq(users.telegramId, userId), isNull(users.securityPhrase)));
+    }
     return body.token;
   }
 
@@ -1625,6 +1637,39 @@ describeDb('API integration', () => {
       await db.delete(creatorAccounts);
       await db.delete(botSettings);
     }
+  });
+
+  it('asks for a security phrase before the first order, and keeps it encrypted', async () => {
+    const userId = 555000999;
+    const headers = {
+      Authorization: `Bearer ${await authToken(userId, 'Phrase', undefined, { withPhrase: false })}`,
+      'content-type': 'application/json',
+    };
+    await db.update(users).set({ securityPhrase: null }).where(eq(users.telegramId, userId));
+    await db.delete(carts).where(eq(carts.userId, userId));
+    await request('/api/cart/items', { method: 'POST', headers, body: JSON.stringify({ productId, quantity: 1 }) });
+    const place = () =>
+      request('/api/orders', { method: 'POST', headers, body: JSON.stringify({ contactUsername: '@phrase_test' }) });
+
+    const refused = await place();
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ error: { code: 'security_phrase' } });
+    expect(await (await request('/api/me/security-phrase', { headers })).json()).toEqual({ phrase: null });
+
+    expect(
+      (await request('/api/me/security-phrase', { method: 'PUT', headers, body: JSON.stringify({ phrase: 'ab' }) })).status,
+    ).toBe(400);
+    await request('/api/me/security-phrase', { method: 'PUT', headers, body: JSON.stringify({ phrase: ' gato azul 🐱 ' }) });
+    expect(await (await request('/api/me/security-phrase', { headers })).json()).toEqual({ phrase: 'gato azul 🐱' });
+    const [row] = await db.select().from(users).where(eq(users.telegramId, userId));
+    expect(row?.securityPhrase).not.toContain('gato');
+
+    const placed = await place();
+    expect(placed.status).toBe(201);
+    const { orderId } = (await placed.json()) as { orderId: string };
+    await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
+    await db.delete(orders).where(eq(orders.id, orderId));
+    await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
   });
 
   it('lets administrators set the GB currency', async () => {
