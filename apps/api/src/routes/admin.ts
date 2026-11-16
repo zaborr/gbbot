@@ -749,11 +749,12 @@ export function adminRoutes(): Hono<AppBindings> {
           tr(lang, 'order.reduced', { ref: tr(lang, 'order.ref', { shop: shop.name, id: order.id.slice(0, 8) }) }),
           ...removed.map((r) => `• −${r.quantity} × ${r.name}`),
           tr(lang, 'order.reducedReason', { reason }),
-          order.amountPaid > 0
-            ? order.amountDue < 0
-              ? tr(lang, 'order.reducedRefund', { amount: money(-order.amountDue) })
-              : tr(lang, 'order.reducedTotal', { total: money(order.total) })
-            : tr(lang, 'order.reducedToPay', { total: money(order.total) }),
+          // Paid more than it now costs: refund. Still something to pay: how much. Otherwise the new total.
+          order.amountDue < 0
+            ? tr(lang, 'order.reducedRefund', { amount: money(-order.amountDue) })
+            : order.amountDue > 0
+              ? tr(lang, 'order.reducedToPay', { total: money(order.amountDue) })
+              : tr(lang, 'order.reducedTotal', { total: money(order.total) }),
         ].join('\n'),
       );
       return c.json(order);

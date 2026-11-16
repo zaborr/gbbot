@@ -517,11 +517,11 @@ function ShipForm({
   const [carrier, setCarrier] = useState(order.carrier ?? '');
   const [tracking, setTracking] = useState(order.trackingNumber ?? '');
   const suggested = carriers.data ?? [];
-  // The last carrier used, ready, when the order has none yet.
+  // The last carrier used, ready, when shipping (not when correcting an older shipment).
   const last = suggested[0];
   useEffect(() => {
-    if (!order.carrier && last) setCarrier((current) => current || last);
-  }, [order.carrier, last]);
+    if (order.status === 'paid' && !order.carrier && last) setCarrier((current) => current || last);
+  }, [order.status, order.carrier, last]);
   return (
     <div className="gb-ship-form">
       <Input
