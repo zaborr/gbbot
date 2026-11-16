@@ -561,6 +561,14 @@ function ShipForm({
           {confirmLabel}
         </Button>
         <Button stretched mode="plain" onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Taking products out of an order (sold out…), or lowering quantities: only
  * down, with a reason the customer gets. What is left keeps its price.
  */

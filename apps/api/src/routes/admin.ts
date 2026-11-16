@@ -728,6 +728,12 @@ export function adminRoutes(): Hono<AppBindings> {
         [
           tr(lang, 'status.shipmentUpdated', { ref: tr(lang, 'order.ref', { shop: shop.name, id: order.id.slice(0, 8) }) }),
           shipmentLine(lang, order),
+        ].join('\n'),
+      );
+      return c.json(order);
+    },
+  );
+
   // The organiser takes products out (sold out…): applied at once, the customer is told why.
   app.post(
     '/orders/:id/reduce',

@@ -1097,6 +1097,8 @@ export class ApiClient {
   /** Carriers already used in this GB, the most recent first. */
   adminCarriers(): Promise<string[]> {
     return this.request<string[]>('/admin/carriers');
+  }
+
   /** Takes products out of an order or lowers quantities (only down); the customer is told why. */
   adminReduceOrder(
     orderId: string,

@@ -1136,6 +1136,9 @@ export async function recentCarriers(db: Database, shopId: string): Promise<stri
     .orderBy(sql`max(${orders.updatedAt}) desc`)
     .limit(8);
   return rows.flatMap((r) => (r.carrier ? [r.carrier] : []));
+}
+
+/**
  * The organiser takes products out of an order or lowers quantities (sold
  * out, for instance). Only down: what is left keeps the price paid, fee and
  * shipping stay, stock held by the order goes back, testings of products no
