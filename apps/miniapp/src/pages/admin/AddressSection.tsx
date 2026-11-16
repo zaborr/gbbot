@@ -5,7 +5,7 @@ import type { DeliveryAddress, Order } from '@tma-shop/shared';
 import { copyText } from '../../lib/clipboard.js';
 import { decryptAddress, loadPrivateKey } from '../../lib/addressCrypto.js';
 import { useShop } from '../../providers/ShopProvider.js';
-import { t } from '../../i18n/index.js';
+import { t, type MessageKey } from '../../i18n/index.js';
 
 type State =
   | { kind: 'loading' }
@@ -31,7 +31,7 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
   const { shop, to } = useShop();
   const navigate = useNavigate();
   const [state, setState] = useState<State>({ kind: 'loading' });
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,27 +107,45 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
         </Section>
       );
     case 'ok': {
-      const lines = addressLines(state.address);
+      const a = state.address;
+      const lines = addressLines(a);
+      const all = [...lines, a.notes ? t('addressSection.notes', { notes: a.notes }) : ''].filter(Boolean).join('\n');
+      // Each piece on its own (courier forms ask for them one by one), then everything.
+      const every: Array<{ key: string; label: MessageKey; value: string }> = [
+        { key: 'name', label: 'addressSection.name', value: a.name },
+        { key: 'line1', label: 'addressSection.line1', value: a.line1 },
+        { key: 'line2', label: 'addressSection.line2', value: a.line2 },
+        { key: 'postalCode', label: 'addressSection.postalCode', value: a.postalCode },
+        { key: 'city', label: 'addressSection.city', value: a.city },
+        { key: 'region', label: 'addressSection.region', value: a.region },
+        { key: 'country', label: 'addressSection.country', value: a.country },
+        { key: 'phone', label: 'addressSection.phone', value: a.phone },
+        { key: 'email', label: 'addressSection.email', value: a.email ?? '' },
+        { key: 'notes', label: 'addressSection.notesLabel', value: a.notes },
+      ];
+      const fields = every.filter((field) => field.value.trim() !== '');
+      const copy = (key: string, text: string): void => {
+        void copyText(text).then((ok) => setCopied(ok ? key : null));
+      };
       return (
-        <Section header={header} footer={state.address.notes ? t('addressSection.notes', { notes: state.address.notes }) : undefined}>
-          {lines.map((line, i) => (
-            <Cell key={i} multiline>
-              {line}
+        <Section header={header}>
+          {fields.map((field) => (
+            <Cell
+              key={field.key}
+              multiline
+              subtitle={t(field.label)}
+              after={
+                <Button size="s" mode="plain" onClick={() => copy(field.key, field.value.trim())}>
+                  {copied === field.key ? '✅' : t('addressSection.copyOne')}
+                </Button>
+              }
+            >
+              <span className="gb-address-value">{field.value}</span>
             </Cell>
           ))}
           <div style={{ padding: 16 }}>
-            <Button
-              size="s"
-              mode="bezeled"
-              onClick={() =>
-                void copyText(
-                  [...lines, state.address.notes ? t('addressSection.notes', { notes: state.address.notes }) : '']
-                    .filter(Boolean)
-                    .join('\n'),
-                ).then(setCopied)
-              }
-            >
-              {copied ? t('addressSection.copied') : t('addressSection.copy')}
+            <Button size="s" mode="bezeled" onClick={() => copy('all', all)}>
+              {copied === 'all' ? t('addressSection.copied') : t('addressSection.copy')}
             </Button>
           </div>
         </Section>
