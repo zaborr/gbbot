@@ -296,6 +296,7 @@ function ActionsSection({
   const [note, setNote] = useState('');
   const [shipping, setShipping] = useState(false);
   const next = ADMIN_STATUS_CHANGES[order.status];
+  const [reducing, setReducing] = useState(false);
 
   /** Changes the status; the bot tells the customer, with the note if there is one. */
   const setStatus = async (
@@ -408,6 +409,14 @@ function ActionsSection({
             {tapLabel(`refund:${id}`, t('actions.markRefunded', { amount: money(-order.amountDue) }))}
           </Button>
         )}
+        {(order.status === 'pending' || order.status === 'paid') &&
+          (reducing ? (
+            <ReduceForm order={order} actions={actions} onClose={() => setReducing(false)} />
+          ) : (
+            <Button stretched mode="bezeled" onClick={() => setReducing(true)}>
+              {t('reduce.open')}
+            </Button>
+          ))}
         {next.includes('cancelled') && (
           <Button
             stretched
@@ -508,11 +517,11 @@ function ShipForm({
   const [carrier, setCarrier] = useState(order.carrier ?? '');
   const [tracking, setTracking] = useState(order.trackingNumber ?? '');
   const suggested = carriers.data ?? [];
-  // The last carrier used, ready, when the order has none yet.
+  // The last carrier used, ready, when shipping (not when correcting an older shipment).
   const last = suggested[0];
   useEffect(() => {
-    if (!order.carrier && last) setCarrier((current) => current || last);
-  }, [order.carrier, last]);
+    if (order.status === 'paid' && !order.carrier && last) setCarrier((current) => current || last);
+  }, [order.status, order.carrier, last]);
   return (
     <div className="gb-ship-form">
       <Input
@@ -552,6 +561,102 @@ function ShipForm({
           {confirmLabel}
         </Button>
         <Button stretched mode="plain" onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Taking products out of an order (sold out…), or lowering quantities: only
+ * down, with a reason the customer gets. What is left keeps its price.
+ */
+function ReduceForm({
+  order,
+  actions,
+  onClose,
+}: {
+  order: Order;
+  actions: AdminActions;
+  onClose: () => void;
+}): React.JSX.Element {
+  const [quantities, setQuantities] = useState<Record<string, number>>(() =>
+    Object.fromEntries(order.items.map((item) => [itemKey(item), item.quantity])),
+  );
+  const [reason, setReason] = useState('');
+  const money = (amount: number): string => formatPrice(amount, order.currency);
+  const quantity = (item: Order['items'][number]): number => quantities[itemKey(item)] ?? item.quantity;
+  const removedValue = order.items.reduce((sum, item) => sum + (item.quantity - quantity(item)) * item.unitPrice, 0);
+  const left = order.items.some((item) => quantity(item) > 0);
+  const newTotal = order.total - removedValue;
+  const refund = order.amountPaid - newTotal;
+  const set = (item: Order['items'][number], value: number): void =>
+    setQuantities({ ...quantities, [itemKey(item)]: Math.max(0, Math.min(item.quantity, value)) });
+
+  return (
+    <div className="gb-reduce-form">
+      {order.items.map((item) => {
+        const value = quantity(item);
+        return (
+          <Cell
+            key={itemKey(item)}
+            multiline
+            subtitle={value < item.quantity ? t('reduce.was', { quantity: item.quantity }) : money(item.unitPrice)}
+            after={
+              <div className="gb-reduce-stepper">
+                <Button size="s" mode="bezeled" disabled={value === 0} onClick={() => set(item, value - 1)}>
+                  −
+                </Button>
+                <span className={value < item.quantity ? 'gb-reduce-changed' : undefined}>{value}</span>
+                <Button size="s" mode="bezeled" disabled={value === item.quantity} onClick={() => set(item, value + 1)}>
+                  +
+                </Button>
+              </div>
+            }
+          >
+            <span style={{ textDecoration: value === 0 ? 'line-through' : undefined }}>{itemName(item)}</span>
+          </Cell>
+        );
+      })}
+      <Textarea
+        header={t('reduce.reason')}
+        placeholder={t('reduce.reasonPlaceholder')}
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+      />
+      {removedValue > 0 && (
+        <Cell multiline>
+          {!left
+            ? t('reduce.nothingLeft')
+            : order.amountPaid > 0 && refund > 0
+              ? t('reduce.previewRefund', { total: money(newTotal), refund: money(refund) })
+              : t('reduce.previewTotal', { total: money(newTotal) })}
+        </Cell>
+      )}
+      <div className="gb-reduce-buttons">
+        <Button
+          stretched
+          mode="filled"
+          disabled={removedValue === 0 || !left || reason.trim() === ''}
+          onClick={() =>
+            void actions.twoTap(`reduce:${order.id}`, async () => {
+              await api.adminReduceOrder(
+                order.id,
+                order.items.map((item) => ({
+                  productId: item.productId,
+                  variantId: item.variantId,
+                  quantity: quantity(item),
+                })),
+                reason.trim(),
+              );
+              onClose();
+            })
+          }
+        >
+          {actions.tapLabel(`reduce:${order.id}`, t('reduce.apply'))}
+        </Button>
+        <Button stretched mode="plain" onClick={onClose}>
           {t('common.cancel')}
         </Button>
       </div>

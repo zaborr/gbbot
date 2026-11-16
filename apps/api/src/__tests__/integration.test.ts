@@ -1672,6 +1672,47 @@ describeDb('API integration', () => {
     await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
   });
 
+  it('lets the organiser take products out of a paid order: the difference is owed back', async () => {
+    const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`, 'content-type': 'application/json' };
+    const auth = { Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}`, 'content-type': 'application/json' };
+    await db.delete(carts).where(eq(carts.userId, CUSTOMER_ID));
+    await request('/api/cart/items', { method: 'POST', headers: auth, body: JSON.stringify({ productId, quantity: 2 }) });
+    const placed = await request('/api/orders', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ contactUsername: '@alice_test' }),
+    });
+    const { orderId } = (await placed.json()) as { orderId: string };
+    await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+    const [before] = await db.select().from(orders).where(eq(orders.id, orderId));
+    const [item] = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+    const [productBefore] = await db.select().from(products).where(eq(products.id, productId));
+    const reduce = (quantity: number, reason = 'Sold out') =>
+      request(`/api/admin/orders/${orderId}/reduce`, {
+        method: 'POST',
+        headers: admin,
+        body: JSON.stringify({ lines: [{ productId, variantId: null, quantity }], reason }),
+      });
+
+    expect((await reduce(3)).status).toBe(400); // never up
+    expect((await reduce(0)).status).toBe(400); // nothing left: cancel instead
+    const res = await reduce(1);
+    expect(res.status).toBe(200);
+    const order = (await res.json()) as { total: number; amountDue: number; status: string; items: Array<{ quantity: number }> };
+    expect(order.status).toBe('paid');
+    expect(order.items[0]?.quantity).toBe(1);
+    expect(order.total).toBe(before!.total - item!.unitPrice);
+    expect(order.amountDue).toBe(-item!.unitPrice);
+    const [productAfter] = await db.select().from(products).where(eq(products.id, productId));
+    if (productBefore?.stock !== null && productBefore?.stock !== undefined) {
+      expect(productAfter?.stock).toBe(productBefore.stock + 1);
+    }
+
+    await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
+    await db.delete(orders).where(eq(orders.id, orderId));
+    await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
+  });
+
   it('lets administrators set the GB currency', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,

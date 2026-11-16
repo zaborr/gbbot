@@ -664,12 +664,45 @@ button.gb-banner {
   flex-direction: column;
   gap: 8px;
   padding: 8px 16px 12px;
+}
+
 /* Address fields in an order: long values (emails, streets) wrap instead of overflowing. */
 .gb-address-value {
   overflow-wrap: anywhere;
   user-select: text;
+}
+
 /* Export: custom days, side by side when there is room. */
 .gb-export-days {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+/* Taking products out of an order: each line with − / + (only down), then the reason. */
+.gb-reduce-form {
+  display: flex;
+  flex-direction: column;
+  margin: 0 -16px;
+  border-top: 1px solid var(--tgui--divider, rgba(0, 0, 0, 0.08));
+  border-bottom: 1px solid var(--tgui--divider, rgba(0, 0, 0, 0.08));
+}
+.gb-reduce-stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gb-reduce-stepper > span {
+  min-width: 24px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.gb-reduce-changed {
+  font-weight: 700;
+  color: var(--tgui--destructive_text_color, #e53935);
+}
+.gb-reduce-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 16px 12px;
 }

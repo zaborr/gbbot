@@ -158,6 +158,24 @@ export const updateShipmentRequest = z.object({
   carrier: z.string().trim().max(60),
   trackingNumber: z.string().trim().max(200),
 });
+/**
+ * The organiser takes products out of an order (or lowers quantities), e.g.
+ * sold out. Only down: what is left keeps the price paid.
+ */
+export const reduceOrderRequest = z.object({
+  lines: z
+    .array(
+      z.object({
+        productId: z.uuid(),
+        variantId: z.uuid().nullable(),
+        quantity: z.number().int().min(0),
+      }),
+    )
+    .min(1),
+  /** Why (told to the customer). */
+  reason: z.string().trim().min(1).max(300),
+});
+export type ReduceOrderRequest = z.infer<typeof reduceOrderRequest>;
 
 /** Which orders an export includes. */
 export const exportScope = z.enum([

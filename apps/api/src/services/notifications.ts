@@ -5,7 +5,7 @@ import { users } from '../db/schema.js';
 import { tr } from '../i18n/messages.js';
 import { TelegramApi } from '../telegram/api.js';
 
-function money(amount: number, currency: string): string {
+export function money(amount: number, currency: string): string {
   return `${(amount / 100).toFixed(2)} ${currency}`;
 }
 
