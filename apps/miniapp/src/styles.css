@@ -660,6 +660,29 @@ button.gb-banner {
   font-size: 13px;
 }
 .gb-ship-form-buttons {
+/* Taking products out of an order: each line with − / + (only down), then the reason. */
+.gb-reduce-form {
+  display: flex;
+  flex-direction: column;
+  margin: 0 -16px;
+  border-top: 1px solid var(--tgui--divider, rgba(0, 0, 0, 0.08));
+  border-bottom: 1px solid var(--tgui--divider, rgba(0, 0, 0, 0.08));
+}
+.gb-reduce-stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gb-reduce-stepper > span {
+  min-width: 24px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.gb-reduce-changed {
+  font-weight: 700;
+  color: var(--tgui--destructive_text_color, #e53935);
+}
+.gb-reduce-buttons {
   display: flex;
   flex-direction: column;
   gap: 8px;

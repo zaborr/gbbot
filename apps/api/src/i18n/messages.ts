@@ -177,6 +177,11 @@ const en = {
   'bots.channelNotice': '🔄 New official bot: {bot}',
   'status.carrier': 'Carrier: {carrier}',
   'status.shipmentUpdated': '📦 The shipping details of your order {ref} have been updated:',
+  'order.reduced': '✏️ The organiser has changed your order {ref}:',
+  'order.reducedReason': 'Reason: {reason}',
+  'order.reducedRefund': 'You will get {amount} back.',
+  'order.reducedTotal': 'New total: {total}.',
+  'order.reducedToPay': 'New total to pay: {total}.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -346,6 +351,11 @@ const es: Record<BotMessageKey, string> = {
   'bots.channelNotice': '🔄 Nuevo bot oficial: {bot}',
   'status.carrier': 'Transportista: {carrier}',
   'status.shipmentUpdated': '📦 Se han actualizado los datos de envío de tu pedido {ref}:',
+  'order.reduced': '✏️ El organizador ha cambiado tu pedido {ref}:',
+  'order.reducedReason': 'Motivo: {reason}',
+  'order.reducedRefund': 'Se te devolverán {amount}.',
+  'order.reducedTotal': 'Nuevo total: {total}.',
+  'order.reducedToPay': 'Nuevo total a pagar: {total}.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -513,6 +523,11 @@ const it: Record<BotMessageKey, string> = {
   'bots.channelNotice': '🔄 Nuovo bot ufficiale: {bot}',
   'status.carrier': 'Corriere: {carrier}',
   'status.shipmentUpdated': '📦 I dati di spedizione del tuo ordine {ref} sono stati aggiornati:',
+  'order.reduced': '✏️ L\'organizzatore ha modificato il tuo ordine {ref}:',
+  'order.reducedReason': 'Motivo: {reason}',
+  'order.reducedRefund': 'Ti verranno restituiti {amount}.',
+  'order.reducedTotal': 'Nuovo totale: {total}.',
+  'order.reducedToPay': 'Nuovo totale da pagare: {total}.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -680,6 +695,11 @@ const pt: Record<BotMessageKey, string> = {
   'bots.channelNotice': '🔄 Novo bot oficial: {bot}',
   'status.carrier': 'Transportadora: {carrier}',
   'status.shipmentUpdated': '📦 Os dados de envio da sua encomenda {ref} foram atualizados:',
+  'order.reduced': '✏️ O organizador alterou a sua encomenda {ref}:',
+  'order.reducedReason': 'Motivo: {reason}',
+  'order.reducedRefund': 'Ser-lhe-ão devolvidos {amount}.',
+  'order.reducedTotal': 'Novo total: {total}.',
+  'order.reducedToPay': 'Novo total a pagar: {total}.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

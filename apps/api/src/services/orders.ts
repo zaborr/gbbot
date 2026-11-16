@@ -1136,4 +1136,83 @@ export async function recentCarriers(db: Database, shopId: string): Promise<stri
     .orderBy(sql`max(${orders.updatedAt}) desc`)
     .limit(8);
   return rows.flatMap((r) => (r.carrier ? [r.carrier] : []));
+ * The organiser takes products out of an order or lowers quantities (sold
+ * out, for instance). Only down: what is left keeps the price paid, fee and
+ * shipping stay, stock held by the order goes back, testings of products no
+ * longer in it drop out. A paid order stays paid with the difference to
+ * refund; an unpaid one simply costs less. No customer approval: the
+ * customer is told, with the reason.
+ */
+export async function reduceOrder(
+  db: Database,
+  shopId: string,
+  orderId: string,
+  lines: Array<{ productId: string; variantId: string | null; quantity: number }>,
+  reason: string,
+): Promise<{ order: Order; removed: Array<{ name: string; quantity: number }> }> {
+  return db.transaction(async (tx) => {
+    const order = await lockOrder(tx, and(eq(orders.shopId, shopId), eq(orders.id, orderId)));
+    if (!order) throw ApiError.notFound('Order not found');
+    if (order.status === 'awaiting_payment') {
+      throw ApiError.conflict('verify_first', 'Confirm or reject the payment being verified first');
+    }
+    if (order.status !== 'pending' && order.status !== 'paid') {
+      throw ApiError.conflict('not_changeable', 'Only orders not shipped yet can be changed');
+    }
+    const current = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+    const wanted = new Map(lines.map((l) => [lineKey(l.productId, l.variantId), l.quantity]));
+    const removed: Array<{ name: string; quantity: number }> = [];
+    const kept: OrderItemRow[] = [];
+    const back: OrderItemRow[] = [];
+    for (const item of current) {
+      const quantity = wanted.get(lineKey(item.productId, item.variantId)) ?? item.quantity;
+      if (quantity > item.quantity) {
+        throw ApiError.badRequest('only_less', 'Products can only be removed or reduced');
+      }
+      const name = item.variantLabel ? `${item.title} (${item.variantLabel})` : item.title;
+      if (quantity < item.quantity) {
+        removed.push({ name, quantity: item.quantity - quantity });
+        back.push({ ...item, quantity: item.quantity - quantity });
+      }
+      if (quantity > 0) kept.push({ ...item, quantity, subtotal: item.unitPrice * quantity });
+    }
+    for (const key of wanted.keys()) {
+      if (!current.some((i) => lineKey(i.productId, i.variantId) === key)) {
+        throw ApiError.badRequest('only_less', 'Products can only be removed or reduced');
+      }
+    }
+    if (removed.length === 0) throw ApiError.badRequest('no_changes', 'The order is unchanged');
+    if (kept.length === 0) {
+      throw ApiError.badRequest('cancel_instead', 'Nothing would be left: cancel the order instead');
+    }
+    // What the order held goes back to stock.
+    if (order.stockApplied) await restoreStock(tx, back);
+
+    await tx.delete(orderItems).where(eq(orderItems.orderId, order.id));
+    const inserted = await tx
+      .insert(orderItems)
+      .values(
+        kept.map((item) => ({
+          orderId: order.id,
+          productId: item.productId,
+          variantId: item.variantId,
+          variantLabel: item.variantLabel,
+          title: item.title,
+          titleEn: item.titleEn,
+          unitPrice: item.unitPrice,
+          quantity: item.quantity,
+          subtotal: item.subtotal,
+        })),
+      )
+      .returning();
+    const testing = await testingAfterChange(tx, order.id, linesOf(kept), true);
+    const total = kept.reduce((sum, i) => sum + i.subtotal, 0) + order.fee + order.shipping + testing;
+    const [updated] = await tx
+      .update(orders)
+      .set({ total, testing, changeRequest: null, statusNote: reason, updatedAt: new Date() })
+      .where(eq(orders.id, order.id))
+      .returning();
+    if (!updated) throw new Error('Failed to update order');
+    return { order: toOrderDTO(updated, inserted), removed };
+  });
 }

@@ -20,6 +20,7 @@ import {
   updateOrderFeeRequest,
   updateOrderStatusRequest,
   updateShipmentRequest,
+  reduceOrderRequest,
   updateShippingRequest,
   updateCheckoutFieldsRequest,
   updatePaymentSetupRequest,
@@ -57,6 +58,7 @@ import {
   changeOrderStatus,
   recentCarriers,
   updateShipment,
+  reduceOrder,
   clearOrderChange,
   deleteOrder,
   getOrder,
@@ -67,6 +69,7 @@ import {
   buildChangeDecisionMessage,
   buildStatusMessage,
   shipmentLine,
+  money as formatMoney,
   notifyUsers,
 } from '../services/notifications.js';
 import {
@@ -725,6 +728,26 @@ export function adminRoutes(): Hono<AppBindings> {
         [
           tr(lang, 'status.shipmentUpdated', { ref: tr(lang, 'order.ref', { shop: shop.name, id: order.id.slice(0, 8) }) }),
           shipmentLine(lang, order),
+  // The organiser takes products out (sold out…): applied at once, the customer is told why.
+  app.post(
+    '/orders/:id/reduce',
+    zValidator('param', idParam),
+    zValidator('json', reduceOrderRequest),
+    async (c) => {
+      const shop = c.get('shop');
+      const { lines, reason } = c.req.valid('json');
+      const { order, removed } = await reduceOrder(c.get('db'), shop.id, c.req.valid('param').id, lines, reason);
+      const money = (amount: number): string => formatMoney(amount, order.currency);
+      await notifyUsers(c.get('db'), botToken(c.get('env')), await customerChat(c, order), (lang) =>
+        [
+          tr(lang, 'order.reduced', { ref: tr(lang, 'order.ref', { shop: shop.name, id: order.id.slice(0, 8) }) }),
+          ...removed.map((r) => `• −${r.quantity} × ${r.name}`),
+          tr(lang, 'order.reducedReason', { reason }),
+          order.amountPaid > 0
+            ? order.amountDue < 0
+              ? tr(lang, 'order.reducedRefund', { amount: money(-order.amountDue) })
+              : tr(lang, 'order.reducedTotal', { total: money(order.total) })
+            : tr(lang, 'order.reducedToPay', { total: money(order.total) }),
         ].join('\n'),
       );
       return c.json(order);

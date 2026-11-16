@@ -1097,6 +1097,16 @@ export class ApiClient {
   /** Carriers already used in this GB, the most recent first. */
   adminCarriers(): Promise<string[]> {
     return this.request<string[]>('/admin/carriers');
+  /** Takes products out of an order or lowers quantities (only down); the customer is told why. */
+  adminReduceOrder(
+    orderId: string,
+    lines: Array<{ productId: string; variantId: string | null; quantity: number }>,
+    reason: string,
+  ): Promise<Order> {
+    return this.request<Order>(`/admin/orders/${orderId}/reduce`, {
+      method: 'POST',
+      body: JSON.stringify({ lines, reason }),
+    });
   }
 
   /** Deletes a product, or archives it when it already appears in an order. */
