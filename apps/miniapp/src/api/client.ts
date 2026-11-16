@@ -1081,12 +1081,22 @@ export class ApiClient {
   adminSetOrderStatus(
     orderId: string,
     status: Order['status'],
-    extra: { note?: string; trackingNumber?: string; force?: boolean } = {},
+    extra: { note?: string; trackingNumber?: string; carrier?: string; force?: boolean } = {},
   ): Promise<Order> {
     return this.request<Order>(`/admin/orders/${orderId}`, {
       method: 'PATCH',
       body: JSON.stringify({ status, ...extra }),
     });
+  }
+
+  /** Corrects the carrier or tracking of a shipped order (the customer is told). */
+  adminUpdateShipment(orderId: string, shipment: { carrier: string; trackingNumber: string }): Promise<Order> {
+    return this.request<Order>(`/admin/orders/${orderId}/shipment`, { method: 'PATCH', body: JSON.stringify(shipment) });
+  }
+
+  /** Carriers already used in this GB, the most recent first. */
+  adminCarriers(): Promise<string[]> {
+    return this.request<string[]>('/admin/carriers');
   }
 
   /** Deletes a product, or archives it when it already appears in an order. */

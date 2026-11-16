@@ -22,6 +22,7 @@ const base: Order = {
   paymentTxUrl: null,
   contactUsername: 'ana',
   trackingNumber: null,
+  carrier: null,
   statusNote: null,
   amountPaid: 5490,
   amountDue: 0,
@@ -55,6 +56,13 @@ describe('buildStatusMessage', () => {
     expect(text).toContain('has been shipped');
     expect(text).toContain('Tracking: RR123456789ES');
     expect(text).toContain('Message from the organiser: Arrives on Friday');
+  });
+
+  it('puts the carrier with the tracking, or alone', () => {
+    const shipped: Order = { ...base, status: 'shipped', trackingNumber: 'RR1', carrier: 'GLS' };
+    expect(buildStatusMessage('en', 'Demo', shipped, 'paid')).toContain('Tracking: GLS · RR1');
+    const noTracking: Order = { ...base, status: 'shipped', carrier: 'Correos' };
+    expect(buildStatusMessage('en', 'Demo', noTracking, 'paid')).toContain('Carrier: Correos');
   });
 
   it('mentions the refund when a paid order is cancelled', () => {

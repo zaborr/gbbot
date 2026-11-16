@@ -19,6 +19,7 @@ import {
   updateShopCurrencyRequest,
   updateOrderFeeRequest,
   updateOrderStatusRequest,
+  updateShipmentRequest,
   updateShippingRequest,
   updateCheckoutFieldsRequest,
   updatePaymentSetupRequest,
@@ -54,6 +55,8 @@ import {
 import {
   approveOrderChange,
   changeOrderStatus,
+  recentCarriers,
+  updateShipment,
   clearOrderChange,
   deleteOrder,
   getOrder,
@@ -63,6 +66,7 @@ import {
 import {
   buildChangeDecisionMessage,
   buildStatusMessage,
+  shipmentLine,
   notifyUsers,
 } from '../services/notifications.js';
 import {
@@ -706,6 +710,27 @@ export function adminRoutes(): Hono<AppBindings> {
       return c.json(order);
     },
   );
+
+  // Correcting the carrier or tracking of a shipped order (the customer is told).
+  app.patch(
+    '/orders/:id/shipment',
+    zValidator('param', idParam),
+    zValidator('json', updateShipmentRequest),
+    async (c) => {
+      const shop = c.get('shop');
+      const id = c.req.valid('param').id;
+      const order = await updateShipment(c.get('db'), shop.id, id, c.req.valid('json'));
+      if (!order) return c.json(await getOrder(c.get('db'), shop.id, id));
+      await notifyUsers(c.get('db'), botToken(c.get('env')), await customerChat(c, order), (lang) =>
+        [
+          tr(lang, 'status.shipmentUpdated', { ref: tr(lang, 'order.ref', { shop: shop.name, id: order.id.slice(0, 8) }) }),
+          shipmentLine(lang, order),
+        ].join('\n'),
+      );
+      return c.json(order);
+    },
+  );
+  app.get('/carriers', async (c) => c.json(await recentCarriers(c.get('db'), c.get('shopId'))));
 
   // Reports: the bot sends the file (Excel or CSV) to the admin's own chat.
   app.post('/export', zValidator('json', exportRequest), async (c) => {

@@ -31,6 +31,7 @@ function order(partial: Partial<Order> & Pick<Order, 'id' | 'status' | 'createdA
     paymentTxUrl: null,
     contactUsername: 'ana_test',
     trackingNumber: null,
+    carrier: null,
     statusNote: null,
     amountPaid: 0,
     amountDue: 1800,

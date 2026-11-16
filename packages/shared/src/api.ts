@@ -146,10 +146,18 @@ export const updateOrderStatusRequest = z.object({
   note: z.string().trim().max(500).optional(),
   /** Tracking number or link, when shipping. */
   trackingNumber: z.string().trim().max(200).optional(),
+  /** Who carries it (Correos, GLS…), when shipping. */
+  carrier: z.string().trim().max(60).optional(),
   /** Confirm a payment even though tracked stock no longer covers the order. */
   force: z.boolean().optional(),
 });
 export type UpdateOrderStatusRequest = z.infer<typeof updateOrderStatusRequest>;
+
+/** Corrects the carrier or tracking of an order already shipped. */
+export const updateShipmentRequest = z.object({
+  carrier: z.string().trim().max(60),
+  trackingNumber: z.string().trim().max(200),
+});
 
 /** Which orders an export includes. */
 export const exportScope = z.enum([

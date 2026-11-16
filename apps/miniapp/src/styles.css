@@ -639,3 +639,29 @@ button.gb-banner {
 .gb-phrase-explain p {
   margin: 0 0 8px;
 }
+
+/* Marking an order as shipped: carrier and tracking in place, before confirming. */
+.gb-ship-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 -16px;
+  padding: 4px 0 0;
+  border-top: 1px solid var(--tgui--divider, rgba(0, 0, 0, 0.08));
+  border-bottom: 1px solid var(--tgui--divider, rgba(0, 0, 0, 0.08));
+}
+.gb-ship-carriers {
+  padding: 0 22px 4px;
+}
+.gb-ship-carriers .gb-chip {
+  cursor: pointer;
+  border: none;
+  font: inherit;
+  font-size: 13px;
+}
+.gb-ship-form-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 16px 12px;
+}
