@@ -668,4 +668,8 @@ button.gb-banner {
 .gb-address-value {
   overflow-wrap: anywhere;
   user-select: text;
+/* Export: custom days, side by side when there is room. */
+.gb-export-days {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
