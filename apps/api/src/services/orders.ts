@@ -1123,7 +1123,7 @@ export async function updateShipment(
   const trackingNumber = shipment.trackingNumber.trim() || null;
   if (carrier === row.carrier && trackingNumber === row.trackingNumber) return null;
   await db.update(orders).set({ carrier, trackingNumber, updatedAt: new Date() }).where(eq(orders.id, orderId));
-  return getOrder(db, shopId, orderId);
+  return (await getOrder(db, shopId, orderId)) ?? null;
 }
 
 /** Carriers already used in a GB, the most recent first (to pick with a tap). */
