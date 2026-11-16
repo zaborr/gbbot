@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import { isSaleStatus, type ExportRequest, type ExportScope, type Order } from '@tma-shop/shared';
 import { api, ApiClientError } from '../../api/client.js';
+import { Input } from '../../components/Field.js';
 import { decryptAddress, loadPrivateKey } from '../../lib/addressCrypto.js';
 import { shareOrDownload, toCsv } from '../../lib/download.js';
 import { copyText } from '../../lib/clipboard.js';
@@ -23,17 +24,44 @@ const SCOPES: Array<{ key: ExportScope; label: MessageKey }> = [
   { key: 'all', label: 'catalog.all' },
 ];
 
-type Period = 'all' | 'thisMonth' | 'lastMonth';
+type Period = 'all' | 'today' | 'last7' | 'thisMonth' | 'lastMonth' | 'custom';
 const PERIODS: Array<{ key: Period; label: MessageKey }> = [
   { key: 'all', label: 'export.allTime' },
+  { key: 'today', label: 'export.today' },
+  { key: 'last7', label: 'export.last7' },
   { key: 'thisMonth', label: 'export.thisMonth' },
   { key: 'lastMonth', label: 'export.lastMonth' },
+  { key: 'custom', label: 'export.custom' },
 ];
 
+/** Chosen days ("YYYY-MM-DD", both included). */
+interface Days {
+  from: string;
+  to: string;
+}
+
+/** Local midnight of a "YYYY-MM-DD" day. */
+const dayStart = (day: string): Date => {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1);
+};
+
 /** [from, to) of a period in local time, as ISO instants. */
-function periodRange(period: Period): { from?: string; to?: string } {
+function periodRange(period: Period, days?: Days): { from?: string; to?: string } {
   const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  if (period === 'today') return { from: today.toISOString() };
+  if (period === 'last7') return { from: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6).toISOString() };
+  if (period === 'custom' && days) {
+    const range: { from?: string; to?: string } = {};
+    if (days.from) range.from = dayStart(days.from).toISOString();
+    if (days.to) {
+      const end = dayStart(days.to);
+      range.to = new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1).toISOString();
+    }
+    return range;
+  }
   if (period === 'thisMonth') return { from: thisMonth.toISOString() };
   if (period === 'lastMonth') {
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -113,6 +141,7 @@ function AdminExport({ part }: { part: 'files' | 'shipping' }): React.JSX.Elemen
   const initialScope = SCOPES.find((s) => s.key === params.get('scope'))?.key ?? 'paid';
   const [scope, setScope] = useState<ExportScope>(initialScope);
   const [period, setPeriod] = useState<Period>('all');
+  const [days, setDays] = useState<Days>({ from: '', to: '' });
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -136,7 +165,7 @@ function AdminExport({ part }: { part: 'files' | 'shipping' }): React.JSX.Elemen
       const result = await api.adminExport({
         format,
         scope,
-        ...periodRange(period),
+        ...periodRange(period, days),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
       const orders = tn(result.orders, 'count.orders.one', 'count.orders.other');
@@ -166,7 +195,7 @@ function AdminExport({ part }: { part: 'files' | 'shipping' }): React.JSX.Elemen
         setListError(t('export.needKey'));
         return;
       }
-      const { from, to } = periodRange(period);
+      const { from, to } = periodRange(period, days);
       const orders = (await api.adminGetOrders()).filter(
         (o) =>
           o.encryptedAddress &&
@@ -306,6 +335,24 @@ function AdminExport({ part }: { part: 'files' | 'shipping' }): React.JSX.Elemen
             </Button>
           ))}
         </div>
+        {period === 'custom' && (
+          <div className="gb-export-days">
+            <Input
+              header={t('export.fromDay')}
+              type="date"
+              value={days.from}
+              max={days.to || undefined}
+              onChange={(e) => setDays({ ...days, from: e.target.value })}
+            />
+            <Input
+              header={t('export.toDay')}
+              type="date"
+              value={days.to}
+              min={days.from || undefined}
+              onChange={(e) => setDays({ ...days, to: e.target.value })}
+            />
+          </div>
+        )}
       </Section>
 
       {part === 'files' && (
