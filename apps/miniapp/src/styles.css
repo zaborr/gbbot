@@ -664,4 +664,8 @@ button.gb-banner {
   flex-direction: column;
   gap: 8px;
   padding: 8px 16px 12px;
+/* Address fields in an order: long values (emails, streets) wrap instead of overflowing. */
+.gb-address-value {
+  overflow-wrap: anywhere;
+  user-select: text;
 }
