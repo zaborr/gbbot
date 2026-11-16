@@ -111,7 +111,7 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
       const lines = addressLines(a);
       const all = [...lines, a.notes ? t('addressSection.notes', { notes: a.notes }) : ''].filter(Boolean).join('\n');
       // Each piece on its own (courier forms ask for them one by one), then everything.
-      const fields: Array<{ key: string; label: MessageKey; value: string }> = [
+      const every: Array<{ key: string; label: MessageKey; value: string }> = [
         { key: 'name', label: 'addressSection.name', value: a.name },
         { key: 'line1', label: 'addressSection.line1', value: a.line1 },
         { key: 'line2', label: 'addressSection.line2', value: a.line2 },
@@ -122,7 +122,8 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
         { key: 'phone', label: 'addressSection.phone', value: a.phone },
         { key: 'email', label: 'addressSection.email', value: a.email ?? '' },
         { key: 'notes', label: 'addressSection.notesLabel', value: a.notes },
-      ].filter((field) => field.value.trim() !== '');
+      ];
+      const fields = every.filter((field) => field.value.trim() !== '');
       const copy = (key: string, text: string): void => {
         void copyText(text).then((ok) => setCopied(ok ? key : null));
       };
