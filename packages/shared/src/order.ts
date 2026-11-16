@@ -136,6 +136,7 @@ export const order = z.object({
   contactUsername: z.string().nullable(),
   /** Shipment tracking number or link, set when the order is shipped. */
   trackingNumber: z.string().nullable(),
+  carrier: z.string().nullable(),
   /** Last message from the shop to the customer about this order. */
   statusNote: z.string().nullable(),
   /** Confirmed money received, net of refunds. */

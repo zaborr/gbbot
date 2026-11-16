@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import { Input, Textarea } from '../../components/Field.js';
@@ -22,7 +22,7 @@ import {
 import { useShopPath } from '../../providers/ShopProvider.js';
 import { AddressSection } from './AddressSection.js';
 import { CopyOrders } from '../../components/CopyOrders.js';
-import { TrackingText } from '../../components/TrackingText.js';
+import { ShipmentCells } from '../../components/TrackingText.js';
 import { t, type MessageKey } from '../../i18n/index.js';
 import { OrderTracker } from '../../components/OrderStatus.js';
 
@@ -96,11 +96,7 @@ function AdminOrder(): React.JSX.Element {
             {t('adminOrder.anonymized')}
           </Cell>
         )}
-        {o.trackingNumber && (
-          <Cell subtitle={t('order.tracking')} multiline>
-            <TrackingText value={o.trackingNumber} />
-          </Cell>
-        )}
+        <ShipmentCells order={o} />
         {o.statusNote && (
           <Cell subtitle={t('adminOrder.lastNote')} multiline>
             {o.statusNote}
@@ -298,20 +294,18 @@ function ActionsSection({
   const { twoTap, tapLabel, run, errorCode } = actions;
   const id = order.id;
   const [note, setNote] = useState('');
-  const [tracking, setTracking] = useState(order.trackingNumber ?? '');
+  const [shipping, setShipping] = useState(false);
   const next = ADMIN_STATUS_CHANGES[order.status];
 
   /** Changes the status; the bot tells the customer, with the note if there is one. */
   const setStatus = async (
     status: Order['status'],
-    more: { trackingNumber?: string; force?: boolean } = {},
+    more: { trackingNumber?: string; carrier?: string; force?: boolean } = {},
   ): Promise<void> => {
     const text = note.trim();
     await api.adminSetOrderStatus(id, status, { ...(text ? { note: text } : {}), ...more });
     setNote('');
   };
-  const trackingInput = (): { trackingNumber?: string } =>
-    tracking.trim() ? { trackingNumber: tracking.trim() } : {};
 
   return (
     <Section
@@ -324,13 +318,6 @@ function ActionsSection({
           placeholder={t('actions.notePlaceholder')}
           value={note}
           onChange={(e) => setNote(e.target.value)}
-        />
-      )}
-      {next.includes('shipped') && (
-        <Input
-          header={t('actions.tracking')}
-          value={tracking}
-          onChange={(e) => setTracking(e.target.value)}
         />
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
@@ -364,15 +351,45 @@ function ActionsSection({
             </Button>
           </>
         )}
-        {order.status === 'paid' && (
-          <Button
-            stretched
-            mode="filled"
-            onClick={() => void run(() => setStatus('shipped', trackingInput()))}
-          >
-            {t('actions.markShipped')}
-          </Button>
-        )}
+        {order.status === 'paid' &&
+          (shipping ? (
+            <ShipForm
+              order={order}
+              confirmLabel={t('actions.confirmShipped')}
+              onCancel={() => setShipping(false)}
+              onSave={(shipment) =>
+                run(async () => {
+                  await setStatus('shipped', {
+                    ...(shipment.carrier ? { carrier: shipment.carrier } : {}),
+                    ...(shipment.trackingNumber ? { trackingNumber: shipment.trackingNumber } : {}),
+                  });
+                  setShipping(false);
+                })
+              }
+            />
+          ) : (
+            <Button stretched mode="filled" onClick={() => setShipping(true)}>
+              {t('actions.markShipped')}
+            </Button>
+          ))}
+        {(order.status === 'shipped' || order.status === 'fulfilled') &&
+          (shipping ? (
+            <ShipForm
+              order={order}
+              confirmLabel={t('actions.saveShipment')}
+              onCancel={() => setShipping(false)}
+              onSave={(shipment) =>
+                run(async () => {
+                  await api.adminUpdateShipment(id, shipment);
+                  setShipping(false);
+                })
+              }
+            />
+          ) : (
+            <Button stretched mode="bezeled" onClick={() => setShipping(true)}>
+              {t('actions.editShipment')}
+            </Button>
+          ))}
         {(order.status === 'paid' || order.status === 'shipped') && (
           <Button
             stretched
@@ -469,5 +486,75 @@ function PaymentCheckCell({
           ? t('check.verified')
           : t('check.failed', { reason })}
     </Cell>
+  );
+}
+
+/**
+ * Carrier and tracking, right where the order is marked as shipped (both
+ * optional). The carriers used before in this GB are a tap away.
+ */
+function ShipForm({
+  order,
+  confirmLabel,
+  onCancel,
+  onSave,
+}: {
+  order: Order;
+  confirmLabel: string;
+  onCancel: () => void;
+  onSave: (shipment: { carrier: string; trackingNumber: string }) => Promise<unknown> | void;
+}): React.JSX.Element {
+  const carriers = useAsync(() => api.adminCarriers(), []);
+  const [carrier, setCarrier] = useState(order.carrier ?? '');
+  const [tracking, setTracking] = useState(order.trackingNumber ?? '');
+  const suggested = carriers.data ?? [];
+  // The last carrier used, ready, when the order has none yet.
+  const last = suggested[0];
+  useEffect(() => {
+    if (!order.carrier && last) setCarrier((current) => current || last);
+  }, [order.carrier, last]);
+  return (
+    <div className="gb-ship-form">
+      <Input
+        header={t('actions.carrier')}
+        placeholder={t('actions.carrierPlaceholder')}
+        value={carrier}
+        maxLength={60}
+        onChange={(e) => setCarrier(e.target.value)}
+      />
+      {suggested.length > 0 && (
+        <div className="gb-chips gb-ship-carriers">
+          {suggested.map((name) => (
+            <button
+              key={name}
+              type="button"
+              className={`gb-chip ${name === carrier ? 'gb-chip--info' : ''}`}
+              onClick={() => setCarrier(name)}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      )}
+      <Input
+        header={t('actions.tracking')}
+        placeholder={t('actions.trackingPlaceholder')}
+        value={tracking}
+        maxLength={200}
+        onChange={(e) => setTracking(e.target.value)}
+      />
+      <div className="gb-ship-form-buttons">
+        <Button
+          stretched
+          mode="filled"
+          onClick={() => void onSave({ carrier: carrier.trim(), trackingNumber: tracking.trim() })}
+        >
+          {confirmLabel}
+        </Button>
+        <Button stretched mode="plain" onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
+      </div>
+    </div>
   );
 }

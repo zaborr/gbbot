@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, ne, or, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, ne, or, sql, type SQL } from 'drizzle-orm';
 import {
   ADMIN_STATUS_CHANGES,
   DEFAULT_CHECKOUT_FIELDS,
@@ -526,6 +526,7 @@ export interface StatusChange {
   status: OrderStatus;
   note?: string | undefined;
   trackingNumber?: string | undefined;
+  carrier?: string | undefined;
   force?: boolean | undefined;
 }
 
@@ -594,6 +595,7 @@ export async function changeOrderStatus(
     }
     if (change.status === 'shipped') {
       set.trackingNumber = change.trackingNumber?.trim() || null;
+      set.carrier = change.carrier?.trim() || null;
     }
     if (change.status === 'cancelled') {
       set.changeRequest = null;
@@ -1100,4 +1102,38 @@ async function attachItems(db: Database, rows: OrderRow[]): Promise<Order[]> {
     else byOrder.set(item.orderId, [item]);
   }
   return rows.map((row) => toOrderDTO(row, byOrder.get(row.id) ?? []));
+}
+
+/**
+ * Corrects the carrier or tracking of an order already shipped (or delivered).
+ * Returns null when nothing changed.
+ */
+export async function updateShipment(
+  db: Database,
+  shopId: string,
+  orderId: string,
+  shipment: { carrier: string; trackingNumber: string },
+): Promise<Order | null> {
+  const row = await db.query.orders.findFirst({ where: and(eq(orders.id, orderId), eq(orders.shopId, shopId)) });
+  if (!row) throw ApiError.notFound('Order not found');
+  if (row.status !== 'shipped' && row.status !== 'fulfilled') {
+    throw ApiError.conflict('not_shipped', 'The order has not been shipped yet');
+  }
+  const carrier = shipment.carrier.trim() || null;
+  const trackingNumber = shipment.trackingNumber.trim() || null;
+  if (carrier === row.carrier && trackingNumber === row.trackingNumber) return null;
+  await db.update(orders).set({ carrier, trackingNumber, updatedAt: new Date() }).where(eq(orders.id, orderId));
+  return (await getOrder(db, shopId, orderId)) ?? null;
+}
+
+/** Carriers already used in a GB, the most recent first (to pick with a tap). */
+export async function recentCarriers(db: Database, shopId: string): Promise<string[]> {
+  const rows = await db
+    .select({ carrier: orders.carrier, at: sql<Date>`max(${orders.updatedAt})` })
+    .from(orders)
+    .where(and(eq(orders.shopId, shopId), isNotNull(orders.carrier)))
+    .groupBy(orders.carrier)
+    .orderBy(sql`max(${orders.updatedAt}) desc`)
+    .limit(8);
+  return rows.flatMap((r) => (r.carrier ? [r.carrier] : []));
 }

@@ -298,6 +298,8 @@ export const orders = pgTable('orders', {
   contactUsername: text('contact_username'),
   /** Shipment tracking number or link, set when the order is shipped. */
   trackingNumber: text('tracking_number'),
+  /** Who carries it (Correos, GLS…), set when the order is shipped. */
+  carrier: text('carrier'),
   /** Last message from the shop to the customer about this order. */
   statusNote: text('status_note'),
   /** Confirmed money received, net of refunds (minor units of `currency`). */

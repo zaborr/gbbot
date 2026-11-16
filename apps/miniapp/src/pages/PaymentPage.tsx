@@ -26,7 +26,7 @@ import { activeVariants, hasVariants, itemKey, customerItemName, vipPriceFor } f
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
 import { useShopPath } from '../providers/ShopProvider.js';
-import { TrackingText } from '../components/TrackingText.js';
+import { ShipmentCells } from '../components/TrackingText.js';
 import { locale, t } from '../i18n/index.js';
 import { SecurityPhraseBadge } from '../components/SecurityPhrase.js';
 import { OrderStatusChip, OrderTracker } from '../components/OrderStatus.js';
@@ -320,22 +320,14 @@ function StatusDetail({ order }: { order: Order }): React.JSX.Element {
       return (
         <Section>
           <Cell multiline>{t('order.onItsWay')}</Cell>
-          {order.trackingNumber && (
-            <Cell subtitle={t('order.tracking')} multiline>
-              <TrackingText value={order.trackingNumber} />
-            </Cell>
-          )}
+          <ShipmentCells order={order} />
         </Section>
       );
     case 'fulfilled':
       return (
         <Section>
           <Cell>{t('order.delivered')}</Cell>
-          {order.trackingNumber && (
-            <Cell subtitle={t('order.tracking')} multiline>
-              <TrackingText value={order.trackingNumber} />
-            </Cell>
-          )}
+          <ShipmentCells order={order} />
         </Section>
       );
     case 'cancelled':

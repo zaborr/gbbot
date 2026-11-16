@@ -257,6 +257,7 @@ export function toOrderDTO(row: OrderRow, items: OrderItemRow[]): Order {
     paymentManual: row.paymentMethodId?.startsWith(MANUAL_METHOD_PREFIX) ?? false,
     contactUsername: row.contactUsername,
     trackingNumber: row.trackingNumber,
+    carrier: row.carrier,
     statusNote: row.statusNote,
     amountPaid: row.amountPaid,
     // A cancelled order owes nothing; whatever was paid goes back.

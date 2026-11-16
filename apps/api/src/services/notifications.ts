@@ -117,6 +117,13 @@ export function buildChangeDecisionMessage(lang: Lang, order: Order, approved: b
   return lines.join('\n');
 }
 
+/** "Tracking: GLS · 1234", "Carrier: GLS" or "Tracking: 1234". */
+export function shipmentLine(lang: Lang, order: { carrier: string | null; trackingNumber: string | null }): string {
+  if (!order.trackingNumber) return tr(lang, 'status.carrier', { carrier: order.carrier ?? '' });
+  const tracking = order.carrier ? `${order.carrier} · ${order.trackingNumber}` : order.trackingNumber;
+  return tr(lang, 'status.tracking', { tracking });
+}
+
 /**
  * Tells the customer their order moved to another status, with the shop's
  * note if the admin wrote one. Empty when there is nothing to say.
@@ -149,7 +156,7 @@ export function buildStatusMessage(
       break;
     case 'shipped':
       lines.push(tr(lang, 'status.shipped', { ref }));
-      if (order.trackingNumber) lines.push(tr(lang, 'status.tracking', { tracking: order.trackingNumber }));
+      if (order.trackingNumber || order.carrier) lines.push(shipmentLine(lang, order));
       break;
     case 'fulfilled':
       lines.push(tr(lang, 'status.delivered', { ref }));
