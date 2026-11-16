@@ -1694,6 +1694,16 @@ describeDb('API integration', () => {
         body: JSON.stringify({ lines: [{ productId, variantId: null, quantity }], reason }),
       });
 
+    const preview = await request(`/api/admin/orders/${orderId}/reduce-preview`, {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ lines: [{ productId, variantId: null, quantity: 1 }] }),
+    });
+    expect(await preview.json()).toEqual({
+      total: before!.total - item!.unitPrice,
+      amountDue: -item!.unitPrice,
+      testingBack: 0,
+    });
     expect((await reduce(3)).status).toBe(400); // never up
     expect((await reduce(0)).status).toBe(400); // nothing left: cancel instead
     const res = await reduce(1);

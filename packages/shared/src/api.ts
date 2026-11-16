@@ -176,6 +176,14 @@ export const reduceOrderRequest = z.object({
   reason: z.string().trim().min(1).max(300),
 });
 export type ReduceOrderRequest = z.infer<typeof reduceOrderRequest>;
+export const reducePreviewRequest = reduceOrderRequest.pick({ lines: true });
+
+/** What a reduction would do: new total, what is owed (negative: to refund), part from testings. */
+export interface ReducePreview {
+  total: number;
+  amountDue: number;
+  testingBack: number;
+}
 
 /** Which orders an export includes. */
 export const exportScope = z.enum([

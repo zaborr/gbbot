@@ -981,6 +981,7 @@ export const es: Record<MessageKey, string> = {
   'reduce.nothingLeft': 'No quedaría nada: mejor cancela el pedido.',
   'reduce.open': '✏️ Quitar o reducir productos',
   'reduce.previewRefund': 'Nuevo total {total} · a devolver {refund}',
+  'reduce.previewRefundTesting': 'Nuevo total {total} · a devolver {refund} (incluye {testing} del testing)',
   'reduce.previewTotal': 'Nuevo total {total}',
   'reduce.reason': 'Motivo (se lo enviamos al cliente)',
   'reduce.reasonPlaceholder': 'p. ej. Agotado en el proveedor',

@@ -21,6 +21,7 @@ import {
   updateOrderStatusRequest,
   updateShipmentRequest,
   reduceOrderRequest,
+  reducePreviewRequest,
   updateShippingRequest,
   updateCheckoutFieldsRequest,
   updatePaymentSetupRequest,
@@ -59,6 +60,7 @@ import {
   recentCarriers,
   updateShipment,
   reduceOrder,
+  previewReduceOrder,
   clearOrderChange,
   deleteOrder,
   getOrder,
@@ -732,6 +734,15 @@ export function adminRoutes(): Hono<AppBindings> {
       );
       return c.json(order);
     },
+  );
+
+  // What taking products out would leave (total, refund, testings dropped), without doing it.
+  app.post(
+    '/orders/:id/reduce-preview',
+    zValidator('param', idParam),
+    zValidator('json', reducePreviewRequest),
+    async (c) =>
+      c.json(await previewReduceOrder(c.get('db'), c.get('shopId'), c.req.valid('param').id, c.req.valid('json').lines)),
   );
 
   // The organiser takes products out (sold out…): applied at once, the customer is told why.

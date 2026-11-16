@@ -1,4 +1,5 @@
 import type {
+  ReducePreview,
   AddCreatorAccountRequest,
   BotInfo,
   BotSettings,
@@ -1097,6 +1098,17 @@ export class ApiClient {
   /** Carriers already used in this GB, the most recent first. */
   adminCarriers(): Promise<string[]> {
     return this.request<string[]>('/admin/carriers');
+  }
+
+  /** What taking products out would leave, without doing it. */
+  adminReducePreview(
+    orderId: string,
+    lines: Array<{ productId: string; variantId: string | null; quantity: number }>,
+  ): Promise<ReducePreview> {
+    return this.request<ReducePreview>(`/admin/orders/${orderId}/reduce-preview`, {
+      method: 'POST',
+      body: JSON.stringify({ lines }),
+    });
   }
 
   /** Takes products out of an order or lowers quantities (only down); the customer is told why. */

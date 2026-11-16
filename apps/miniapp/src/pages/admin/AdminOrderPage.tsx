@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import { Input, Textarea } from '../../components/Field.js';
-import { ADMIN_STATUS_CHANGES, RATE_SCALE, convertAmount, type Order } from '@tma-shop/shared';
+import { ADMIN_STATUS_CHANGES, RATE_SCALE, convertAmount, type Order, type ReducePreview } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
 import { useLiveRefresh } from '../../hooks/useLiveRefresh.js';
@@ -589,8 +589,27 @@ function ReduceForm({
   const quantity = (item: Order['items'][number]): number => quantities[itemKey(item)] ?? item.quantity;
   const removedValue = order.items.reduce((sum, item) => sum + (item.quantity - quantity(item)) * item.unitPrice, 0);
   const left = order.items.some((item) => quantity(item) > 0);
-  const newTotal = order.total - removedValue;
-  const refund = order.amountPaid - newTotal;
+  // The server's figures (testings dropped included); a local estimate meanwhile.
+  const [preview, setPreview] = useState<ReducePreview | null>(null);
+  const linesKey = order.items.map((item) => `${itemKey(item)}:${quantity(item)}`).join('|');
+  useEffect(() => {
+    setPreview(null);
+    if (removedValue === 0 || !left) return;
+    const timer = setTimeout(() => {
+      void api
+        .adminReducePreview(
+          order.id,
+          order.items.map((item) => ({ productId: item.productId, variantId: item.variantId, quantity: quantity(item) })),
+        )
+        .then(setPreview)
+        .catch(() => undefined);
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linesKey]);
+  const newTotal = preview?.total ?? order.total - removedValue;
+  const refund = preview ? -preview.amountDue : order.amountPaid - newTotal;
+  const testingBack = preview?.testingBack ?? 0;
   const set = (item: Order['items'][number], value: number): void =>
     setQuantities({ ...quantities, [itemKey(item)]: Math.max(0, Math.min(item.quantity, value)) });
 
@@ -630,7 +649,13 @@ function ReduceForm({
           {!left
             ? t('reduce.nothingLeft')
             : order.amountPaid > 0 && refund > 0
-              ? t('reduce.previewRefund', { total: money(newTotal), refund: money(refund) })
+              ? testingBack > 0
+                ? t('reduce.previewRefundTesting', {
+                    total: money(newTotal),
+                    refund: money(refund),
+                    testing: money(testingBack),
+                  })
+                : t('reduce.previewRefund', { total: money(newTotal), refund: money(refund) })
               : t('reduce.previewTotal', { total: money(newTotal) })}
         </Cell>
       )}
