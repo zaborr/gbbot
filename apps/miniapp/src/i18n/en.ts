@@ -979,6 +979,7 @@ export const en = {
   'reduce.nothingLeft': 'Nothing would be left: cancel the order instead.',
   'reduce.open': '✏️ Remove or reduce products',
   'reduce.previewRefund': 'New total {total} · to refund {refund}',
+  'reduce.previewRefundTesting': 'New total {total} · to refund {refund} (includes {testing} from the testing)',
   'reduce.previewTotal': 'New total {total}',
   'reduce.reason': 'Reason (the customer gets it)',
   'reduce.reasonPlaceholder': 'e.g. Sold out at the supplier',

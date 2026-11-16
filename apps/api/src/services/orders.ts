@@ -1138,6 +1138,60 @@ export async function recentCarriers(db: Database, shopId: string): Promise<stri
   return rows.flatMap((r) => (r.carrier ? [r.carrier] : []));
 }
 
+/** What reducing an order leaves (kept), gives back to stock and tells the customer (removed). */
+async function planReduce(
+  tx: Database | Tx,
+  orderId: string,
+  lines: Array<{ productId: string; variantId: string | null; quantity: number }>,
+): Promise<{ kept: OrderItemRow[]; back: OrderItemRow[]; removed: Array<{ name: string; quantity: number }> }> {
+  const current = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+  const wanted = new Map(lines.map((l) => [lineKey(l.productId, l.variantId), l.quantity]));
+  const removed: Array<{ name: string; quantity: number }> = [];
+  const kept: OrderItemRow[] = [];
+  const back: OrderItemRow[] = [];
+  for (const item of current) {
+    const quantity = wanted.get(lineKey(item.productId, item.variantId)) ?? item.quantity;
+    if (quantity > item.quantity) {
+      throw ApiError.badRequest('only_less', 'Products can only be removed or reduced');
+    }
+    const name = item.variantLabel ? `${item.title} (${item.variantLabel})` : item.title;
+    if (quantity < item.quantity) {
+      removed.push({ name, quantity: item.quantity - quantity });
+      back.push({ ...item, quantity: item.quantity - quantity });
+    }
+    if (quantity > 0) kept.push({ ...item, quantity, subtotal: item.unitPrice * quantity });
+  }
+  for (const key of wanted.keys()) {
+    if (!current.some((i) => lineKey(i.productId, i.variantId) === key)) {
+      throw ApiError.badRequest('only_less', 'Products can only be removed or reduced');
+    }
+  }
+  if (removed.length === 0) throw ApiError.badRequest('no_changes', 'The order is unchanged');
+  if (kept.length === 0) {
+    throw ApiError.badRequest('cancel_instead', 'Nothing would be left: cancel the order instead');
+  }
+  return { kept, back, removed };
+}
+
+/**
+ * What reducing would do, without doing it: the new total, what is owed
+ * (negative: to refund) and how much of that comes from testings dropped
+ * because their product leaves the order.
+ */
+export async function previewReduceOrder(
+  db: Database,
+  shopId: string,
+  orderId: string,
+  lines: Array<{ productId: string; variantId: string | null; quantity: number }>,
+): Promise<{ total: number; amountDue: number; testingBack: number }> {
+  const order = await db.query.orders.findFirst({ where: and(eq(orders.shopId, shopId), eq(orders.id, orderId)) });
+  if (!order) throw ApiError.notFound('Order not found');
+  const { kept } = await planReduce(db, order.id, lines);
+  const testing = await testingAfterChange(db, order.id, linesOf(kept), false);
+  const total = kept.reduce((sum, i) => sum + i.subtotal, 0) + order.fee + order.shipping + testing;
+  return { total, amountDue: total - order.amountPaid, testingBack: order.testing - testing };
+}
+
 /**
  * The organiser takes products out of an order or lowers quantities (sold
  * out, for instance). Only down: what is left keeps the price paid, fee and
@@ -1162,32 +1216,7 @@ export async function reduceOrder(
     if (order.status !== 'pending' && order.status !== 'paid') {
       throw ApiError.conflict('not_changeable', 'Only orders not shipped yet can be changed');
     }
-    const current = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
-    const wanted = new Map(lines.map((l) => [lineKey(l.productId, l.variantId), l.quantity]));
-    const removed: Array<{ name: string; quantity: number }> = [];
-    const kept: OrderItemRow[] = [];
-    const back: OrderItemRow[] = [];
-    for (const item of current) {
-      const quantity = wanted.get(lineKey(item.productId, item.variantId)) ?? item.quantity;
-      if (quantity > item.quantity) {
-        throw ApiError.badRequest('only_less', 'Products can only be removed or reduced');
-      }
-      const name = item.variantLabel ? `${item.title} (${item.variantLabel})` : item.title;
-      if (quantity < item.quantity) {
-        removed.push({ name, quantity: item.quantity - quantity });
-        back.push({ ...item, quantity: item.quantity - quantity });
-      }
-      if (quantity > 0) kept.push({ ...item, quantity, subtotal: item.unitPrice * quantity });
-    }
-    for (const key of wanted.keys()) {
-      if (!current.some((i) => lineKey(i.productId, i.variantId) === key)) {
-        throw ApiError.badRequest('only_less', 'Products can only be removed or reduced');
-      }
-    }
-    if (removed.length === 0) throw ApiError.badRequest('no_changes', 'The order is unchanged');
-    if (kept.length === 0) {
-      throw ApiError.badRequest('cancel_instead', 'Nothing would be left: cancel the order instead');
-    }
+    const { kept, back, removed } = await planReduce(tx, order.id, lines);
     // What the order held goes back to stock.
     if (order.stockApplied) await restoreStock(tx, back);
 
