@@ -3058,7 +3058,11 @@ describeDb('API integration', () => {
       vipNoFee: true,
     });
 
-    const source = await db.select().from(products).where(eq(products.shopId, shopId));
+    // Donation products (made with testings) are not copied.
+    const source = await db
+      .select()
+      .from(products)
+      .where(and(eq(products.shopId, shopId), eq(products.kind, 'sale')));
     const copied = await db.select().from(products).where(eq(products.shopId, copy.id));
     expect(copied.map((p) => p.slug).sort()).toEqual(source.map((p) => p.slug).sort());
     expect(copied.find((p) => p.slug === 'sencha')?.vipPrice).toBe(120);

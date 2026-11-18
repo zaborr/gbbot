@@ -44,7 +44,7 @@ type Writer = Pick<Database, 'select' | 'insert' | 'update' | 'delete'>;
  * What an order has given to testings and not paid yet, for sums in SQL where
  * `orders` is in the query.
  */
-export const donationOfOrder = sql<number>`(select coalesce(sum(di.donation_unpaid * di.unit_price), 0) from order_items di where di.order_id = ${orders.id})`;
+export const donationOfOrder = sql<number>`(select coalesce(sum(di.donation_unpaid * di.unit_price), 0) from order_items di where di.order_id = "orders"."id")`;
 
 /**
  * The money of each testing: fees paid (and what was paid on top of them) on
