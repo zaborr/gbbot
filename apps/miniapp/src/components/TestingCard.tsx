@@ -109,10 +109,20 @@ export function TestingCard({
           key={tier.id}
           before={
             <span className="gb-testing-tier-icon" aria-hidden="true">
-              {tier.reached ? '✅' : tier === next ? '⏳' : '🔒'}
+              {tier.upgradedTo ? '⬆️' : tier.reached ? '✅' : tier === next ? '⏳' : '🔒'}
             </span>
           }
-          subtitle={tier.reached ? t('testing.tierReached') : missingText(tier)}
+          subtitle={[
+            tier.upgradedTo
+              ? t('testing.tierUpgradedTo', { tier: tier.upgradedTo })
+              : tier.reached
+                ? t('testing.tierReached')
+                : missingText(tier),
+            tier.upgrades ? t('testing.tierUpgradeOf', { tier: tier.upgrades }) : null,
+            tier.lab ? t('testing.lab', { lab: tier.lab }) : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
           multiline
         >
           {tier.name}

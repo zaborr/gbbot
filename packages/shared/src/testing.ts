@@ -18,6 +18,13 @@ export const testingTier = z.object({
   cost: z.number().int().positive().max(100_000_000),
   /** Vials it needs (0 when it reuses another tier's vial). */
   vials: z.number().int().min(0).max(20),
+  /** Another lab than the testing's (null or missing: the testing's). */
+  lab: z.string().trim().max(80).nullable().optional(),
+  /**
+   * An upgrade of an earlier tier (its id): once reached, that one is not done
+   * and its cost goes towards this one.
+   */
+  replaces: z.string().max(40).nullable().optional(),
 });
 export type TestingTier = z.infer<typeof testingTier>;
 
@@ -49,7 +56,14 @@ const tiers = z
   .array(testingTier)
   .min(1)
   .max(MAX_TESTING_TIERS)
-  .refine((list) => new Set(list.map((tier) => tier.id)).size === list.length, 'Repeated tier');
+  .refine((list) => new Set(list.map((tier) => tier.id)).size === list.length, 'Repeated tier')
+  .refine(
+    (list) =>
+      list.every((tier, i) => !tier.replaces || list.slice(0, i).some((before) => before.id === tier.replaces)) &&
+      new Set(list.flatMap((tier) => (tier.replaces ? [tier.replaces] : []))).size ===
+        list.filter((tier) => tier.replaces).length,
+    'An upgrade replaces one tier before it, and each tier is upgraded once',
+  );
 
 /** What the organiser sets when creating it. */
 export const createTestingRequest = z.object({
@@ -77,6 +91,11 @@ export interface TestingTierView {
   id: string;
   name: string;
   vials: number;
+  /** Its own lab, when not the testing's. */
+  lab: string | null;
+  /** The tier it upgrades, and the upgrade that replaced it (names). */
+  upgrades: string | null;
+  upgradedTo: string | null;
   reached: boolean;
   /** Its share covered so far (0 to 1), from where the tier before ends. */
   share: number;
@@ -196,9 +215,11 @@ export interface TierStep {
   /** Its cost and the vials given back for it. */
   cost: number;
   vialCost: number;
-  /** The pot it needs, with the tiers before it. */
+  /** The pot it needs, with the tiers before it (an upgrade reuses what the tier it replaces costs). */
   needed: number;
   reached: boolean;
+  /** Reached, but an upgrade of it was reached too: it is not done (nor paid). */
+  upgradedTo: TestingTier | null;
   missing: number;
   share: number;
   unitsLeft: number | null;
@@ -216,18 +237,38 @@ export function tierSteps(input: {
   done?: readonly string[] | null;
 }): TierStep[] {
   let before = 0;
-  return input.tiers.map((tier) => {
+  const own = new Map<string, number>();
+  const steps = input.tiers.map((tier) => {
     const vialCost = tier.vials * input.vialPrice;
-    const needed = before + tier.cost + vialCost;
-    const reached = input.done ? input.done.includes(tier.id) : input.pot >= needed;
+    // An upgrade: what the tier it replaces costs is used for it instead.
+    const reused = tier.replaces ? (own.get(tier.replaces) ?? 0) : 0;
+    const needed = before - reused + tier.cost + vialCost;
+    own.set(tier.id, tier.cost + vialCost);
+    const done = input.done ? input.done.includes(tier.id) : null;
+    const reached = done ?? input.pot >= needed;
     const missing = reached ? 0 : Math.max(needed - input.pot, 0);
     const span = needed - before;
     const share = reached ? 1 : span > 0 ? Math.min(Math.max((input.pot - before) / span, 0), 1) : 0;
     const unitsLeft =
       reached || input.done ? null : input.unitValue > 0 ? Math.max(Math.ceil(missing / input.unitValue), 1) : null;
     before = needed;
-    return { tier, cost: tier.cost, vialCost, needed, reached, missing, share, unitsLeft };
+    return { tier, cost: tier.cost, vialCost, needed, reached, upgradedTo: null as TestingTier | null, missing, share, unitsLeft };
   });
+  // A tier whose upgrade was reached (or done) is upgraded, not done.
+  for (const step of steps) {
+    if (!step.tier.replaces) continue;
+    const replaced = steps.find((s) => s.tier.id === step.tier.replaces);
+    if (!replaced) continue;
+    const upgraded = input.done ? input.done.includes(step.tier.id) : step.reached;
+    if (upgraded) {
+      replaced.upgradedTo = step.tier;
+      replaced.reached = true;
+      replaced.missing = 0;
+      replaced.share = 1;
+      replaced.unitsLeft = null;
+    }
+  }
+  return steps;
 }
 
 /** One person who can be drawn to donate a vial (their order, published by its short id). */
@@ -272,12 +313,30 @@ export function settleDraw(
   reached: readonly string[],
   ranked: ReadonlyArray<Pick<DrawCandidate, 'ref'>>,
 ): { tiersDone: string[]; donors: string[] } {
+  const upgradeOf = (id: string): TestingTier | undefined =>
+    tiersList.find((tier) => tier.replaces === id && reached.includes(tier.id));
   let vials = 0;
-  const done: string[] = [];
+  const done = new Set<string>();
+  const skipped: TestingTier[] = [];
   for (const tier of tiersList) {
-    if (!reached.includes(tier.id) || vials + tier.vials > ranked.length) break;
+    if (!reached.includes(tier.id)) break;
+    // Upgraded: its upgrade is done instead (unless that one cannot be).
+    if (upgradeOf(tier.id)) {
+      skipped.push(tier);
+      continue;
+    }
+    if (vials + tier.vials > ranked.length) break;
     vials += tier.vials;
-    done.push(tier.id);
+    done.add(tier.id);
   }
-  return { tiersDone: done, donors: ranked.slice(0, vials).map((c) => c.ref) };
+  // An upgrade that could not be done: the tier it replaced is done after all.
+  for (const tier of skipped) {
+    const up = upgradeOf(tier.id);
+    if (up && done.has(up.id)) continue;
+    if (vials + tier.vials > ranked.length) continue;
+    vials += tier.vials;
+    done.add(tier.id);
+  }
+  const tiersDone = tiersList.filter((tier) => done.has(tier.id)).map((tier) => tier.id);
+  return { tiersDone, donors: ranked.slice(0, vials).map((c) => c.ref) };
 }

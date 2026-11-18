@@ -799,3 +799,10 @@ html[data-theme='dark'] .gb-testing-badge--hot {
   gap: 8px;
   padding: 0 16px 12px 0;
 }
+/* Which earlier tier a tier upgrades: a label and one button per tier. */
+.gb-testing-tier-upgrade {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 16px 8px;
+}
