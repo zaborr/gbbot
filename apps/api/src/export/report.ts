@@ -702,7 +702,7 @@ function testingSheet(input: ReportInput, testings: readonly Testing[]): Sheet {
         money(step.vialCost),
         money(step.needed),
         money(step.missing),
-        tier?.reached ? L('tcol.yes') : L('tcol.no'),
+        tier?.upgradedTo ? `⬆️ ${tier.upgradedTo}` : tier?.reached ? L('tcol.yes') : L('tcol.no'),
       ]);
     }
   }

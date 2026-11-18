@@ -35,6 +35,10 @@ interface TierDraft {
   name: string;
   cost: string;
   vials: string;
+  /** Empty: the testing's lab. */
+  lab: string;
+  /** The earlier tier it upgrades, or null. */
+  replaces: string | null;
 }
 
 const newTier = (): TierDraft => ({
@@ -42,6 +46,8 @@ const newTier = (): TierDraft => ({
   name: '',
   cost: '',
   vials: '1',
+  lab: '',
+  replaces: null,
 });
 
 const FEE_MODES: TestingFeeMode[] = ['mandatory', 'mandatory_non_vip', 'optional'];
@@ -123,6 +129,8 @@ function TestingForm({
           name: tier.name,
           cost: toMajor(tier.cost),
           vials: String(tier.vials),
+          lab: tier.lab ?? '',
+          replaces: tier.replaces ?? null,
         }))
       : [newTier()],
   );
@@ -138,11 +146,18 @@ function TestingForm({
   const perUnitCents = perUnit.trim() === '' || !perUnitOk ? 0 : cents(perUnit);
   const tierOk = (tier: TierDraft): boolean =>
     tier.name.trim() !== '' && MONEY_RE.test(tier.cost.trim()) && cents(tier.cost) > 0 && COUNT_RE.test(tier.vials.trim());
+  // An upgrade only of a tier before it (moving tiers around can undo that).
+  const upgradeOk = (index: number): boolean => {
+    const target = tiers[index]?.replaces;
+    return !target || tiers.slice(0, index).some((tier) => tier.id === target);
+  };
   const parsedTiers: TestingTier[] = tiers.filter(tierOk).map((tier) => ({
     id: tier.id,
     name: tier.name.trim(),
     cost: cents(tier.cost),
     vials: Number(tier.vials.trim()),
+    lab: tier.lab.trim() && tier.lab.trim() !== lab.trim() ? tier.lab.trim() : null,
+    replaces: upgradeOk(tiers.indexOf(tier)) ? tier.replaces : null,
   }));
 
   // The price of a vial (what a donor gets back), and what a unit adds.
@@ -242,6 +257,11 @@ function TestingForm({
             id: step.tier.id,
             name: step.tier.name,
             vials: step.tier.vials,
+            lab: step.tier.lab ?? null,
+            upgrades: step.tier.replaces
+              ? (parsedTiers.find((x) => x.id === step.tier.replaces)?.name ?? null)
+              : null,
+            upgradedTo: step.upgradedTo?.name ?? null,
             reached: step.reached,
             share: step.share,
             unitsLeft: step.unitsLeft,
@@ -431,6 +451,45 @@ function TestingForm({
                   />
                 </div>
               </div>
+              <Input
+                header={t('testing.tierLab')}
+                placeholder={lab.trim() || t('testing.labPlaceholder')}
+                value={tier.lab}
+                disabled={!editable}
+                onChange={(e) => updateTier(index, { lab: e.target.value })}
+              />
+              {index > 0 && (
+                <div className="gb-testing-tier-upgrade">
+                  <span className="gb-hint">{t('testing.tierUpgrades')}</span>
+                  <div className="gb-chips">
+                    <Button
+                      size="s"
+                      mode={tier.replaces === null ? 'filled' : 'bezeled'}
+                      disabled={!editable}
+                      onClick={() => updateTier(index, { replaces: null })}
+                    >
+                      {t('testing.tierUpgradesNone')}
+                    </Button>
+                    {tiers.slice(0, index).map((before) => {
+                      const taken = tiers.some((x) => x.id !== tier.id && x.replaces === before.id);
+                      return (
+                        <Button
+                          key={before.id}
+                          size="s"
+                          mode={tier.replaces === before.id ? 'filled' : 'bezeled'}
+                          disabled={!editable || taken}
+                          onClick={() => updateTier(index, { replaces: before.id })}
+                        >
+                          {before.name.trim() || t('testing.tierName', { n: tiers.indexOf(before) + 1 })}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  {tier.replaces && !upgradeOk(index) && (
+                    <span className="gb-hint">{t('testing.tierUpgradeMoved')}</span>
+                  )}
+                </div>
+              )}
               {zero && zero.unitsLeft !== null && (
                 <span className="gb-hint gb-testing-tier-hint">
                   {t('testing.tierEquals', { amount: fmt(zero.needed), units: units(zero.unitsLeft) })}
@@ -454,7 +513,13 @@ function TestingForm({
                     size="s"
                     mode="plain"
                     disabled={tiers.length === 1}
-                    onClick={() => setTiers(tiers.filter((_, i) => i !== index))}
+                    onClick={() =>
+              setTiers(
+                tiers
+                  .filter((_, i) => i !== index)
+                  .map((x) => (x.replaces === tier.id ? { ...x, replaces: null } : x)),
+              )
+            }
                   >
                     {t('testing.removeTier')}
                   </Button>
@@ -578,16 +643,18 @@ function PotSection({ testing, steps }: { testing: Testing; steps: ReturnType<ty
             key={step.tier.id}
             before={
               <span className="gb-testing-tier-icon" aria-hidden="true">
-                {step.reached ? '✅' : step === next ? '⏳' : '🔒'}
+                {step.upgradedTo ? '⬆️' : step.reached ? '✅' : step === next ? '⏳' : '🔒'}
               </span>
             }
             after={<span className="gb-testing-money">{fmt(step.cost + step.vialCost)}</span>}
             subtitle={
-              step.reached
-                ? t('testing.tierReached')
-                : step.unitsLeft !== null
-                  ? t('testing.potMissingUnits', { amount: fmt(step.missing), units: units(step.unitsLeft) })
-                  : t('testing.potMissing', { amount: fmt(step.missing) })
+              step.upgradedTo
+                ? t('testing.tierUpgradedTo', { tier: step.upgradedTo.name })
+                : step.reached
+                  ? t('testing.tierReached')
+                  : step.unitsLeft !== null
+                    ? t('testing.potMissingUnits', { amount: fmt(step.missing), units: units(step.unitsLeft) })
+                    : t('testing.potMissing', { amount: fmt(step.missing) })
             }
             multiline
           >

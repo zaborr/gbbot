@@ -255,6 +255,9 @@ function toTestingDTO(
       id: step.tier.id,
       name: step.tier.name,
       vials: step.tier.vials,
+      lab: step.tier.lab && step.tier.lab !== row.lab ? step.tier.lab : null,
+      upgrades: step.tier.replaces ? (row.tiers.find((x) => x.id === step.tier.replaces)?.name ?? null) : null,
+      upgradedTo: step.upgradedTo?.name ?? null,
       reached: step.reached,
       share: step.share,
       unitsLeft: step.unitsLeft,
@@ -304,7 +307,8 @@ function toTestingDTO(
           balance:
             pot -
             steps
-              .filter((step) => step.reached)
+              // An upgraded tier is not done: its money went to the upgrade.
+              .filter((step) => step.reached && !step.upgradedTo)
               .reduce((sum, step) => sum + step.cost + (settled ? 0 : step.vialCost), 0),
         }
       : null,

@@ -68,3 +68,47 @@ describe('testing money', () => {
     expect(createTestingRequest.safeParse({ ...base, tiers: [tiers[0]!, tiers[0]!] }).success).toBe(false);
   });
 });
+
+describe('testing upgrades', () => {
+  const ladder: TestingTier[] = [
+    { id: 'purity', name: 'Purity', cost: 10000, vials: 1 },
+    { id: 'mass', name: 'Mass purity', cost: 25000, vials: 1, lab: 'Better lab', replaces: 'purity' },
+    { id: 'endo', name: 'Endotoxins', cost: 5000, vials: 0 },
+  ];
+
+  it('reuses what the tier it upgrades costs, and marks that one as upgraded', () => {
+    // Vials at 10: purity 110, mass 110 − 110 + 260 = 260, endotoxins 310.
+    const below = tierSteps({ tiers: ladder, pot: 20000, vialPrice: 1000, unitValue: 1000 });
+    expect(below.map((s) => s.needed)).toEqual([11000, 26000, 31000]);
+    expect(below.map((s) => s.reached)).toEqual([true, false, false]);
+    expect(below[0]?.upgradedTo).toBeNull();
+
+    const above = tierSteps({ tiers: ladder, pot: 26000, vialPrice: 1000, unitValue: 1000 });
+    expect(above[0]).toMatchObject({ reached: true, upgradedTo: expect.objectContaining({ id: 'mass' }) });
+    expect(above[1]?.reached).toBe(true);
+  });
+
+  it('draws vials for the upgrade, not for what it replaces', () => {
+    const ranked = [{ ref: 'a' }, { ref: 'b' }];
+    expect(settleDraw(ladder, ['purity', 'mass', 'endo'], ranked)).toEqual({
+      tiersDone: ['mass', 'endo'],
+      donors: ['a'],
+    });
+    // Mass purity not reached: purity is done.
+    expect(settleDraw(ladder, ['purity'], ranked)).toEqual({ tiersDone: ['purity'], donors: ['a'] });
+  });
+
+  it('wants an upgrade to replace one tier before it', () => {
+    const base = {
+      productId: '8a6e0804-2bd0-4672-b79d-d97027f9071a',
+      variantId: null,
+      lab: 'Lab',
+      contribution: 500,
+      perUnit: 0,
+      feeMode: 'mandatory' as const,
+    };
+    expect(createTestingRequest.safeParse({ ...base, tiers: ladder }).success).toBe(true);
+    const later = [{ ...ladder[0]!, replaces: 'mass' }, { ...ladder[1]!, replaces: null }];
+    expect(createTestingRequest.safeParse({ ...base, tiers: later }).success).toBe(false);
+  });
+});
