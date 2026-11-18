@@ -26,7 +26,8 @@ function chipOf(order: Order): { text: string; kind: Kind } {
   const kinds: Record<OrderStatus, Kind> = {
     pending: 'warn',
     awaiting_payment: 'info',
-    paid: 'ok',
+    // Green only once it has arrived; paid and on its way are blue.
+    paid: 'info',
     shipped: 'info',
     fulfilled: 'ok',
     cancelled: '',
