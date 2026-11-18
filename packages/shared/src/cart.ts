@@ -29,8 +29,10 @@ export const cartTesting = z.object({
   /** "Product · variant", for display. */
   label: z.string(),
   amount: moneyAmount,
-  /** Offers to donate a vial (free testing if drawn). */
+  /** Offers to donate a vial (its price goes back if drawn). */
   volunteer: z.boolean(),
+  /** The fee comes with the product: it cannot be left out. */
+  mandatory: z.boolean(),
 });
 export type CartTesting = z.infer<typeof cartTesting>;
 

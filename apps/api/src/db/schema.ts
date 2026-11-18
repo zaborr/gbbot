@@ -16,6 +16,7 @@ import {
 import { relations } from 'drizzle-orm';
 import type {
   Blacklist,
+  TestingFeeMode,
   BotGroupStatus,
   BotSwitchNotices,
   Lang,
@@ -33,7 +34,6 @@ import type {
   CheckoutFields,
   TestingTier,
   TestingDraw,
-  TestingSettlement,
   WebRole,
 } from '@tma-shop/shared';
 
@@ -384,8 +384,10 @@ export const testings = pgTable(
     /** The product's token when it was created: contributions are paid in it. */
     currency: text('currency').notNull(),
     lab: text('lab').notNull(),
-    /** The most each participant pays (minor units). */
+    /** The testing fee, paid once per buyer (minor units). */
     contribution: integer('contribution').notNull(),
+    /** Who pays the fee: everyone, whoever chooses to, or everyone but VIPs. */
+    feeMode: text('fee_mode').$type<TestingFeeMode>().notNull().default('mandatory'),
     /** Leftovers below this per person are not sent back. */
     refundThreshold: integer('refund_threshold').notNull().default(200),
     tiers: jsonb('tiers').$type<TestingTier[]>().notNull(),
@@ -394,8 +396,8 @@ export const testings = pgTable(
     notifiedTiers: integer('notified_tiers').notNull().default(0),
     /** The draw of donors (block, candidates, result). */
     draw: jsonb('draw').$type<TestingDraw>(),
-    /** How the money was worked out, once settled. */
-    settlement: jsonb('settlement').$type<TestingSettlement>(),
+    /** No longer used (money of the first testing model). */
+    settlement: jsonb('settlement'),
     /** The lab report (a file in Telegram) and when it was sent to the participants. */
     report: jsonb('report').$type<{ fileId: string; kind: 'document' | 'photo'; sentAt: string }>(),
     /** The bot asked an organiser for the report: their reply carries it. */

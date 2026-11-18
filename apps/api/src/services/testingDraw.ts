@@ -18,13 +18,14 @@ import { withoutBlocked } from './blacklist.js';
 import { notifyUsers } from './notifications.js';
 import type { ShopRow } from './shop.js';
 import { botToken } from './activeBot.js';
+import { testingTotals } from './testing.js';
 
 /**
  * The draw of donors for a testing: the organiser launches it once the GB is
- * closed and every contribution paid; the next Bitcoin block decides it.
- * Volunteers come first; if they are not enough, everyone who bought what is
- * tested. Each candidate's place comes from sha256(block hash + short order id),
- * so anyone can check it.
+ * closed and every fee paid; the next Bitcoin block decides it. Candidates are
+ * those who paid the fee (and VIPs exempt from it who offered a vial);
+ * volunteers come first. Each candidate's place comes from
+ * sha256(block hash + short order id), so anyone can check it.
  */
 
 type TestingRow = typeof testings.$inferSelect;
@@ -79,6 +80,7 @@ async function unpaidEntries(db: Database, testingId: string): Promise<number> {
       and(
         eq(testingEntries.testingId, testingId),
         ne(orders.status, 'cancelled'),
+        sql`${testingEntries.amount} > 0`,
         sql`${orders.amountPaid} < ${orders.total}`,
       ),
     );
@@ -94,9 +96,10 @@ export async function drawBlocker(db: Database, shop: ShopRow, testing: TestingR
 }
 
 /**
- * Who can be drawn: paid participants (volunteers marked), and everyone else
- * whose paid order has what is tested. One place per person, blacklisted
- * customers left out.
+ * Who can be drawn: those who paid the fee (their order paid in full), and VIPs
+ * exempt from it who offered a vial. One place per person, blacklisted
+ * customers left out. Each with the price of one unit of what is tested on
+ * their order: what a donor gets back.
  */
 async function loadCandidates(db: Database, env: Env, shop: ShopRow, testing: TestingRow): Promise<DrawCandidate[]> {
   const entries = await db
@@ -105,32 +108,29 @@ async function loadCandidates(db: Database, env: Env, shop: ShopRow, testing: Te
     .innerJoin(orders, eq(testingEntries.orderId, orders.id))
     .where(and(eq(testingEntries.testingId, testing.id), ne(orders.status, 'cancelled')))
     .orderBy(asc(testingEntries.createdAt));
-  const buyers = await db
-    .select({ order: orders })
-    .from(orders)
-    .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
-    .where(
-      and(
-        eq(orders.shopId, shop.id),
-        eq(orderItems.productId, testing.productId),
-        testing.variantId ? eq(orderItems.variantId, testing.variantId) : undefined,
-      ),
-    )
-    .orderBy(asc(orders.createdAt));
+  const orderIds = entries.map((e) => e.order.id);
+  const items =
+    orderIds.length > 0
+      ? await db
+          .select({ orderId: orderItems.orderId, unitPrice: orderItems.unitPrice, variantId: orderItems.variantId })
+          .from(orderItems)
+          .where(and(inArray(orderItems.orderId, orderIds), eq(orderItems.productId, testing.productId)))
+      : [];
+  const priceOf = (orderId: string): number =>
+    items.find((i) => i.orderId === orderId && (testing.variantId === null || i.variantId === testing.variantId))
+      ?.unitPrice ?? 0;
 
   const people = new Map<number, DrawCandidate>();
   for (const { entry, order } of entries) {
     if (order.userId === null || order.amountPaid < order.total || people.has(order.userId)) continue;
+    // Exempt (fee 0): only as a volunteer.
+    if (entry.amount <= 0 && !entry.volunteer) continue;
     people.set(order.userId, {
       orderId: order.id,
       ref: shortRef(order.id),
       volunteer: entry.volunteer,
-      paid: entry.amount,
+      vialPrice: priceOf(order.id),
     });
-  }
-  for (const { order } of buyers) {
-    if (order.userId === null || people.has(order.userId) || !isSaleStatus(order.status as OrderStatus)) continue;
-    people.set(order.userId, { orderId: order.id, ref: shortRef(order.id), volunteer: false, paid: 0 });
   }
   const allowed = new Set(await withoutBlocked(db, env, shop, [...people.keys()]));
   return [...people.entries()].filter(([userId]) => allowed.has(userId)).map(([, c]) => c);
@@ -238,9 +238,9 @@ export async function finishDraw(
 
   const shop = await db.query.shops.findFirst({ where: eq(shops.id, testing.shopId) });
   if (!shop) return false;
-  const raised = await paidRaised(db, testing.id);
+  const units = (await testingTotals(db, [testing.id])).get(testing.id)?.units ?? 0;
   const ranked = rankCandidates(hash, draw.candidates);
-  const { tiersDone, donors } = settleDraw(testing.tiers, raised, ranked);
+  const { tiersDone, donors } = settleDraw(testing.tiers, units, ranked);
   const done: TestingDraw = {
     ...draw,
     hash,
@@ -296,22 +296,6 @@ export async function finishDraw(
     tr(lang, 'testing.drawDonor', { shop: shop.name, product: what, height: draw.height, link }),
   );
   return true;
-}
-
-/** Contributions counted: entries whose order is paid in full. */
-async function paidRaised(db: Database, testingId: string): Promise<number> {
-  const [row] = await db
-    .select({ sum: sql<number>`coalesce(sum(${testingEntries.amount}), 0)::bigint` })
-    .from(testingEntries)
-    .innerJoin(orders, eq(testingEntries.orderId, orders.id))
-    .where(
-      and(
-        eq(testingEntries.testingId, testingId),
-        ne(orders.status, 'cancelled'),
-        sql`${orders.amountPaid} >= ${orders.total}`,
-      ),
-    );
-  return Number(row?.sum ?? 0);
 }
 
 /** Checks the draws waiting for their block (every minute while the server runs). */

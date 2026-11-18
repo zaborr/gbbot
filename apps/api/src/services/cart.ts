@@ -153,7 +153,7 @@ export async function getCart(
     lines.length > 0 && !(isVip && shop?.vipNoFee) ? (shop?.orderFee ?? 0) : 0;
   // Testings ticked here that still apply (the cart holds what they test).
   const testings = shop
-    ? await cartTestingsFor(db, shop, cart.id, userId, cartLinesForTesting(lines))
+    ? await cartTestingsFor(db, shop, cart.id, userId, cartLinesForTesting(lines), isVip)
     : [];
 
   return {

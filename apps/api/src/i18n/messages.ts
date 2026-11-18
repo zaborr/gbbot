@@ -182,6 +182,7 @@ const en = {
   'order.reducedRefund': 'You will get {amount} back.',
   'order.reducedTotal': 'New total: {total}.',
   'order.reducedToPay': 'New total to pay: {total}.',
+  'testing.vialRefund': '🧪 {shop} · {product}: thank you for the vial for the testing! {amount} go back to you on your order.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -356,6 +357,7 @@ const es: Record<BotMessageKey, string> = {
   'order.reducedRefund': 'Se te devolverán {amount}.',
   'order.reducedTotal': 'Nuevo total: {total}.',
   'order.reducedToPay': 'Nuevo total a pagar: {total}.',
+  'testing.vialRefund': '🧪 {shop} · {product}: ¡gracias por el vial para el testing! Se te devuelven {amount} en tu pedido.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -528,6 +530,7 @@ const it: Record<BotMessageKey, string> = {
   'order.reducedRefund': 'Ti verranno restituiti {amount}.',
   'order.reducedTotal': 'Nuovo totale: {total}.',
   'order.reducedToPay': 'Nuovo totale da pagare: {total}.',
+  'testing.vialRefund': '🧪 {shop} · {product}: grazie per la fiala per il testing! Ti vengono restituiti {amount} sul tuo ordine.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -700,6 +703,7 @@ const pt: Record<BotMessageKey, string> = {
   'order.reducedRefund': 'Ser-lhe-ão devolvidos {amount}.',
   'order.reducedTotal': 'Novo total: {total}.',
   'order.reducedToPay': 'Novo total a pagar: {total}.',
+  'testing.vialRefund': '🧪 {shop} · {product}: obrigado pelo frasco para o testing! São-lhe devolvidos {amount} na sua encomenda.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

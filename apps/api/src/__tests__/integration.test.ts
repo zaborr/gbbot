@@ -33,6 +33,7 @@ import { goalTotals } from '../services/goal.js';
 import { cancelDrawsOnReopen, finishDraw, launchDraw } from '../services/testingDraw.js';
 import { botToken, loadActiveBot, useBot } from '../services/activeBot.js';
 import { switchBot } from '../services/botSwitch.js';
+import { resetVipCache } from '../services/vip.js';
 import {
   addCreatorAccount,
   checkCreatorAccounts,
@@ -886,10 +887,10 @@ describeDb('API integration', () => {
       variantId: null,
       lab: 'Lab X',
       contribution: 2000,
-      refundThreshold: 200,
+      feeMode: 'optional',
       tiers: [
-        { id: 'mp', name: 'M&P', cost: 20000, vials: 1 },
-        { id: 'endo', name: 'Endo', cost: 10000, vials: 0 },
+        { id: 'mp', name: 'M&P', units: 10, cost: 20000, vials: 1 },
+        { id: 'endo', name: 'Endo', units: 20, cost: 10000, vials: 0 },
       ],
     };
     const create = (): Promise<Response> =>
@@ -963,8 +964,8 @@ describeDb('API integration', () => {
         variantId: null,
         lab: 'Lab',
         contribution: 2000,
-        refundThreshold: 200,
-        tiers: [{ id: 'mp', name: 'M&P', cost: 2000, vials: 1 }],
+        feeMode: 'optional',
+        tiers: [{ id: 'mp', name: 'M&P', units: 1, cost: 2000, vials: 1 }],
       }),
     });
     const { id: testingId } = (await created.json()) as { id: string };
@@ -1004,11 +1005,11 @@ describeDb('API integration', () => {
       testing: number;
     };
     expect(order).toMatchObject({ total: items + 2000, testing: 2000 });
-    const listed = async (): Promise<{ raised: number; pending: number; joined: boolean }> => {
+    const listed = async (): Promise<{ raised: number; units: number; pendingUnits: number; joined: boolean }> => {
       const res = await request(`/api/products/${productId}/testings`, { headers: auth });
-      return ((await res.json()) as Array<{ raised: number; pending: number; joined: boolean }>)[0]!;
+      return ((await res.json()) as Array<{ raised: number; units: number; pendingUnits: number; joined: boolean }>)[0]!;
     };
-    expect(await listed()).toMatchObject({ raised: 0, pending: 2000, joined: true });
+    expect(await listed()).toMatchObject({ raised: 0, units: 0, pendingUnits: 1, joined: true });
 
     // Counted once the whole order is paid; and one entry per person.
     await request(`/api/admin/orders/${orderId}`, {
@@ -1016,7 +1017,7 @@ describeDb('API integration', () => {
       headers: admin,
       body: JSON.stringify({ status: 'paid' }),
     });
-    expect(await listed()).toMatchObject({ raised: 2000, pending: 0 });
+    expect(await listed()).toMatchObject({ raised: 2000, units: 1, pendingUnits: 0 });
     await request('/api/cart/items', {
       method: 'POST',
       headers: auth,
@@ -1025,7 +1026,7 @@ describeDb('API integration', () => {
     expect((await join()).status).toBe(409);
     const participants = await request(`/api/admin/testings/${testingId}/participants`, { headers: admin });
     expect(await participants.json()).toEqual([
-      expect.objectContaining({ contact: 'alice_test', paid: true, volunteer: true, amount: 2000 }),
+      expect.objectContaining({ contact: 'alice_test', paid: true, volunteer: true, amount: 2000, units: 1 }),
     ]);
     // Taken part in: it cannot be deleted, nor its tiers changed.
     expect((await request(`/api/admin/testings/${testingId}`, { method: 'DELETE', headers: admin })).status).toBe(409);
@@ -1056,8 +1057,8 @@ describeDb('API integration', () => {
         variantId: null,
         lab: 'Lab',
         contribution: 1000,
-        refundThreshold: 200,
-        tiers: [{ id: 'mp', name: 'M&P', cost: 5000, vials: 1 }],
+        feeMode: 'optional',
+        tiers: [{ id: 'mp', name: 'M&P', units: 1, cost: 5000, vials: 1 }],
       }),
     });
     const { id: testingId } = (await created.json()) as { id: string };
@@ -1114,8 +1115,8 @@ describeDb('API integration', () => {
         variantId: null,
         lab: 'Lab',
         contribution: 1000,
-        refundThreshold: 200,
-        tiers: [{ id: 'mp', name: 'M&P', cost: 500, vials: 1 }],
+        feeMode: 'optional',
+        tiers: [{ id: 'mp', name: 'M&P', units: 1, cost: 500, vials: 1 }],
       }),
     });
     const { id: testingId } = (await created.json()) as { id: string };
@@ -1159,8 +1160,8 @@ describeDb('API integration', () => {
       const launched = await launchDraw(db, testEnv, shopRow, testingId, explorer);
       expect(launched.draw).toMatchObject({ height: 900001, hash: null });
       expect(launched.draw?.candidates).toEqual([
-        expect.objectContaining({ orderId, volunteer: true, paid: 1000 }),
-        expect.objectContaining({ orderId: danOrder, volunteer: false, paid: 1000 }),
+        expect.objectContaining({ orderId, volunteer: true, vialPrice: expect.any(Number) as number }),
+        expect.objectContaining({ orderId: danOrder, volunteer: false }),
       ]);
 
       expect(await finishDraw(db, testEnv, launched, explorer)).toBe(true);
@@ -1187,7 +1188,7 @@ describeDb('API integration', () => {
     await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
   });
 
-  it('settles a drawn testing: donors get it all back, the rest share the leftover', async () => {
+  it('closes a drawn testing: the donor gets the vial back, the fees stay', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
       'content-type': 'application/json',
@@ -1201,16 +1202,19 @@ describeDb('API integration', () => {
         variantId: null,
         lab: 'Lab',
         contribution: 1000,
-        refundThreshold: 200,
-        tiers: [{ id: 'mp', name: 'M&P', cost: 600, vials: 1 }],
+        feeMode: 'mandatory',
+        tiers: [{ id: 'mp', name: 'M&P', units: 2, cost: 600, vials: 1 }],
       }),
     });
     const { id: testingId } = (await created.json()) as { id: string };
+    // Mandatory: the fee comes with the product; Alice also offers a vial.
     const join = async (userId: number, name: string, volunteer: boolean): Promise<string> => {
       const headers = { Authorization: `Bearer ${await authToken(userId, name)}`, 'content-type': 'application/json' };
       await db.delete(carts).where(eq(carts.userId, userId));
       await request('/api/cart/items', { method: 'POST', headers, body: JSON.stringify({ productId, quantity: 1 }) });
-      await request('/api/cart/testings', { method: 'POST', headers, body: JSON.stringify({ testingId, volunteer }) });
+      if (volunteer) {
+        await request('/api/cart/testings', { method: 'POST', headers, body: JSON.stringify({ testingId, volunteer }) });
+      }
       const placed = await request('/api/orders', {
         method: 'POST',
         headers,
@@ -1222,6 +1226,9 @@ describeDb('API integration', () => {
     };
     const volunteer = await join(CUSTOMER_ID, 'Alice', true);
     const other = await join(555000888, 'Eve', false);
+    const [fee] = await db.select().from(orders).where(eq(orders.id, other));
+    expect(fee?.testing).toBe(1000);
+    const [item] = await db.select().from(orderItems).where(eq(orderItems.orderId, volunteer));
 
     await db.update(shops).set({ closedAt: new Date() }).where(eq(shops.id, shopId));
     try {
@@ -1232,22 +1239,18 @@ describeDb('API integration', () => {
       const shopRow = (await db.query.shops.findFirst({ where: eq(shops.id, shopId) }))!;
       const launched = await launchDraw(db, testEnv, shopRow, testingId, explorer);
       await finishDraw(db, testEnv, launched, explorer);
+      const [drawn] = await db.select().from(testings).where(eq(testings.id, testingId));
+      expect(drawn?.draw).toMatchObject({ donors: [volunteer.slice(0, 8)], tiersDone: ['mp'] });
 
-      // The lab charged 500 in the end: 2 000 raised − 1 000 back to the donor − 500 = 500 for Eve.
-      const body = JSON.stringify({ realCosts: { mp: 500 } });
-      const preview = await request(`/api/admin/testings/${testingId}/settle-preview`, { method: 'POST', headers: admin, body });
-      expect(await preview.json()).toMatchObject({
-        settlement: { raised: 2000, spent: 500, donorRefunds: 1000, leftover: 500, perPerson: 500 },
-        refunds: { [volunteer.slice(0, 8)]: 1000, [other.slice(0, 8)]: 500 },
-      });
-      expect((await request(`/api/admin/testings/${testingId}/settle`, { method: 'POST', headers: admin, body })).status).toBe(200);
+      expect((await request(`/api/admin/testings/${testingId}/settle`, { method: 'POST', headers: admin })).status).toBe(200);
       const rows = await db.select().from(orders).where(inArray(orders.id, [volunteer, other]));
       const due = (id: string): number => {
         const o = rows.find((r) => r.id === id)!;
         return o.total - o.amountPaid;
       };
-      expect(due(volunteer)).toBe(-1000);
-      expect(due(other)).toBe(-500);
+      // The donor gets the price of the vial back; the other keeps the fee paid.
+      expect(due(volunteer)).toBe(-item!.unitPrice);
+      expect(due(other)).toBe(0);
       const [settled] = await db.select().from(testings).where(eq(testings.id, testingId));
       expect(settled?.status).toBe('settled');
       // A GB with a settled testing cannot be opened again.
@@ -1260,6 +1263,62 @@ describeDb('API integration', () => {
     await db.delete(testings).where(eq(testings.id, testingId));
     await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
     await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
+  });
+
+  it('exempts VIPs from a fee mandatory for the rest', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const auth = {
+      Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const created = await request('/api/admin/testings', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({
+        productId,
+        variantId: null,
+        lab: 'Lab',
+        contribution: 700,
+        feeMode: 'mandatory_non_vip',
+        tiers: [{ id: 'mp', name: 'M&P', units: 5, cost: 600, vials: 1 }],
+      }),
+    });
+    const { id: testingId } = (await created.json()) as { id: string };
+    await db.delete(carts).where(eq(carts.userId, CUSTOMER_ID));
+    await request('/api/cart/items', { method: 'POST', headers: auth, body: JSON.stringify({ productId, quantity: 1 }) });
+    const cartOf = async () =>
+      (await (await request('/api/cart', { headers: auth })).json()) as { testings: Array<{ amount: number; mandatory: boolean }> };
+    // Not VIP: the fee is there and cannot be left out.
+    expect((await cartOf()).testings).toEqual([expect.objectContaining({ amount: 700, mandatory: true })]);
+    // As a VIP: no fee (only a vial offer would add the testing, at 0).
+    const [shopRow] = await db.select().from(shops).where(eq(shops.id, shopId));
+    await db
+      .update(shops)
+      .set({ vipClub: { ...shopRow!.vipClub, userIds: [CUSTOMER_ID] } })
+      .where(eq(shops.id, shopId));
+    resetVipCache();
+    try {
+      const vipAuth = {
+        Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}`,
+        'content-type': 'application/json',
+      };
+      const vipCart = (await (await request('/api/cart', { headers: vipAuth })).json()) as { testings: unknown[] };
+      expect(vipCart.testings).toEqual([]);
+      const listed = (await (await request(`/api/products/${productId}/testings`, { headers: vipAuth })).json()) as Array<{
+        exempt: boolean;
+      }>;
+      expect(listed[0]?.exempt).toBe(true);
+    } finally {
+      await db.update(shops).set({ vipClub: shopRow!.vipClub }).where(eq(shops.id, shopId));
+      resetVipCache();
+      await db.delete(carts).where(eq(carts.userId, CUSTOMER_ID));
+      await db.delete(testings).where(eq(testings.id, testingId));
+      await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
+    }
   });
 
   it('cancels a testing: what was paid for it goes back', async () => {
@@ -1280,8 +1339,8 @@ describeDb('API integration', () => {
         variantId: null,
         lab: 'Lab',
         contribution: 1000,
-        refundThreshold: 200,
-        tiers: [{ id: 'mp', name: 'M&P', cost: 600, vials: 1 }],
+        feeMode: 'optional',
+        tiers: [{ id: 'mp', name: 'M&P', units: 1, cost: 600, vials: 1 }],
       }),
     });
     const { id: testingId } = (await created.json()) as { id: string };

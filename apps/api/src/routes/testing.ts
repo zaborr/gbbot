@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { createTestingRequest, langFrom, settleTestingRequest, updateTestingRequest } from '@tma-shop/shared';
+import { createTestingRequest, langFrom, updateTestingRequest } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { drawBlocker, launchDraw, substituteDonor } from '../services/testingDraw.js';
-import { cancelTesting, requestReport, settlePreview, settleTesting } from '../services/testingSettle.js';
+import { cancelTesting, requestReport, settleTesting } from '../services/testingSettle.js';
 import { languagesOf } from '../services/notifications.js';
 import { ApiError } from '../lib/errors.js';
 import {
@@ -52,19 +52,9 @@ export function testingAdminRoutes(): Hono<AppBindings> {
     },
   );
   // Settling the money, cancelling, and asking (through the bot) for the lab report.
-  app.post('/:id/settle-preview', zValidator('param', idParam), zValidator('json', settleTestingRequest), async (c) => {
-    const testing = await c
-      .get('db')
-      .query.testings.findFirst({ where: (t, { and, eq }) => and(eq(t.shopId, c.get('shopId')), eq(t.id, c.req.valid('param').id)) });
-    if (!testing) throw ApiError.notFound('Testing not found');
-    const { settlement, refunds } = await settlePreview(c.get('db'), testing, c.req.valid('json'));
-    return c.json({
-      settlement,
-      refunds: Object.fromEntries([...refunds].map(([orderId, amount]) => [orderId.slice(0, 8), amount])),
-    });
-  });
-  app.post('/:id/settle', zValidator('param', idParam), zValidator('json', settleTestingRequest), async (c) => {
-    await settleTesting(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('param').id, c.req.valid('json'));
+  // Closing it: donors get their vial's price back on their order.
+  app.post('/:id/settle', zValidator('param', idParam), async (c) => {
+    await settleTesting(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('param').id);
     return c.json({ ok: true });
   });
   app.post('/:id/cancel', zValidator('param', idParam), async (c) => {

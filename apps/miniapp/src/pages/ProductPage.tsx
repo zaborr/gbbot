@@ -377,8 +377,49 @@ function TestingActions({
   if (testing.joined) return <Cell multiline>{t('testing.joinedAlready')}</Cell>;
   if (closed || testing.status !== 'open') return <Cell multiline>{t('testing.closedNow')}</Cell>;
 
-  const joined = inCart ? ticked !== undefined : choice.join;
   const volunteer = inCart ? (ticked?.volunteer ?? false) : choice.volunteer;
+  const volunteerSwitch = (onToggle: (value: boolean) => void): React.JSX.Element => (
+    <Cell
+      Component="label"
+      after={<Switch checked={volunteer} disabled={busy} onChange={(e) => onToggle(e.target.checked)} />}
+      subtitle={t('testing.volunteerHint')}
+      multiline
+    >
+      {t('testing.volunteer')}
+    </Cell>
+  );
+
+  // A VIP exempt from the fee: nothing to pay, and every result; only a vial to offer.
+  if (testing.exempt) {
+    return (
+      <>
+        <Cell multiline>{t('testing.exemptNote')}</Cell>
+        {volunteerSwitch((value) => {
+          if (!inCart) onChoice({ join: value, volunteer: value });
+          else run(() => (value ? joinTesting(testing.id, true) : leaveTesting(testing.id)));
+        })}
+        {error && <Cell multiline>{error}</Cell>}
+      </>
+    );
+  }
+
+  // Mandatory: the fee comes with the product.
+  if (testing.feeMode !== 'optional') {
+    return (
+      <>
+        <Cell multiline subtitle={inCart ? t('testing.joinInCart') : t('testing.joinOnAdd', { item: what })}>
+          {t('testing.feeIncluded', { amount })}
+        </Cell>
+        {volunteerSwitch((value) => {
+          if (!inCart) onChoice({ join: value, volunteer: value });
+          else run(() => joinTesting(testing.id, value));
+        })}
+        {error && <Cell multiline>{error}</Cell>}
+      </>
+    );
+  }
+
+  const joined = inCart ? ticked !== undefined : choice.join;
   const setJoined = (join: boolean): void => {
     if (!inCart) onChoice({ join, volunteer: join && choice.volunteer });
     else run(() => (join ? joinTesting(testing.id, false) : leaveTesting(testing.id)));
@@ -398,16 +439,7 @@ function TestingActions({
       >
         {t('testing.joinSwitch', { amount })}
       </Cell>
-      {joined && (
-        <Cell
-          Component="label"
-          after={<Switch checked={volunteer} disabled={busy} onChange={(e) => setVolunteer(e.target.checked)} />}
-          subtitle={t('testing.volunteerHint')}
-          multiline
-        >
-          {t('testing.volunteer')}
-        </Cell>
-      )}
+      {joined && volunteerSwitch(setVolunteer)}
       {error && <Cell multiline>{error}</Cell>}
     </>
   );

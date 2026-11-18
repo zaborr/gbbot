@@ -1,8 +1,8 @@
 import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
-import { settleMoney, tierProgress, type Lang, type TestingTier } from '@tma-shop/shared';
+import { tierProgress, type Lang } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
-import { orders, testingEntries, testings } from '../db/schema.js';
+import { orderItems, orders, testingEntries, testings } from '../db/schema.js';
 import { tr } from '../i18n/messages.js';
 import { ApiError } from '../lib/errors.js';
 import { TelegramApi } from '../telegram/api.js';
@@ -10,10 +10,11 @@ import { languagesOf, notifyUsers } from './notifications.js';
 import type { ShopRow } from './shop.js';
 import { audience, testedLabel } from './testingDraw.js';
 import { botToken } from './activeBot.js';
+import { testingTotals } from './testing.js';
 
 /**
- * The end of a testing: working out the money (what each participant gets
- * back), cancelling it, and sending the lab report to the participants.
+ * The end of a testing: closing it (donors get their vial's price back),
+ * cancelling it, and sending the lab report to whoever may see it.
  * Refunds are made the usual way: an order that now costs less than what was
  * paid shows what is owed, and the organiser marks it as sent back.
  */
@@ -62,105 +63,52 @@ async function refundEntry(
     .where(eq(orders.id, entry.orderId));
 }
 
-export interface SettleInput {
-  /** What the lab finally charged, per tier done (planned cost when left out). */
-  realCosts: Record<string, number>;
-  /** A tier added with the leftover (only when it covers it all). */
-  extra?: { name: string; cost: number } | undefined;
-}
-
-/** What settling would give now (also shown before confirming). */
-export async function settlePreview(db: Database, testing: TestingRow, input: SettleInput) {
-  const rows = await liveEntries(db, testing.id);
-  const paid = rows.filter(({ order }) => order.amountPaid >= order.total);
-  const raised = paid.reduce((sum, { entry }) => sum + entry.amount, 0);
-  const donorRefs = new Set(testing.draw?.donors ?? []);
-  const entries = paid.map(({ entry, order }) => ({
-    orderId: order.id,
-    amount: entry.amount,
-    donor: donorRefs.has(order.id.slice(0, 8)),
-  }));
-  const doneIds = new Set(testing.status === 'drawn' ? (testing.draw?.tiersDone ?? []) : []);
-  const done = testing.tiers.filter((tier) => doneIds.has(tier.id));
-  // No tier done (not even the first reached, or none could be covered): everything goes back.
-  const allBack =
-    testing.status === 'drawn'
-      ? done.length === 0
-      : !(tierProgress(testing.tiers, raised, testing.contribution)[0]?.reached ?? false);
-  const cost = (tier: TestingTier): number => input.realCosts[tier.id] ?? tier.realCost ?? tier.cost;
-  const base = done.reduce((sum, tier) => sum + cost(tier), 0);
-  const before = settleMoney(entries, base, testing.refundThreshold, allBack);
-  if (input.extra && input.extra.cost > before.settlement.leftover) {
-    throw ApiError.conflict('extra_not_covered', 'The leftover does not cover that extra tier');
-  }
-  const spent = base + (input.extra?.cost ?? 0);
-  return { ...settleMoney(entries, spent, testing.refundThreshold, allBack), done, cost, paid };
-}
-
-/** Settles the money of a drawn testing (or one that reached no tier): refunds go on the orders. */
-export async function settleTesting(
-  db: Database,
-  env: Env,
-  shop: ShopRow,
-  id: string,
-  input: SettleInput,
-): Promise<TestingRow> {
+/**
+ * Closes a drawn testing (or one that reached no tier): each donor gets the
+ * price of the vial they give back on their order (shown there as owed, then
+ * marked as sent back the usual way). The fees stay: nothing else goes back.
+ */
+export async function settleTesting(db: Database, env: Env, shop: ShopRow, id: string): Promise<TestingRow> {
   const testing = await findTesting(db, shop.id, id);
-  if (testing.status !== 'drawn' && testing.status !== 'closed') {
+  const nothingReached = testing.status === 'closed' && !(await anyTierReached(db, testing));
+  if (testing.status !== 'drawn' && !nothingReached) {
     throw ApiError.conflict('settle_not_ready', 'Draw the donors before settling');
   }
-  const { settlement, refunds, done, cost, paid } = await settlePreview(db, testing, input);
-  if (testing.status === 'closed' && !settlement.allBack) {
-    throw ApiError.conflict('settle_not_ready', 'Draw the donors before settling');
-  }
-  const tiers: TestingTier[] = testing.tiers.map((tier) =>
-    done.includes(tier) ? { ...tier, realCost: cost(tier) } : tier,
-  );
-  if (input.extra) {
-    tiers.push({
-      id: `extra-${Date.now().toString(36)}`,
-      name: input.extra.name,
-      cost: input.extra.cost,
-      realCost: input.extra.cost,
-      vials: 0,
-      extra: true,
-    });
-  }
+  const draw = testing.draw;
+  const donors = (draw?.candidates ?? []).filter((c) => draw?.donors.includes(c.ref));
+  const rows = await liveEntries(db, testing.id);
   const [row] = await db.transaction(async (tx) => {
-    for (const { entry, order } of paid) await refundEntry(tx, entry, refunds.get(order.id) ?? 0);
+    for (const donor of donors) {
+      const found = rows.find(({ order }) => order.id === donor.orderId);
+      if (found) await refundEntry(tx, found.entry, donor.vialPrice);
+    }
     return tx
       .update(testings)
-      .set({
-        status: 'settled',
-        tiers,
-        settlement: { ...settlement, at: new Date().toISOString() },
-        draw: testing.draw && input.extra
-          ? { ...testing.draw, tiersDone: [...testing.draw.tiersDone, tiers[tiers.length - 1]?.id ?? ''] }
-          : testing.draw,
-        updatedAt: new Date(),
-      })
+      .set({ status: 'settled', updatedAt: new Date() })
       .where(and(eq(testings.id, testing.id), inArray(testings.status, ['drawn', 'closed'])))
       .returning();
   });
   if (!row) throw ApiError.conflict('settle_not_ready', 'Draw the donors before settling');
 
   const what = await testedLabel(db, testing);
-  for (const { order } of paid) {
-    if (order.userId === null) continue;
-    const back = refunds.get(order.id) ?? 0;
-    const [chat] = await audience(db, env, shop, [order.id]);
-    if (chat === undefined) continue;
+  for (const donor of donors) {
+    const [chat] = await audience(db, env, shop, [donor.orderId]);
+    if (chat === undefined || donor.vialPrice <= 0) continue;
     await notifyUsers(db, botToken(env), [chat], (lang: Lang) =>
-      back > 0
-        ? tr(lang, 'testing.settledRefund', {
-            shop: shop.name,
-            product: what,
-            amount: formatMoney(back, testing.currency),
-          })
-        : tr(lang, 'testing.settledNoRefund', { shop: shop.name, product: what }),
+      tr(lang, 'testing.vialRefund', {
+        shop: shop.name,
+        product: what,
+        amount: formatMoney(donor.vialPrice, testing.currency),
+      }),
     );
   }
   return row;
+}
+
+/** Whether the units paid reach at least the first tier. */
+async function anyTierReached(db: Database, testing: TestingRow): Promise<boolean> {
+  const units = (await testingTotals(db, [testing.id])).get(testing.id)?.units ?? 0;
+  return tierProgress(testing.tiers, units).some((p) => p.reached);
 }
 
 /**
@@ -217,14 +165,35 @@ export async function cancelTesting(db: Database, env: Env, shop: ShopRow, id: s
   return row;
 }
 
-/** Who gets the report: participants who paid, and the donors. */
+/**
+ * Who gets the report: those who paid the fee, the donors, and VIPs exempt
+ * from the fee who bought what is tested (they see every result).
+ */
 async function reportAudience(db: Database, env: Env, shop: ShopRow, testing: TestingRow): Promise<number[]> {
   const rows = await liveEntries(db, testing.id);
   const donorOrders = (testing.draw?.candidates ?? [])
     .filter((c) => testing.draw?.donors.includes(c.ref))
     .map((c) => c.orderId);
-  const paid = rows.filter(({ order }) => order.amountPaid >= order.total).map(({ order }) => order.id);
-  return audience(db, env, shop, [...new Set([...paid, ...donorOrders])]);
+  const paid = rows
+    .filter(({ entry, order }) => entry.amount > 0 && order.amountPaid >= order.total)
+    .map(({ order }) => order.id);
+  const vips =
+    testing.feeMode === 'mandatory_non_vip'
+      ? await db
+          .selectDistinct({ id: orders.id })
+          .from(orders)
+          .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+          .where(
+            and(
+              eq(orders.shopId, shop.id),
+              eq(orders.isVip, true),
+              ne(orders.status, 'cancelled'),
+              eq(orderItems.productId, testing.productId),
+              testing.variantId ? eq(orderItems.variantId, testing.variantId) : undefined,
+            ),
+          )
+      : [];
+  return audience(db, env, shop, [...new Set([...paid, ...donorOrders, ...vips.map((v) => v.id)])]);
 }
 
 /** The bot asks this organiser (in their chat with it) to reply with the report. */

@@ -960,6 +960,7 @@ function OrderTestingOffers({ order, onAdded }: { order: Order; onAdded: () => v
     (x) =>
       x.status === 'open' &&
       !x.joined &&
+      !x.exempt &&
       x.currency === order.currency &&
       order.items.some(
         (item) => item.productId === x.productId && (x.variantId === null || item.variantId === x.variantId),

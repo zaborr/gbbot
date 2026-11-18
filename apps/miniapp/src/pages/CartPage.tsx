@@ -79,6 +79,8 @@ export function CartPage(): React.JSX.Element {
     (x) =>
       x.status === 'open' &&
       !x.joined &&
+      !x.exempt &&
+      x.feeMode === 'optional' &&
       !(cart?.testings ?? []).some((c) => c.testingId === x.id) &&
       (cart?.lines ?? []).some(
         (line) => line.product.id === x.productId && (x.variantId === null || line.variant?.id === x.variantId),
@@ -365,16 +367,23 @@ export function CartPage(): React.JSX.Element {
           <Cell
             key={x.testingId}
             after={money(x.amount)}
-            subtitle={x.volunteer ? t('testing.volunteerChip') : undefined}
+            subtitle={
+              [x.mandatory ? t('testing.mandatoryChip') : null, x.volunteer ? t('testing.volunteerChip') : null]
+                .filter(Boolean)
+                .join(' · ') || undefined
+            }
             description={
-              <Button
-                size="s"
-                mode="plain"
-                loading={testingBusy === x.testingId}
-                onClick={() => onTesting(x.testingId, () => leaveTesting(x.testingId))}
-              >
-                {t('cart.remove')}
-              </Button>
+              // A mandatory fee comes with the product: only an optional one can be left out.
+              x.mandatory ? undefined : (
+                <Button
+                  size="s"
+                  mode="plain"
+                  loading={testingBusy === x.testingId}
+                  onClick={() => onTesting(x.testingId, () => leaveTesting(x.testingId))}
+                >
+                  {t('cart.remove')}
+                </Button>
+              )
             }
             multiline
           >
