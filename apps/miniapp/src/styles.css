@@ -785,3 +785,17 @@ html[data-theme='dark'] .gb-testing-badge--hot {
   gap: 4px;
   margin-top: 4px;
 }
+
+/* Giving to a testing from the order: the amount and its button on one line. */
+.gb-donation {
+  border-bottom: 1px solid var(--tgui--divider);
+}
+.gb-donation:last-of-type {
+  border-bottom: 0;
+}
+.gb-donation-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 0 16px 12px 0;
+}

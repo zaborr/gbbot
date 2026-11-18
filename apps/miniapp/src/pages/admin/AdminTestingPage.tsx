@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import {
+  MAX_DONATION_HOURS,
   MAX_TESTING_TIERS,
   tierSteps,
   type Product,
@@ -114,6 +115,7 @@ function TestingForm({
   const [contribution, setContribution] = useState(testing ? toMajor(testing.contribution) : '');
   const [perUnit, setPerUnit] = useState(money ? toMajor(money.perUnit) : '');
   const [feeMode, setFeeMode] = useState<TestingFeeMode>(testing?.feeMode ?? 'mandatory');
+  const [donationHours, setDonationHours] = useState(String(testing?.donationHours ?? 48));
   const [tiers, setTiers] = useState<TierDraft[]>(
     money
       ? money.tiers.map((tier) => ({
@@ -162,6 +164,7 @@ function TestingForm({
     setTiers(next);
   };
 
+  const hoursOk = COUNT_RE.test(donationHours.trim()) && Number(donationHours) >= 1 && Number(donationHours) <= MAX_DONATION_HOURS;
   const problem = !lab.trim()
     ? t('testing.needLab')
     : !contributionOk
@@ -170,7 +173,9 @@ function TestingForm({
         ? t('testing.badPerUnit')
         : tiers.length === 0 || parsedTiers.length !== tiers.length
           ? t('testing.badTiers')
-          : null;
+          : !hoursOk
+            ? t('testing.badDonationHours', { max: MAX_DONATION_HOURS })
+            : null;
 
   const save = async (): Promise<void> => {
     setBusy(true);
@@ -181,6 +186,7 @@ function TestingForm({
         perUnit: perUnitCents,
         feeMode,
         tiers: parsedTiers,
+        donationHours: Number(donationHours),
       };
       if (testing) {
         await api.adminUpdateTesting(testing.id, body);
@@ -246,6 +252,10 @@ function TestingForm({
           exempt: false,
           draw: null,
           reportSentAt: null,
+          donationHours: Number(donationHours) || 48,
+          donationsUntil: null,
+          donationsOpen: false,
+          donationProductId: null,
           money: null,
         }
       : null;
@@ -341,6 +351,19 @@ function TestingForm({
         />
         <Cell multiline>
           <span className="gb-hint">{locked ? t('testing.feeLockedHint') : t('testing.perUnitHint')}</span>
+        </Cell>
+        <Input
+          header={t('testing.donationHoursField')}
+          type="text"
+          inputMode="numeric"
+          placeholder="48"
+          status={hoursOk ? 'default' : 'error'}
+          value={donationHours}
+          disabled={!editable}
+          onChange={(e) => setDonationHours(e.target.value)}
+        />
+        <Cell multiline>
+          <span className="gb-hint">{t('testing.donationHoursHint')}</span>
         </Cell>
       </Section>
 
@@ -537,6 +560,9 @@ function PotSection({ testing, steps }: { testing: Testing; steps: ReturnType<ty
           value={fmt(m.fees)}
         />
         {m.extras > 0 && <Line label={t('testing.potExtras')} value={fmt(m.extras)} />}
+        {(m.donations > 0 || testing.donationsUntil) && (
+          <Line label={t('testing.potDonations')} value={fmt(m.donations)} />
+        )}
         <Line
           label={t('testing.potHidden', { units: units(m.units), amount: fmt(m.perUnit) })}
           value={fmt(m.perUnitTotal)}
@@ -713,9 +739,13 @@ function DrawSection({ testing, onChange }: { testing: Testing; onChange: () => 
     const reason =
       blocker === 'gb_open'
         ? t('testing.drawGbOpen')
-        : blocker === 'unpaid'
-          ? t('testing.drawUnpaid')
-          : t('testing.drawReady', { vials });
+        : blocker === 'donations_open'
+          ? t('testing.drawDonationsOpen', {
+              date: testing.donationsUntil ? new Date(testing.donationsUntil).toLocaleString() : '—',
+            })
+          : blocker === 'unpaid'
+            ? t('testing.drawUnpaid')
+            : t('testing.drawReady', { vials });
     return (
       <Section header={t('testing.drawTitle')} footer={t('testing.drawFooter')}>
         <ErrorBanner message={actions.error} />

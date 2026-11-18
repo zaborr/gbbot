@@ -495,6 +495,10 @@ export async function markOrderPaid(
       .where(eq(orders.id, order.id))
       .returning();
     if (!updated) throw new Error('Failed to update order');
+    // Paid in full: what it gives to testings is paid too.
+    if (amountPaid >= order.total) {
+      await tx.update(orderItems).set({ donationUnpaid: 0 }).where(eq(orderItems.orderId, order.id));
+    }
 
     if (!order.stockApplied) await takeStock(tx, items);
 

@@ -575,6 +575,19 @@ export class ApiClient {
     return this.request<Cart>(`/cart/testings/${testingId}`, { method: 'DELETE' });
   }
 
+  /** Gives to a testing once the GB is closed (whole units): the order then waits for that payment. */
+  addDonation(orderId: string, testingId: string, amount: number): Promise<Order> {
+    return this.request<Order>(`/orders/${orderId}/donations`, {
+      method: 'POST',
+      body: JSON.stringify({ testingId, amount }),
+    });
+  }
+
+  /** Takes back what was given to a testing, while it is not paid. */
+  removeDonation(orderId: string, testingId: string): Promise<Order> {
+    return this.request<Order>(`/orders/${orderId}/donations/${testingId}`, { method: 'DELETE' });
+  }
+
   /** Joins a product testing with an order already placed (paid or not). */
   addOrderTesting(orderId: string, testingId: string, volunteer: boolean): Promise<Order> {
     return this.request<Order>(`/orders/${orderId}/testings`, {

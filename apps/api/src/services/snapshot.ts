@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { EMPTY_VIP_CLUB, type GbSnapshot } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import { categories, productVariants, products, shops } from '../db/schema.js';
@@ -16,7 +16,11 @@ export async function takeSnapshot(db: Database, shop: ShopRow): Promise<GbSnaps
       .from(categories)
       .where(eq(categories.shopId, shop.id))
       .orderBy(asc(categories.sortOrder), asc(categories.title)),
-    db.select().from(products).where(eq(products.shopId, shop.id)).orderBy(asc(products.createdAt)),
+    db
+      .select()
+      .from(products)
+      .where(and(eq(products.shopId, shop.id), eq(products.kind, 'sale')))
+      .orderBy(asc(products.createdAt)),
   ]);
   const variantRows =
     productRows.length === 0

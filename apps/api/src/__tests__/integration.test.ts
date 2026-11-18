@@ -34,6 +34,7 @@ import { cancelDrawsOnReopen, finishDraw, launchDraw } from '../services/testing
 import { botToken, loadActiveBot, useBot } from '../services/activeBot.js';
 import { switchBot } from '../services/botSwitch.js';
 import { resetVipCache } from '../services/vip.js';
+import { closeDonationWindows, openDonationWindows } from '../services/testingDonations.js';
 import {
   addCreatorAccount,
   checkCreatorAccounts,
@@ -1314,6 +1315,118 @@ describeDb('API integration', () => {
       await db.delete(testings).where(eq(testings.id, testingId));
       await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
       await db.delete(products).where(eq(products.id, tested));
+    }
+  });
+
+  it('lets buyers give for a while once the GB closes; unpaid gifts come off', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const auth = {
+      Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const [seed] = await db.select().from(products).where(eq(products.id, productId));
+    const [own] = await db
+      .insert(products)
+      .values({
+        shopId,
+        categoryId: seed!.categoryId,
+        slug: 'gyokuro-gifts',
+        title: 'Gyokuro',
+        description: '',
+        price: 150,
+        currency: 'USDC',
+        stock: 10,
+        isActive: true,
+      })
+      .returning();
+    const tested = own!.id;
+    const created = await request('/api/admin/testings', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({
+        productId: tested,
+        variantId: null,
+        lab: 'Lab',
+        contribution: 1000,
+        perUnit: 0,
+        feeMode: 'mandatory',
+        donationHours: 1,
+        tiers: [{ id: 'mp', name: 'M&P', cost: 5000, vials: 0 }],
+      }),
+    });
+    const testing = (await created.json()) as { id: string; donationProductId: string };
+    const testingId = testing.id;
+    // Its donation product is not one of the GB's products.
+    const listed = (await (await request('/api/admin/products', { headers: admin })).json()) as Array<{ id: string }>;
+    expect(listed.some((p) => p.id === testing.donationProductId)).toBe(false);
+
+    await db.delete(carts).where(eq(carts.userId, CUSTOMER_ID));
+    await request('/api/cart/items', { method: 'POST', headers: auth, body: JSON.stringify({ productId: tested, quantity: 1 }) });
+    const placed = await request('/api/orders', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ contactUsername: '@alice_test' }),
+    });
+    const { orderId } = (await placed.json()) as { orderId: string };
+    await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+    const give = (amount: number): Promise<Response> =>
+      Promise.resolve(
+        request(`/api/orders/${orderId}/donations`, {
+          method: 'POST',
+          headers: auth,
+          body: JSON.stringify({ testingId, amount }),
+        }),
+      );
+    const pot = async (): Promise<{ donations: number; pot: number }> =>
+      ((await (await request('/api/admin/testings', { headers: admin })).json()) as Array<{
+        id: string;
+        money: { donations: number; pot: number };
+      }>).find((x) => x.id === testingId)!.money;
+
+    // Not while the GB is open.
+    expect((await give(2000)).status).toBe(409);
+    await db.update(shops).set({ closedAt: new Date() }).where(eq(shops.id, shopId));
+    try {
+      await db.update(testings).set({ status: 'closed' }).where(eq(testings.id, testingId));
+      const shopRow = (await db.query.shops.findFirst({ where: eq(shops.id, shopId) }))!;
+      await openDonationWindows(db, testEnv, shopRow);
+      const status = await request(`/api/admin/testings/${testingId}/draw`, { headers: admin });
+      expect(await status.json()).toEqual({ blocker: 'donations_open' });
+
+      // Whole units only; giving twice adds to the same line, and the order waits for it.
+      expect((await give(250)).status).toBe(400);
+      expect((await give(2000)).status).toBe(200);
+      const more = await give(500);
+      const order = (await more.json()) as { status: string; amountDue: number; items: Array<{ productId: string; quantity: number }> };
+      expect(order).toMatchObject({ status: 'pending', amountDue: 2500 });
+      expect(order.items.find((i) => i.productId === testing.donationProductId)?.quantity).toBe(25);
+      // Not paid yet: not in the pot.
+      expect(await pot()).toMatchObject({ donations: 0, pot: 1000 });
+
+      await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+      expect(await pot()).toMatchObject({ donations: 2500, pot: 3500 });
+
+      // Given again and not paid when the time is up: it comes off, the order is paid again.
+      expect((await give(700)).status).toBe(200);
+      await closeDonationWindows(db, testEnv, new Date(Date.now() + 2 * 3600_000));
+      const [row] = await db.select().from(orders).where(eq(orders.id, orderId));
+      expect(row?.status).toBe('paid');
+      expect((row?.total ?? 0) - (row?.amountPaid ?? 0)).toBe(0);
+      expect(await pot()).toMatchObject({ donations: 2500 });
+      const after = await request(`/api/admin/testings/${testingId}/draw`, { headers: admin });
+      expect(await after.json()).toEqual({ blocker: null });
+      expect((await give(100)).status).toBe(409);
+    } finally {
+      await db.update(shops).set({ closedAt: null }).where(eq(shops.id, shopId));
+      await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
+      await db.delete(orders).where(eq(orders.id, orderId));
+      await db.delete(testings).where(eq(testings.id, testingId));
+      await db.delete(products).where(inArray(products.id, [tested, testing.donationProductId]));
+      await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
     }
   });
 

@@ -1,3 +1,4 @@
+import { cancelDonationWindows, openDonationWindows } from './testingDonations.js';
 import { and, eq, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { isClosedAt, type ClosePreview } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
@@ -67,6 +68,8 @@ async function cleanUpClosed(db: Database, env: Env, shop: ShopRow): Promise<voi
     .where(and(eq(testings.shopId, shop.id), eq(testings.status, 'open')));
   // Testings added to paid orders and not paid: they drop out (the order is paid again).
   await dropUnpaidTesting(db, shop.id);
+  // Their buyers can now give for a while (once per closing).
+  await openDonationWindows(db, env, shop);
   await db.delete(orders).where(unpaidOrders(shop.id));
   await db.delete(carts).where(eq(carts.shopId, shop.id));
   const rejected = await db
@@ -107,6 +110,8 @@ export async function reopenShop(db: Database, env: Env, shop: ShopRow): Promise
   }
   // Draws not settled are cancelled (kept in their history; everyone is told).
   await cancelDrawsOnReopen(db, env, shop);
+  // The time to give stops (what was given and paid stays); it starts again at the next closing.
+  await cancelDonationWindows(db, shop);
   const [row] = await db
     .update(shops)
     .set({ closedAt: null, closesAt: null })

@@ -28,7 +28,7 @@ import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
 import { useShopPath } from '../providers/ShopProvider.js';
 import { ShipmentCells } from '../components/TrackingText.js';
-import { locale, t } from '../i18n/index.js';
+import { locale, t, tn } from '../i18n/index.js';
 import { SecurityPhraseBadge } from '../components/SecurityPhrase.js';
 import { OrderStatusChip, OrderTracker } from '../components/OrderStatus.js';
 
@@ -158,6 +158,8 @@ export function PaymentPage(): React.JSX.Element {
       </Section>
 
       {!closed && shop.data.testingEnabled && <OrderTestingOffers order={current} onAdded={reload} />}
+
+      {closed && shop.data.testingEnabled && <DonationSection order={current} onChanged={reload} />}
 
       {!done && <StatusSection order={current} autoCancelHours={shop.data.autoCancelHours} />}
 
@@ -1005,6 +1007,118 @@ function OrderTestingOffers({ order, onAdded }: { order: Order; onAdded: () => v
       >
         {t('testing.volunteer')}
       </Cell>
+      {error && <Cell multiline>{error}</Cell>}
+    </Section>
+  );
+}
+
+/**
+ * Once the GB is closed, for a while: giving to the testings of what this
+ * order has (whole units, added to the order and paid the usual way).
+ */
+function DonationSection({ order, onChanged }: { order: Order; onChanged: () => void }): React.JSX.Element | null {
+  const testings = useAsync(() => api.getTestings(), [order.id, order.total]);
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const open = (testings.data ?? []).filter(
+    (x) =>
+      x.donationsOpen &&
+      (x.joined || x.exempt) &&
+      x.currency === order.currency &&
+      order.items.some(
+        (item) => item.productId === x.productId && (x.variantId === null || item.variantId === x.variantId),
+      ),
+  );
+  if (open.length === 0) return null;
+  // A payment being checked: nothing can be added until it is done.
+  const canGive = order.amountSubmitted === 0 && (order.status === 'paid' || order.status === 'pending');
+
+  const run = (id: string, action: () => Promise<unknown>): void => {
+    setBusy(id);
+    setError(null);
+    void action()
+      .then(() => {
+        setAmounts((current) => ({ ...current, [id]: '' }));
+        onChanged();
+      })
+      .catch((err: unknown) => setError(err instanceof ApiClientError ? err.message : t('error.title')))
+      .finally(() => setBusy(null));
+  };
+
+  return (
+    <Section header={t('donation.title')} footer={t('donation.footer')}>
+      {open.map((x) => {
+        const given = order.items
+          .filter((item) => item.productId === x.donationProductId)
+          .reduce((sum, item) => sum + item.subtotal, 0);
+        const line = given > 0 ? given : null;
+        const next = x.tiers.find((tier) => !tier.reached);
+        const text = amounts[x.id] ?? '';
+        const whole = /^\d+$/.test(text.trim()) ? Number(text.trim()) : 0;
+        const valid = whole >= 1 && whole <= 999;
+        const name = x.variantLabel ? `${x.productTitle} · ${x.variantLabel}` : x.productTitle;
+        return (
+          <div key={x.id} className="gb-donation">
+            <Cell
+              multiline
+              subtitle={[
+                next
+                  ? next.unitsLeft !== null
+                    ? t('donation.next', {
+                        tier: next.name,
+                        units: tn(next.unitsLeft, 'testing.units.one', 'testing.units.other'),
+                      })
+                    : t('donation.nextShare', { tier: next.name, percent: Math.floor(next.share * 100) })
+                  : t('testing.allTiers'),
+                x.donationsUntil
+                  ? t('donation.until', { date: new Date(x.donationsUntil).toLocaleString() })
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+              after={line ? formatPrice(line, order.currency) : undefined}
+            >
+              {name}
+            </Cell>
+            {canGive && (
+              <div className="gb-donation-row">
+                <div style={{ flex: 1 }}>
+                  <Input
+                    header={t('donation.amount', { currency: order.currency })}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="10"
+                    value={text}
+                    status={text.trim() === '' || valid ? 'default' : 'error'}
+                    onChange={(e) => setAmounts((current) => ({ ...current, [x.id]: e.target.value }))}
+                  />
+                </div>
+                <Button
+                  size="m"
+                  disabled={!valid}
+                  loading={busy === x.id}
+                  onClick={() => run(x.id, () => api.addDonation(order.id, x.id, whole * 100))}
+                >
+                  {line ? t('donation.giveMore') : t('donation.give')}
+                </Button>
+              </div>
+            )}
+            {line && order.status === 'pending' && order.amountSubmitted === 0 && (
+              <div className="gb-donation-row">
+                <Button
+                  size="s"
+                  mode="plain"
+                  loading={busy === `remove-${x.id}`}
+                  onClick={() => run(`remove-${x.id}`, () => api.removeDonation(order.id, x.id))}
+                >
+                  {t('donation.remove')}
+                </Button>
+              </div>
+            )}
+          </div>
+        );
+      })}
       {error && <Cell multiline>{error}</Cell>}
     </Section>
   );
