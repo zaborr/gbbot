@@ -8,7 +8,7 @@ import { hasVipPrice, isSoldOut, priceRange } from '../lib/variants.js';
 import { useShop, useShopPath } from '../providers/ShopProvider.js';
 import { t } from '../i18n/index.js';
 import { useCart } from '../providers/CartProvider.js';
-import { productTestingState } from '../lib/testingState.js';
+import { productTestingState, sharePercent } from '../lib/testingState.js';
 
 export function ProductCard({
   product,
@@ -42,12 +42,11 @@ export function ProductCard({
   ) : null;
   const testingLine = testing
     ? [
-        testing.reached.length > 0 ? `${testing.reached[testing.reached.length - 1]?.tier.name ?? ''} ✅` : null,
+        testing.reached.length > 0 ? `${testing.reached[testing.reached.length - 1]?.name ?? ''} ✅` : null,
         testing.next
-          ? t('catalog.testingNext', {
-              units: testing.next.missing,
-              tier: testing.next.tier.name,
-            })
+          ? testing.next.unitsLeft !== null
+            ? t('catalog.testingNext', { units: testing.next.unitsLeft, tier: testing.next.name })
+            : t('catalog.testingNextShare', { percent: sharePercent(testing.next), tier: testing.next.name })
           : t('catalog.testingAll'),
       ]
         .filter(Boolean)

@@ -18,7 +18,7 @@ import { withoutBlocked } from './blacklist.js';
 import { notifyUsers } from './notifications.js';
 import type { ShopRow } from './shop.js';
 import { botToken } from './activeBot.js';
-import { testingTotals } from './testing.js';
+import { reachedTiers } from './testing.js';
 
 /**
  * The draw of donors for a testing: the organiser launches it once the GB is
@@ -238,9 +238,9 @@ export async function finishDraw(
 
   const shop = await db.query.shops.findFirst({ where: eq(shops.id, testing.shopId) });
   if (!shop) return false;
-  const units = (await testingTotals(db, [testing.id])).get(testing.id)?.units ?? 0;
+  const reached = await reachedTiers(db, testing);
   const ranked = rankCandidates(hash, draw.candidates);
-  const { tiersDone, donors } = settleDraw(testing.tiers, units, ranked);
+  const { tiersDone, donors } = settleDraw(testing.tiers, reached, ranked);
   const done: TestingDraw = {
     ...draw,
     hash,

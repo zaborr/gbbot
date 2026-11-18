@@ -43,7 +43,7 @@ import type { Context } from 'hono';
 import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth, requireOwner } from '../auth/middleware.js';
 import { testingAdminRoutes } from './testing.js';
-import { announceTestingTiers, setTestingEnabled } from '../services/testing.js';
+import { announceTestingTiers, listTestings, setTestingEnabled } from '../services/testing.js';
 import {
   createCategory,
   createProduct,
@@ -800,6 +800,7 @@ export function adminRoutes(): Hono<AppBindings> {
       customers,
       request,
       lang,
+      testings: shop.testingEnabled ? await listTestings(db, shop.id) : [],
     });
     if (file.orderCount === 0) {
       throw ApiError.badRequest('nothing_to_export', 'No orders match these filters');

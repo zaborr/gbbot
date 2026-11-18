@@ -22,7 +22,8 @@ interface CartValue {
   setQuantity: (lineId: string, quantity: number) => Promise<void>;
   remove: (lineId: string) => Promise<void>;
   /** Product testings joined with this cart. */
-  joinTesting: (testingId: string, volunteer: boolean) => Promise<void>;
+  /** `extra`: paid on top of the fee, to help (left as it was when not given). */
+  joinTesting: (testingId: string, volunteer: boolean, extra?: number) => Promise<void>;
   leaveTesting: (testingId: string) => Promise<void>;
 }
 
@@ -59,8 +60,8 @@ export function CartProvider({ children }: { children: ReactNode }): React.JSX.E
     setCart(await api.removeCartItem(lineId));
   }, []);
 
-  const joinTesting = useCallback(async (testingId: string, volunteer: boolean) => {
-    setCart(await api.joinTesting(testingId, volunteer));
+  const joinTesting = useCallback(async (testingId: string, volunteer: boolean, extra?: number) => {
+    setCart(await api.joinTesting(testingId, volunteer, extra));
   }, []);
 
   const leaveTesting = useCallback(async (testingId: string) => {

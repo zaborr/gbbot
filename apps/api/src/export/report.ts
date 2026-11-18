@@ -4,6 +4,7 @@ import {
   type ExportScope,
   type Lang,
   type Order,
+  type Testing,
 } from '@tma-shop/shared';
 import { buildCsv, buildXlsx, type CellValue, type Sheet } from './xlsx.js';
 
@@ -22,6 +23,8 @@ export interface ReportInput {
   now?: Date;
   /** Language of the sheet names, headers and labels (the admin's). */
   lang?: Lang;
+  /** The GB's testings with their money (organiser's view): a sheet of their own. */
+  testings?: Testing[];
 }
 
 export interface ReportFile {
@@ -54,6 +57,28 @@ const TEXT = {
     'sheet.orders': 'Orders',
     'sheet.lines': 'Lines',
     'sheet.products': 'Products',
+    'sheet.testing': 'Testing',
+    'tcol.product': 'Product',
+    'tcol.lab': 'Lab',
+    'tcol.status': 'Status',
+    'tcol.fee': 'Fee',
+    'tcol.perUnit': 'Per unit (hidden)',
+    'tcol.units': 'Units sold',
+    'tcol.orders': 'Orders',
+    'tcol.payers': 'Fee paid by',
+    'tcol.fees': 'Fees',
+    'tcol.extras': 'Paid on top',
+    'tcol.hidden': 'Hidden part',
+    'tcol.pot': 'Pot',
+    'tcol.balance': 'Balance',
+    'tcol.tier': 'Tier',
+    'tcol.cost': 'Cost',
+    'tcol.vials': 'Vials given back',
+    'tcol.needed': 'Pot needed',
+    'tcol.missing': 'Missing',
+    'tcol.reached': 'Reached',
+    'tcol.yes': 'Yes',
+    'tcol.no': 'No',
     'col.order': 'Order',
     'col.date': 'Date',
     'col.status': 'Status',
@@ -113,6 +138,28 @@ const TEXT = {
     'sheet.orders': 'Pedidos',
     'sheet.lines': 'Líneas',
     'sheet.products': 'Productos',
+    'sheet.testing': 'Testing',
+    'tcol.product': 'Producto',
+    'tcol.lab': 'Laboratorio',
+    'tcol.status': 'Estado',
+    'tcol.fee': 'Tarifa',
+    'tcol.perUnit': 'Por unidad (oculto)',
+    'tcol.units': 'Unidades vendidas',
+    'tcol.orders': 'Pedidos',
+    'tcol.payers': 'Pagan la tarifa',
+    'tcol.fees': 'Tarifas',
+    'tcol.extras': 'Pagado de más',
+    'tcol.hidden': 'Parte oculta',
+    'tcol.pot': 'Bote',
+    'tcol.balance': 'Saldo',
+    'tcol.tier': 'Tramo',
+    'tcol.cost': 'Coste',
+    'tcol.vials': 'Viales devueltos',
+    'tcol.needed': 'Bote necesario',
+    'tcol.missing': 'Falta',
+    'tcol.reached': 'Conseguido',
+    'tcol.yes': 'Sí',
+    'tcol.no': 'No',
     'col.order': 'Pedido',
     'col.date': 'Fecha',
     'col.status': 'Estado',
@@ -172,6 +219,28 @@ const TEXT = {
     'sheet.orders': 'Ordini',
     'sheet.lines': 'Righe',
     'sheet.products': 'Prodotti',
+    'sheet.testing': 'Testing',
+    'tcol.product': 'Prodotto',
+    'tcol.lab': 'Laboratorio',
+    'tcol.status': 'Stato',
+    'tcol.fee': 'Quota',
+    'tcol.perUnit': 'Per unità (nascosto)',
+    'tcol.units': 'Unità vendute',
+    'tcol.orders': 'Ordini',
+    'tcol.payers': 'Pagano la quota',
+    'tcol.fees': 'Quote',
+    'tcol.extras': 'Pagato in più',
+    'tcol.hidden': 'Parte nascosta',
+    'tcol.pot': 'Fondo',
+    'tcol.balance': 'Saldo',
+    'tcol.tier': 'Livello',
+    'tcol.cost': 'Costo',
+    'tcol.vials': 'Fiale rimborsate',
+    'tcol.needed': 'Fondo necessario',
+    'tcol.missing': 'Manca',
+    'tcol.reached': 'Raggiunto',
+    'tcol.yes': 'Sì',
+    'tcol.no': 'No',
     'col.order': 'Ordine',
     'col.date': 'Data',
     'col.status': 'Stato',
@@ -231,6 +300,28 @@ const TEXT = {
     'sheet.orders': 'Pedidos',
     'sheet.lines': 'Linhas',
     'sheet.products': 'Produtos',
+    'sheet.testing': 'Testing',
+    'tcol.product': 'Produto',
+    'tcol.lab': 'Laboratório',
+    'tcol.status': 'Estado',
+    'tcol.fee': 'Taxa',
+    'tcol.perUnit': 'Por unidade (oculto)',
+    'tcol.units': 'Unidades vendidas',
+    'tcol.orders': 'Encomendas',
+    'tcol.payers': 'Pagam a taxa',
+    'tcol.fees': 'Taxas',
+    'tcol.extras': 'Pago a mais',
+    'tcol.hidden': 'Parte oculta',
+    'tcol.pot': 'Fundo',
+    'tcol.balance': 'Saldo',
+    'tcol.tier': 'Nível',
+    'tcol.cost': 'Custo',
+    'tcol.vials': 'Frascos devolvidos',
+    'tcol.needed': 'Fundo necessário',
+    'tcol.missing': 'Falta',
+    'tcol.reached': 'Conseguido',
+    'tcol.yes': 'Sim',
+    'tcol.no': 'Não',
     'col.order': 'Pedido',
     'col.date': 'Data',
     'col.status': 'Estado',
@@ -545,6 +636,73 @@ function summarySheet(input: ReportInput, orders: readonly Order[], now: Date): 
   return { name: L('sheet.summary'), rows, widths: [18, 24, 9, 12, 12, 11, 12, 12], filter: false };
 }
 
+/** Each testing's money, then each tier against the pot. */
+function testingSheet(input: ReportInput, testings: readonly Testing[]): Sheet {
+  const L = labels(input);
+  const name = (x: Testing): string => (x.variantLabel ? `${x.productTitle} (${x.variantLabel})` : x.productTitle);
+  const rows: CellValue[][] = [
+    [
+      L('tcol.product'),
+      L('tcol.lab'),
+      L('tcol.status'),
+      L('tcol.fee'),
+      L('tcol.perUnit'),
+      L('tcol.units'),
+      L('tcol.orders'),
+      L('tcol.payers'),
+      L('tcol.fees'),
+      L('tcol.extras'),
+      L('tcol.hidden'),
+      L('tcol.pot'),
+      L('tcol.balance'),
+    ],
+  ];
+  for (const x of testings) {
+    const m = x.money;
+    if (!m) continue;
+    rows.push([
+      name(x),
+      x.lab,
+      x.status,
+      money(x.contribution),
+      money(m.perUnit),
+      m.units,
+      m.orders,
+      m.payers,
+      money(m.fees),
+      money(m.extras),
+      money(m.perUnitTotal),
+      money(m.pot),
+      money(m.balance),
+    ]);
+  }
+  rows.push([]);
+  rows.push([
+    L('tcol.product'),
+    L('tcol.tier'),
+    L('tcol.cost'),
+    L('tcol.vials'),
+    L('tcol.needed'),
+    L('tcol.missing'),
+    L('tcol.reached'),
+  ]);
+  for (const x of testings) {
+    for (const step of x.money?.steps ?? []) {
+      const tier = x.tiers.find((t) => t.id === step.id);
+      rows.push([
+        name(x),
+        tier?.name ?? step.id,
+        money(step.cost),
+        money(step.vialCost),
+        money(step.needed),
+        money(step.missing),
+        tier?.reached ? L('tcol.yes') : L('tcol.no'),
+      ]);
+    }
+  }
+  return { name: L('sheet.testing'), rows, widths: [28, 18, 12, 10, 12, 10, 10, 10, 12, 12, 12, 12, 12], filter: false };
+}
+
 function dateStamp(now: Date, timeZone: string): string {
   try {
     return new Intl.DateTimeFormat('en-CA', { timeZone }).format(now);
@@ -571,6 +729,7 @@ export function buildReport(input: ReportInput): ReportFile {
             ordersSheet(input, orders),
             linesSheet(input, orders),
             productsSheet(input, orders),
+            ...(input.testings && input.testings.length > 0 ? [testingSheet(input, input.testings)] : []),
           ],
           { timeZone },
         ),

@@ -302,6 +302,7 @@ export async function createOrderFromCart(
           orderId: order.id,
           userId,
           amount: x.amount,
+          extra: x.extra,
           volunteer: x.volunteer,
         })),
       );

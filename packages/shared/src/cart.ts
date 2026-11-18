@@ -28,7 +28,9 @@ export const cartTesting = z.object({
   testingId: id,
   /** "Product · variant", for display. */
   label: z.string(),
+  /** What it adds to the order: the fee and anything paid on top. */
   amount: moneyAmount,
+  extra: moneyAmount,
   /** Offers to donate a vial (its price goes back if drawn). */
   volunteer: z.boolean(),
   /** The fee comes with the product: it cannot be left out. */
@@ -36,7 +38,12 @@ export const cartTesting = z.object({
 });
 export type CartTesting = z.infer<typeof cartTesting>;
 
-export const cartTestingRequest = z.object({ testingId: id, volunteer: z.boolean() });
+export const cartTestingRequest = z.object({
+  testingId: id,
+  volunteer: z.boolean(),
+  /** Paid on top of the fee, to help (minor units). */
+  extra: z.number().int().min(0).max(100_000_000).optional(),
+});
 export type CartTestingRequest = z.infer<typeof cartTestingRequest>;
 
 export const cart = z.object({

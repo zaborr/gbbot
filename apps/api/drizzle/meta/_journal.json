@@ -435,6 +435,13 @@
       "when": 1795291200000,
       "tag": "0061_order_address_extras",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1795377600000,
+      "tag": "0062_testing_money",
+      "breakpoints": true
     }
   ]
 }
