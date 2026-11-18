@@ -276,7 +276,7 @@ function toTestingDTO(
 async function withLabels(
   db: Database,
   rows: TestingRow[],
-  options: { userId?: number; isVip?: boolean; admin: boolean },
+  options: { userId?: number | undefined; isVip?: boolean; admin: boolean },
 ): Promise<Testing[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);

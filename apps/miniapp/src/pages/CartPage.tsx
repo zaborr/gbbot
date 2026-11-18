@@ -375,7 +375,7 @@ export function CartPage(): React.JSX.Element {
             subtitle={
               [
                 x.mandatory ? t('testing.mandatoryChip') : null,
-                x.extra > 0 ? t('testing.extraIncluded', { amount: money(x.extra) }) : null,
+                x.extra > 0 ? t('testing.extraIncluded', { amount: formatPrice(x.extra, cart?.currency ?? '') }) : null,
                 x.volunteer ? t('testing.volunteerChip') : null,
               ]
                 .filter(Boolean)
