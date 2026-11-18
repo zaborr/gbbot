@@ -188,6 +188,8 @@ const en = {
   'testing.donationsOpen': '🧪 {shop}: the GB is closed and for {hours} h you can give to the testing of {product}. About {units} units\' worth are missing for {tier}: give from your order in the app.',
   'testing.donationsOpenShare': '🧪 {shop}: the GB is closed and for {hours} h you can give to the testing of {product}. {tier} is {percent}% covered: give from your order in the app.',
   'testing.donationsOver': '🧪 {shop}: the time to give to the testing of {product} is over ({amount} given). Unpaid donations were taken off; you can launch the draw.',
+  'testing.barAll': '✅ All tests secured',
+  'testing.barUnits': 'about {units} units to go',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -368,6 +370,8 @@ const es: Record<BotMessageKey, string> = {
   'testing.donationsOpen': '🧪 {shop}: la GB está cerrada y durante {hours} h puedes donar al testing de {product}. Para {tier} faltan unas {units} unidades: dona desde tu pedido en la app.',
   'testing.donationsOpenShare': '🧪 {shop}: la GB está cerrada y durante {hours} h puedes donar al testing de {product}. {tier} está cubierto al {percent} %: dona desde tu pedido en la app.',
   'testing.donationsOver': '🧪 {shop}: ha terminado el periodo de donaciones del testing de {product} ({amount} donados). Las donaciones sin pagar se han quitado; ya puedes lanzar el sorteo.',
+  'testing.barAll': '✅ Todos los tests conseguidos',
+  'testing.barUnits': 'faltan unas {units} unidades',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -546,6 +550,8 @@ const it: Record<BotMessageKey, string> = {
   'testing.donationsOpen': '🧪 {shop}: il GB è chiuso e per {hours} h puoi donare al testing di {product}. Per {tier} mancano circa {units} unità: dona dal tuo ordine nell\'app.',
   'testing.donationsOpenShare': '🧪 {shop}: il GB è chiuso e per {hours} h puoi donare al testing di {product}. {tier} è coperto al {percent}%: dona dal tuo ordine nell\'app.',
   'testing.donationsOver': '🧪 {shop}: è finito il periodo delle donazioni del testing di {product} ({amount} donati). Le donazioni non pagate sono state tolte; puoi lanciare il sorteggio.',
+  'testing.barAll': '✅ Tutti i test ottenuti',
+  'testing.barUnits': 'ne mancano circa {units} unità',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -724,6 +730,8 @@ const pt: Record<BotMessageKey, string> = {
   'testing.donationsOpen': '🧪 {shop}: o GB está fechado e durante {hours} h pode doar para o testing de {product}. Para {tier} faltam cerca de {units} unidades: doe a partir da sua encomenda na app.',
   'testing.donationsOpenShare': '🧪 {shop}: o GB está fechado e durante {hours} h pode doar para o testing de {product}. {tier} está coberto a {percent} %: doe a partir da sua encomenda na app.',
   'testing.donationsOver': '🧪 {shop}: terminou o período de doações do testing de {product} ({amount} doados). As doações por pagar foram retiradas; já pode lançar o sorteio.',
+  'testing.barAll': '✅ Todos os testes garantidos',
+  'testing.barUnits': 'faltam cerca de {units} unidades',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

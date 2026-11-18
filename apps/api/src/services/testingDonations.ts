@@ -11,7 +11,15 @@ import { getOrder } from './orders.js';
 import type { ShopRow } from './shop.js';
 import { botToken } from './activeBot.js';
 import { audience, testedLabel } from './testingDraw.js';
-import { donationOfOrder, donationsOpen, feeExempt, stepsOf, testingTotals, vialPrices } from './testing.js';
+import {
+  donationOfOrder,
+  donationsOpen,
+  feeExempt,
+  progressText,
+  stepsOf,
+  testingTotals,
+  vialPrices,
+} from './testing.js';
 
 /**
  * Giving to a testing once the GB is closed: for a while (hours set per
@@ -303,20 +311,24 @@ export async function openDonationWindows(db: Database, env: Env, shop: ShopRow,
       .returning();
     if (!opened) continue;
     const t = totals.get(row.id);
-    const next = t ? stepsOf(opened, t, prices.get(row.id) ?? 0).find((s) => !s.reached) : undefined;
+    const steps = t ? stepsOf(opened, t, prices.get(row.id) ?? 0) : [];
+    const next = steps.find((s) => !s.reached);
     // Nothing left to reach: no point asking for more.
     if (!next) continue;
     const what = await testedLabel(db, row);
     const ids = await giversOf(db, env, shop, row);
     await notifyUsers(db, botToken(env), ids, (lang: Lang) =>
-      tr(lang, next.unitsLeft !== null ? 'testing.donationsOpen' : 'testing.donationsOpenShare', {
-        shop: shop.name,
-        product: what,
-        tier: next.tier.name,
-        units: next.unitsLeft ?? 0,
-        percent: Math.floor(next.share * 100),
-        hours: row.donationHours,
-      }),
+      [
+        tr(lang, next.unitsLeft !== null ? 'testing.donationsOpen' : 'testing.donationsOpenShare', {
+          shop: shop.name,
+          product: what,
+          tier: next.tier.name,
+          units: next.unitsLeft ?? 0,
+          percent: Math.floor(next.share * 100),
+          hours: row.donationHours,
+        }),
+        progressText(lang, steps, false),
+      ].join('\n\n'),
     );
   }
 }

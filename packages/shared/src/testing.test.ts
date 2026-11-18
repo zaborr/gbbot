@@ -112,3 +112,12 @@ describe('testing upgrades', () => {
     expect(createTestingRequest.safeParse({ ...base, tiers: later }).success).toBe(false);
   });
 });
+
+describe('text bar', () => {
+  it('draws how far a tier is, in ten cells', async () => {
+    const { textBar } = await import('./testing.js');
+    expect(textBar(0.7)).toBe('▓▓▓▓▓▓▓░░░');
+    expect(textBar(0)).toBe('░░░░░░░░░░');
+    expect(textBar(1.4)).toBe('▓▓▓▓▓▓▓▓▓▓');
+  });
+});

@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, isNull, ne, notInArray, sql } from 'drizzle-orm';
-import { DONATION_UNIT, tierSteps, unitValue, type TierStep } from '@tma-shop/shared';
+import { DONATION_UNIT, textBar, tierSteps, unitValue, type Lang, type TierStep } from '@tma-shop/shared';
 import type {
   CartTesting,
   TestingParticipant,
@@ -179,6 +179,19 @@ export function stepsOf(row: TestingRow, totals: TestingTotals, vialPrice: numbe
     }),
     done: drawn ? (row.draw?.tiersDone ?? []) : null,
   });
+}
+
+/**
+ * For bot messages: the next tier as a text bar ("Endotoxins ▓▓▓▓▓▓▓░░░ 70 %"),
+ * with the units still missing when asked; every test secured when there is none.
+ */
+export function progressText(lang: Lang, steps: readonly TierStep[], withUnits: boolean): string {
+  const next = steps.find((step) => !step.reached);
+  if (!next) return tr(lang, 'testing.barAll');
+  const line = `${next.tier.name} ${textBar(next.share)} ${Math.floor(next.share * 100)} %`;
+  return withUnits && next.unitsLeft !== null
+    ? `${line}\n${tr(lang, 'testing.barUnits', { units: next.unitsLeft })}`
+    : line;
 }
 
 /** The tiers a testing's pot covers now, for one testing (loads what it needs). */
@@ -837,9 +850,8 @@ export async function announceTestingTiers(db: Database, env: Env, shopId: strin
   const prices = await vialPrices(db, rows);
   const labels = await withLabels(db, rows, { admin: false });
   for (const row of rows) {
-    const reached = stepsOf(row, totals.get(row.id) ?? EMPTY_TOTALS, prices.get(row.id) ?? 0).filter(
-      (p) => p.reached,
-    ).length;
+    const steps = stepsOf(row, totals.get(row.id) ?? EMPTY_TOTALS, prices.get(row.id) ?? 0);
+    const reached = steps.filter((p) => p.reached).length;
     if (reached <= row.notifiedTiers) continue;
     // Claim it first, so two payments at once do not announce it twice.
     const claimed = await db
@@ -871,7 +883,9 @@ export async function announceTestingTiers(db: Database, env: Env, shopId: strin
     const what = dto?.variantLabel ? `${dto.productTitle} · ${dto.variantLabel}` : (dto?.productTitle ?? '');
     const newly = row.tiers.slice(row.notifiedTiers, reached).map((tier) => tier.name).join(', ');
     await notifyUsers(db, botToken(env), ids, (lang) =>
-      tr(lang, 'testing.tierReached', { shop: shop.name, product: what, tiers: newly }),
+      [tr(lang, 'testing.tierReached', { shop: shop.name, product: what, tiers: newly }), progressText(lang, steps, true)].join(
+        '\n\n',
+      ),
     );
   }
 }
