@@ -156,17 +156,20 @@ export function ErrorBanner({ message }: { message: string | null }): React.JSX.
 
 /**
  * The order's status as a coloured label for the team: orange = the team's
- * turn (payment to check, change requested, refund owed), green = paid or
- * delivered, blue = shipped, grey = waiting for the customer or cancelled.
+ * turn (payment to check, change requested, refund owed), soft orange = paid,
+ * to ship, blue = shipped, green = delivered (done), grey = waiting for the
+ * customer or cancelled.
  */
 export function AdminStatusChip({ order }: { order: Order }): React.JSX.Element {
   const kind = needsAttention(order)
     ? 'gb-chip gb-chip--warn'
-    : order.status === 'paid' || order.status === 'fulfilled'
+    : order.status === 'fulfilled'
       ? 'gb-chip gb-chip--ok'
-      : order.status === 'shipped'
-        ? 'gb-chip gb-chip--info'
-        : 'gb-chip';
+      : order.status === 'paid'
+        ? 'gb-chip gb-chip--soft'
+        : order.status === 'shipped'
+          ? 'gb-chip gb-chip--info'
+          : 'gb-chip';
   return <span className={kind}>{statusLabel(order)}</span>;
 }
 

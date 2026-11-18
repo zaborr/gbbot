@@ -244,8 +244,8 @@ div[style*='padding:'] > .tma-field-wrap {
   color: #1e7a2e;
 }
 .gb-chip--info {
-  background: rgba(36, 129, 204, 0.14);
-  color: #1d5f99;
+  background: rgba(36, 129, 204, 0.18);
+  color: #145a96;
 }
 .gb-chip--vip {
   background: rgba(230, 170, 0, 0.18);
@@ -440,8 +440,8 @@ div[style*='padding:'] > .tma-field-wrap {
   color: #86e096;
 }
 .tma-dark .gb-chip--info {
-  background: rgba(100, 170, 240, 0.18);
-  color: #9cccf5;
+  background: rgba(70, 150, 245, 0.26);
+  color: #8ec3ff;
 }
 .tma-dark .gb-chip--soft {
   background: rgba(255, 160, 60, 0.14);
