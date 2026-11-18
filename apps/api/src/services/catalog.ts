@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import type { CatalogQuery, Category, Product } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
-import { categories, products } from '../db/schema.js';
+import { categories, products, testings } from '../db/schema.js';
 import { toCategoryDTO, toProductDTO } from '../db/mappers.js';
 import { loadVariants } from './variants.js';
 
@@ -32,6 +32,12 @@ export async function listProducts(
   const filters = [eq(products.shopId, shopId), eq(products.isActive, true)];
   if (!showVip) filters.push(eq(products.vipOnly, false));
   if (query.categoryId) filters.push(eq(products.categoryId, query.categoryId));
+  // Only products with a testing (not cancelled).
+  if (query.testing) {
+    filters.push(
+      sql`${products.id} in (select ${testings.productId} from ${testings} where ${testings.shopId} = ${shopId} and ${testings.status} <> 'cancelled')`,
+    );
+  }
   // Search in both languages.
   if (query.search) {
     const pattern = `%${query.search}%`;

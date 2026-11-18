@@ -11,6 +11,7 @@ import { useCart } from '../providers/CartProvider.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
 import { ProductCard } from '../components/ProductCard.js';
+import { productTestingState } from '../lib/testingState.js';
 import { ProductImage } from '../components/ProductImage.js';
 import { useShop, useShopPath } from '../providers/ShopProvider.js';
 import { t } from '../i18n/index.js';
@@ -30,6 +31,7 @@ const PAGE_SIZE = 30;
 interface CatalogPlace {
   categoryId: string | undefined;
   search: string;
+  onlyTesting: boolean;
   more: { items: Product[]; page: number };
   scrollY: number;
 }
@@ -43,6 +45,7 @@ export function CatalogPage(): React.JSX.Element {
   const [place] = useState(() => places.get(shop.id));
   const [categoryId, setCategoryId] = useState<string | undefined>(place?.categoryId);
   const [search, setSearch] = useState(place?.search ?? '');
+  const [onlyTesting, setOnlyTesting] = useState(place?.onlyTesting ?? false);
 
   const categories = useAsync(() => api.getCategories(), []);
   // Orders still to pay: a note at the top and a badge on "My orders".
@@ -52,8 +55,8 @@ export function CatalogPage(): React.JSX.Element {
     shop.testingEnabled,
   ]);
   const unpaid = (myOrders.data ?? []).filter(awaitsPayment);
-  const query = { categoryId, search: search.trim() || undefined };
-  const products = useAsync(() => api.getProducts({ ...query, limit: PAGE_SIZE }), [categoryId, search]);
+  const query = { categoryId, search: search.trim() || undefined, ...(onlyTesting ? { testing: '1' as const } : {}) };
+  const products = useAsync(() => api.getProducts({ ...query, limit: PAGE_SIZE }), [categoryId, search, onlyTesting]);
   // Further pages, appended below the first; cleared when the search or the
   // category changes (an answer for an old search is dropped).
   const [more, setMore] = useState<{ items: Product[]; page: number }>(
@@ -63,18 +66,18 @@ export function CatalogPage(): React.JSX.Element {
   const queryKey = useRef('');
   const firstRun = useRef(true);
   useEffect(() => {
-    queryKey.current = `${categoryId ?? ''}|${search}`;
+    queryKey.current = `${categoryId ?? ''}|${search}|${onlyTesting}`;
     // On arrival the remembered pages stay; a new search starts again.
     if (firstRun.current) {
       firstRun.current = false;
       return;
     }
     setMore({ items: [], page: 1 });
-  }, [categoryId, search]);
+  }, [categoryId, search, onlyTesting]);
 
   // Remember the place when leaving; scroll back to it once the list is there.
-  const latest = useRef({ categoryId, search, more });
-  latest.current = { categoryId, search, more };
+  const latest = useRef({ categoryId, search, onlyTesting, more });
+  latest.current = { categoryId, search, onlyTesting, more };
   useEffect(
     () => () => {
       places.set(shop.id, { ...latest.current, scrollY: window.scrollY });
@@ -105,8 +108,21 @@ export function CatalogPage(): React.JSX.Element {
 
   // A product added meanwhile shifts the pages: never show one twice.
   const seen = new Set<string>();
-  const items = [...(products.data?.items ?? []), ...more.items].filter((p) =>
+  const loaded = [...(products.data?.items ?? []), ...more.items].filter((p) =>
     seen.has(p.id) ? false : (seen.add(p.id), true),
+  );
+  // Only those with a testing: the closest to their next tier first.
+  const openTestings = (testings.data ?? []).filter((x) => x.status === 'open');
+  const items = onlyTesting
+    ? [...loaded].sort(
+        (a, b) =>
+          (productTestingState(a.id, openTestings)?.distance ?? 3) -
+          (productTestingState(b.id, openTestings)?.distance ?? 3),
+      )
+    : loaded;
+  const testedProducts = new Set(openTestings.map((x) => x.productId));
+  const reachedProducts = new Set(
+    [...testedProducts].filter((id) => (productTestingState(id, openTestings)?.reached.length ?? 0) > 0),
   );
   const total = products.data?.total ?? 0;
 
@@ -181,6 +197,24 @@ export function CatalogPage(): React.JSX.Element {
       {canManage && (
         <Section>
           <Cell onClick={() => navigate(to('/admin'))}>{t('catalog.admin')}</Cell>
+        </Section>
+      )}
+
+      {testedProducts.size > 0 && (
+        <Section>
+          <Cell
+            multiline
+            after={
+              <Button size="s" mode={onlyTesting ? 'filled' : 'bezeled'} onClick={() => setOnlyTesting(!onlyTesting)}>
+                {onlyTesting ? t('catalog.testingShowAll') : t('catalog.testingOnly')}
+              </Button>
+            }
+            subtitle={onlyTesting ? t('catalog.testingSorted') : undefined}
+          >
+            {reachedProducts.size > 0
+              ? t('catalog.testingSummaryReached', { count: testedProducts.size, reached: reachedProducts.size })
+              : t('catalog.testingSummary', { count: testedProducts.size })}
+          </Cell>
         </Section>
       )}
 

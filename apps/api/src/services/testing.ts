@@ -226,15 +226,38 @@ export async function listVisibleTestings(
   return withLabels(db, rows, userId, isVip);
 }
 
-/** Whether a GB has a testing people can join now (start screen). */
-export async function shopsWithOpenTesting(db: Database, shopIds: readonly string[]): Promise<Set<string>> {
-  if (shopIds.length === 0) return new Set();
+/**
+ * For the start screen: per GB (testing on), how many products have an open
+ * testing and how many of them have already reached a tier.
+ */
+export async function shopTestingCounts(
+  db: Database,
+  shopIds: readonly string[],
+): Promise<Map<string, { count: number; reached: number }>> {
+  const result = new Map<string, { count: number; reached: number }>();
+  if (shopIds.length === 0) return result;
   const rows = await db
-    .selectDistinct({ shopId: testings.shopId })
+    .select({ testing: testings })
     .from(testings)
     .innerJoin(shops, eq(testings.shopId, shops.id))
     .where(and(inArray(testings.shopId, [...shopIds]), eq(testings.status, 'open'), eq(shops.testingEnabled, true)));
-  return new Set(rows.map((r) => r.shopId));
+  const totals = await testingTotals(
+    db,
+    rows.map((r) => r.testing.id),
+  );
+  const byShop = new Map<string, { products: Set<string>; reached: Set<string> }>();
+  for (const { testing } of rows) {
+    const entry = byShop.get(testing.shopId) ?? { products: new Set<string>(), reached: new Set<string>() };
+    entry.products.add(testing.productId);
+    if (tierProgress(testing.tiers, totals.get(testing.id)?.units ?? 0).some((p) => p.reached)) {
+      entry.reached.add(testing.productId);
+    }
+    byShop.set(testing.shopId, entry);
+  }
+  for (const [shopId, entry] of byShop) {
+    result.set(shopId, { count: entry.products.size, reached: entry.reached.size });
+  }
+  return result;
 }
 
 /** A line (product, variant) as the cart and the order hold it. */
