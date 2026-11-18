@@ -21,7 +21,7 @@ import { donationOfOrder, donationsOpen, feeExempt, stepsOf, testingTotals, vial
  */
 
 type TestingRow = typeof testings.$inferSelect;
-type Writer = Pick<Database, 'select' | 'insert' | 'update' | 'delete'>;
+type Writer = Pick<Database, 'select' | 'selectDistinct' | 'insert' | 'update' | 'delete'>;
 
 /** Formats an amount the way the bot does. */
 const formatMoney = (amount: number, currency: string): string => `${(amount / 100).toFixed(2)} ${currency}`;

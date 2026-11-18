@@ -314,7 +314,7 @@ export async function createOrderFromCart(
 
     return toOrderDTO(
       order,
-      draft.items.map((item) => ({ ...item, id: '', orderId: order.id })),
+      draft.items.map((item) => ({ ...item, id: '', orderId: order.id, donationUnpaid: 0 })),
     );
   });
 }
