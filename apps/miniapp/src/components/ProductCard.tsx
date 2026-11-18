@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Cell } from '@telegram-apps/telegram-ui';
-import { testingTarget, type Product, type Testing } from '@tma-shop/shared';
+import { testingMaxUnits, type Product, type Testing } from '@tma-shop/shared';
 import { formatPrice } from '../lib/format.js';
 import { productDescription, productTitle } from '../lib/localize.js';
 import { ProductImage } from './ProductImage.js';
@@ -32,10 +32,10 @@ export function ProductCard({
     .filter((line) => line.product.id === product.id)
     .reduce((sum, line) => sum + line.quantity, 0);
 
-  // An open testing of it: how far the money raised has got.
+  // An open testing of it: how far the units bought have got towards the last tier.
   const testing = testings.find((x) => x.productId === product.id && x.status === 'open');
   const testingPercent = testing
-    ? Math.min(100, Math.floor((testing.raised * 100) / Math.max(testingTarget(testing.tiers, testing.contribution), 1)))
+    ? Math.min(100, Math.floor((testing.units * 100) / Math.max(testingMaxUnits(testing.tiers), 1)))
     : null;
   const chips = [
     inCart > 0 ? (

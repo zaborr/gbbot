@@ -270,7 +270,7 @@ export async function createOrderFromCart(
       variantId: item.variantId,
       label: item.variantLabel ? `${item.title} · ${item.variantLabel}` : item.title,
     }));
-    const ticked = cart ? await cartTestingsFor(tx, shop, cart.id, userId, testingLines) : [];
+    const ticked = cart ? await cartTestingsFor(tx, shop, cart.id, userId, testingLines, isVip) : [];
     const testing = ticked.reduce((sum, x) => sum + x.amount, 0);
     const [order] = await tx
       .insert(orders)

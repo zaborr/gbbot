@@ -40,10 +40,15 @@ type TestingRow = typeof testings.$inferSelect;
 type Executor = Pick<Database, 'select'>;
 type Writer = Pick<Database, 'select' | 'insert' | 'update' | 'delete'>;
 
-/** Money raised for each testing: an entry counts once its whole order is paid. */
+/**
+ * Where each testing stands: units of what is tested bought by people who pay
+ * the fee (their whole order paid, or not yet), and the fees paid. A VIP who
+ * does not pay the fee (entry of 0) does not count.
+ */
 export interface TestingTotals {
+  units: number;
+  pendingUnits: number;
   raised: number;
-  pending: number;
   participants: number;
 }
 
@@ -54,26 +59,56 @@ export async function testingTotals(
   const result = new Map<string, TestingTotals>();
   if (testingIds.length === 0) return result;
   const paid = sql`${orders.amountPaid} >= ${orders.total}`;
-  const rows = await db
+  const live = and(
+    inArray(testingEntries.testingId, [...testingIds]),
+    ne(orders.status, 'cancelled'),
+    sql`${testingEntries.amount} > 0`,
+  );
+  const money = await db
     .select({
       testingId: testingEntries.testingId,
       raised: sql<number>`coalesce(sum(case when ${paid} then ${testingEntries.amount} else 0 end), 0)::bigint`,
-      pending: sql<number>`coalesce(sum(case when ${paid} then 0 else ${testingEntries.amount} end), 0)::bigint`,
       participants: sql<number>`count(*) filter (where ${paid})::int`,
     })
     .from(testingEntries)
     .innerJoin(orders, eq(testingEntries.orderId, orders.id))
-    .where(and(inArray(testingEntries.testingId, [...testingIds]), ne(orders.status, 'cancelled')))
+    .where(live)
     .groupBy(testingEntries.testingId);
-  for (const row of rows) {
-    result.set(row.testingId, {
-      raised: Number(row.raised),
-      pending: Number(row.pending),
-      participants: Number(row.participants),
+  const units = await db
+    .select({
+      testingId: testingEntries.testingId,
+      units: sql<number>`coalesce(sum(case when ${paid} then ${orderItems.quantity} else 0 end), 0)::int`,
+      pendingUnits: sql<number>`coalesce(sum(case when ${paid} then 0 else ${orderItems.quantity} end), 0)::int`,
+    })
+    .from(testingEntries)
+    .innerJoin(orders, eq(testingEntries.orderId, orders.id))
+    .innerJoin(testings, eq(testingEntries.testingId, testings.id))
+    .innerJoin(
+      orderItems,
+      and(
+        eq(orderItems.orderId, orders.id),
+        eq(orderItems.productId, testings.productId),
+        sql`(${testings.variantId} is null or ${orderItems.variantId} = ${testings.variantId})`,
+      ),
+    )
+    .where(live)
+    .groupBy(testingEntries.testingId);
+  for (const id of testingIds) {
+    const m = money.find((r) => r.testingId === id);
+    const u = units.find((r) => r.testingId === id);
+    result.set(id, {
+      units: Number(u?.units ?? 0),
+      pendingUnits: Number(u?.pendingUnits ?? 0),
+      raised: Number(m?.raised ?? 0),
+      participants: Number(m?.participants ?? 0),
     });
   }
   return result;
 }
+
+/** A VIP does not pay this testing's fee. */
+export const feeExempt = (testing: Pick<TestingRow, 'feeMode'>, isVip: boolean): boolean =>
+  isVip && testing.feeMode === 'mandatory_non_vip';
 
 /** The testings this person already takes part in (on an order not cancelled). */
 async function joinedBy(db: Executor, userId: number | undefined, testingIds: readonly string[]): Promise<Set<string>> {
@@ -101,6 +136,7 @@ function toTestingDTO(
   label: string | null,
   totals: TestingTotals | undefined,
   joined: boolean,
+  isVip: boolean,
 ): Testing {
   return {
     id: row.id,
@@ -111,21 +147,22 @@ function toTestingDTO(
     currency: row.currency,
     lab: row.lab,
     contribution: row.contribution,
-    refundThreshold: row.refundThreshold,
+    feeMode: row.feeMode,
     tiers: row.tiers,
     status: row.status as TestingStatus,
+    units: totals?.units ?? 0,
+    pendingUnits: totals?.pendingUnits ?? 0,
     raised: totals?.raised ?? 0,
     participants: totals?.participants ?? 0,
-    pending: totals?.pending ?? 0,
     joined,
+    exempt: feeExempt(row, isVip),
     draw: row.draw ?? null,
-    settlement: row.settlement ?? null,
     reportSentAt: row.report?.sentAt ?? null,
   };
 }
 
-/** The shop's testings with their product titles, variant labels and money raised. */
-async function withLabels(db: Database, rows: TestingRow[], userId?: number): Promise<Testing[]> {
+/** The shop's testings with their product titles, variant labels and progress. */
+async function withLabels(db: Database, rows: TestingRow[], userId?: number, isVip = false): Promise<Testing[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   const [totals, joined] = await Promise.all([testingTotals(db, ids), joinedBy(db, userId, ids)]);
@@ -149,6 +186,7 @@ async function withLabels(db: Database, rows: TestingRow[], userId?: number): Pr
       row.variantId ? (labels.get(row.variantId) ?? null) : null,
       totals.get(row.id),
       joined.has(row.id),
+      isVip,
     ),
   );
 }
@@ -171,6 +209,7 @@ export async function listVisibleTestings(
   shop: ShopRow,
   userId: number | undefined,
   productId?: string,
+  isVip = false,
 ): Promise<Testing[]> {
   if (!shop.testingEnabled) return [];
   const rows = await db
@@ -184,7 +223,7 @@ export async function listVisibleTestings(
       ),
     )
     .orderBy(asc(testings.createdAt));
-  return withLabels(db, rows, userId);
+  return withLabels(db, rows, userId, isVip);
 }
 
 /** Whether a GB has a testing people can join now (start screen). */
@@ -210,9 +249,10 @@ const covers = (testing: Pick<TestingRow, 'productId' | 'variantId'>, lines: rea
   );
 
 /**
- * The testings ticked in a cart that still apply: the GB has testing on and is
- * open, the testing is open, the cart holds what it tests, and this person is
- * not in it already.
+ * The testings that go with a cart: for each open testing of what the cart
+ * holds (this person not in it yet), the fee when it applies — always when
+ * mandatory (VIPs exempt in that mode), when ticked when optional — and a VIP
+ * exempt only when offering a vial (fee 0).
  */
 export async function cartTestingsFor(
   db: Executor,
@@ -220,31 +260,37 @@ export async function cartTestingsFor(
   cartId: string,
   userId: number,
   lines: ReadonlyArray<Line & { label: string }>,
+  isVip = false,
 ): Promise<CartTesting[]> {
-  if (!shop.testingEnabled || shop.closedAt) return [];
-  const rows = await db
-    .select({ ticked: cartTestings, testing: testings })
-    .from(cartTestings)
-    .innerJoin(testings, eq(cartTestings.testingId, testings.id))
-    .where(eq(cartTestings.cartId, cartId));
-  if (rows.length === 0) return [];
+  if (!shop.testingEnabled || shop.closedAt || lines.length === 0) return [];
+  const open = await db
+    .select()
+    .from(testings)
+    .where(and(eq(testings.shopId, shop.id), eq(testings.status, 'open')));
+  if (open.length === 0) return [];
+  const ticked = await db.select().from(cartTestings).where(eq(cartTestings.cartId, cartId));
   const joined = await joinedBy(
     db,
     userId,
-    rows.map((r) => r.testing.id),
+    open.map((t) => t.id),
   );
-  return rows.flatMap(({ ticked, testing }) => {
-    if (testing.shopId !== shop.id || testing.status !== 'open' || joined.has(testing.id)) return [];
+  return open.flatMap((testing) => {
+    if (joined.has(testing.id)) return [];
     const line = lines.find(
       (l) => l.productId === testing.productId && (testing.variantId === null || l.variantId === testing.variantId),
     );
     if (!line) return [];
+    const tick = ticked.find((t) => t.testingId === testing.id);
+    const exempt = feeExempt(testing, isVip);
+    const pays = !exempt && (testing.feeMode !== 'optional' || tick !== undefined);
+    if (!pays && !(exempt && tick?.volunteer)) return [];
     return [
       {
         testingId: testing.id,
         label: line.label,
-        amount: testing.contribution,
-        volunteer: ticked.volunteer,
+        amount: pays ? testing.contribution : 0,
+        volunteer: tick?.volunteer ?? false,
+        mandatory: testing.feeMode !== 'optional' && !exempt,
       },
     ];
   });
@@ -363,7 +409,7 @@ export async function createTesting(
       currency: product.currency,
       lab: input.lab,
       contribution: input.contribution,
-      refundThreshold: input.refundThreshold,
+      feeMode: input.feeMode,
       tiers: input.tiers,
     })
     .returning();
@@ -381,15 +427,20 @@ export async function updateTesting(
   if (current.status !== 'open') {
     throw ApiError.conflict('testing_not_open', 'Only an open testing can be changed');
   }
-  // Once people take part, what they signed up for stays: same contribution,
+  // Once people take part, what they signed up for stays: same fee and mode,
   // same tiers in the same order (new ones can be added at the end).
   if (await hasEntries(db, current.id)) {
     const kept = input.tiers.slice(0, current.tiers.length);
     const same =
       input.contribution === current.contribution &&
+      input.feeMode === current.feeMode &&
       kept.length === current.tiers.length &&
       current.tiers.every(
-        (tier, i) => kept[i]?.id === tier.id && kept[i]?.cost === tier.cost && kept[i]?.vials === tier.vials,
+        (tier, i) =>
+          kept[i]?.id === tier.id &&
+          kept[i]?.units === tier.units &&
+          kept[i]?.cost === tier.cost &&
+          kept[i]?.vials === tier.vials,
       );
     if (!same) {
       throw ApiError.conflict(
@@ -403,7 +454,7 @@ export async function updateTesting(
     .set({
       lab: input.lab,
       contribution: input.contribution,
-      refundThreshold: input.refundThreshold,
+      feeMode: input.feeMode,
       tiers: input.tiers,
       updatedAt: new Date(),
     })
@@ -436,13 +487,31 @@ export async function listParticipants(
     .leftJoin(users, eq(testingEntries.userId, users.telegramId))
     .where(and(eq(testingEntries.testingId, testing.id), ne(orders.status, 'cancelled')))
     .orderBy(asc(testingEntries.createdAt));
+  const items = await db
+    .select({ orderId: orderItems.orderId, quantity: orderItems.quantity, variantId: orderItems.variantId })
+    .from(orderItems)
+    .where(
+      and(
+        inArray(
+          orderItems.orderId,
+          rows.length > 0 ? rows.map((r) => r.order.id) : ['00000000-0000-0000-0000-000000000000'],
+        ),
+        eq(orderItems.productId, testing.productId),
+      ),
+    );
+  const unitsOf = (orderId: string): number =>
+    items
+      .filter((i) => i.orderId === orderId && (testing.variantId === null || i.variantId === testing.variantId))
+      .reduce((sum, i) => sum + i.quantity, 0);
   const list = rows.map(({ entry, order, user }) => ({
     orderId: order.id,
     name: user?.firstName ?? '—',
     contact: order.contactUsername ?? user?.username ?? null,
     amount: entry.amount,
+    units: unitsOf(order.id),
     paid: order.amountPaid >= order.total,
     volunteer: entry.volunteer,
+    exempt: entry.amount === 0,
   }));
   return [...list.filter((p) => p.paid), ...list.filter((p) => !p.paid)];
 }
@@ -541,8 +610,8 @@ export async function announceTestingTiers(db: Database, env: Env, shopId: strin
   );
   const labels = await withLabels(db, rows);
   for (const row of rows) {
-    const raised = totals.get(row.id)?.raised ?? 0;
-    const reached = tierProgress(row.tiers, raised, row.contribution).filter((p) => p.reached).length;
+    const units = totals.get(row.id)?.units ?? 0;
+    const reached = tierProgress(row.tiers, units).filter((p) => p.reached).length;
     if (reached <= row.notifiedTiers) continue;
     // Claim it first, so two payments at once do not announce it twice.
     const claimed = await db
@@ -561,6 +630,7 @@ export async function announceTestingTiers(db: Database, env: Env, shopId: strin
           eq(testingEntries.testingId, row.id),
           ne(orders.status, 'cancelled'),
           sql`${orders.amountPaid} >= ${orders.total}`,
+          sql`${testingEntries.amount} > 0`,
         ),
       );
     const ids = await withoutBlocked(
@@ -654,6 +724,12 @@ export async function joinTestingWithOrder(
     }
     if ((await joinedBy(tx, userId, [testing.id])).size > 0) {
       throw ApiError.conflict('testing_joined', 'You already take part in this testing');
+    }
+    // A VIP exempt from the fee joins only to offer a vial: nothing to pay.
+    if (feeExempt(testing, order.isVip)) {
+      if (!volunteer) throw ApiError.conflict('testing_exempt', 'As a VIP you do not pay this testing');
+      await tx.insert(testingEntries).values({ testingId: testing.id, orderId: order.id, userId, amount: 0, volunteer });
+      return;
     }
     await tx.insert(testingEntries).values({
       testingId: testing.id,

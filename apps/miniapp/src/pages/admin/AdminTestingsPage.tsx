@@ -1,14 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Cell, List, Section, Switch } from '@telegram-apps/telegram-ui';
-import { testingTotalCost, type Testing } from '@tma-shop/shared';
+import { testingMaxUnits, type Testing } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
 import { useShop } from '../../providers/ShopProvider.js';
 import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { PageTitle } from '../../components/PageTitle.js';
-import { formatPrice } from '../../lib/format.js';
 import { AdminOnly, ErrorBanner, useAdminActions } from './common.js';
 import { t, type MessageKey } from '../../i18n/index.js';
 
@@ -60,8 +59,7 @@ function AdminTestings(): React.JSX.Element {
                   <span className="gb-chips" style={{ marginTop: 4 }}>
                     <TestingStatusChip status={testing.status} />
                     <span className="gb-chip">
-                      {formatPrice(testing.raised, testing.currency)} /{' '}
-                      {formatPrice(testingTotalCost(testing.tiers), testing.currency)}
+                      {t('testing.unitsOf', { units: testing.units, max: testingMaxUnits(testing.tiers) })}
                     </span>
                   </span>
                 }

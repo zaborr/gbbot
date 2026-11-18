@@ -1,63 +1,40 @@
 import { describe, expect, it } from 'vitest';
-import { settleDraw, settleMoney, tierProgress, type TestingTier } from './testing.js';
+import { createTestingRequest, settleDraw, testingMaxUnits, tierProgress, type TestingTier } from './testing.js';
 
 const tiers: TestingTier[] = [
-  { id: 'mp', name: 'M&P', cost: 20000, vials: 1 },
-  { id: 'endo', name: 'Endo', cost: 10000, vials: 0 },
-  { id: 'lcms', name: 'LCMS', cost: 15000, vials: 1 },
+  { id: 'hplc', name: 'HPLC', units: 10, cost: 20000, vials: 1 },
+  { id: 'ms', name: 'MS', units: 20, cost: 10000, vials: 0 },
+  { id: 'endo', name: 'Endotoxins', units: 40, cost: 15000, vials: 1 },
 ];
 
 describe('testing tiers', () => {
-  it('says how far each tier is and how many people it still needs', () => {
-    // M&P needs 20 000 + one donor's 2 000 back; Endo 10 000 more.
-    const [mp, endo] = tierProgress(tiers, 25000, 2000);
-    expect(mp).toMatchObject({ reached: true, missing: 0, threshold: 22000 });
-    expect(endo).toMatchObject({ reached: false, missing: 7000, people: 4 });
-    expect(tierProgress(tiers, 21000, 2000)[0]).toMatchObject({ reached: false, missing: 1000, people: 1 });
+  it('counts units: reached tiers, and how many units the rest still need', () => {
+    const [hplc, ms, endo] = tierProgress(tiers, 23);
+    expect(hplc).toMatchObject({ reached: true, missing: 0 });
+    expect(ms).toMatchObject({ reached: true, missing: 0 });
+    expect(endo).toMatchObject({ reached: false, missing: 17 });
+    expect(testingMaxUnits(tiers)).toBe(40);
   });
 
-  it('takes tiers while the money, less what donors get back, covers them', () => {
-    const ranked = [
-      { ref: 'a', paid: 2000 },
-      { ref: 'b', paid: 0 },
-      { ref: 'c', paid: 2000 },
-    ];
-    // 46 000 raised: M&P + Endo + LCMS cost 45 000, but two donors get 2 000 back.
-    expect(settleDraw(tiers, 46000, ranked)).toEqual({ tiersDone: ['mp', 'endo'], donors: ['a'] });
-    // With the second donor not having paid, LCMS fits.
-    expect(settleDraw(tiers, 47000, ranked)).toEqual({ tiersDone: ['mp', 'endo', 'lcms'], donors: ['a', 'b'] });
+  it('does the tiers reached while there are candidates for their vials', () => {
+    const ranked = [{ ref: 'a' }, { ref: 'b' }];
+    expect(settleDraw(tiers, 23, ranked)).toEqual({ tiersDone: ['hplc', 'ms'], donors: ['a'] });
+    expect(settleDraw(tiers, 45, ranked)).toEqual({ tiersDone: ['hplc', 'ms', 'endo'], donors: ['a', 'b'] });
+    // One candidate only: endotoxins would need a second vial.
+    expect(settleDraw(tiers, 45, [{ ref: 'a' }])).toEqual({ tiersDone: ['hplc', 'ms'], donors: ['a'] });
+    expect(settleDraw(tiers, 9, ranked)).toEqual({ tiersDone: [], donors: [] });
   });
 
-  it('leaves out a tier whose vials nobody can give', () => {
-    expect(settleDraw(tiers, 100000, [{ ref: 'a', paid: 0 }])).toEqual({
-      tiersDone: ['mp', 'endo'],
-      donors: ['a'],
-    });
-    expect(settleDraw(tiers, 100000, [])).toEqual({ tiersDone: [], donors: [] });
-  });
-});
-
-describe('settling a testing', () => {
-  const entries = [
-    { orderId: 'a', amount: 2000, donor: true },
-    { orderId: 'b', amount: 2000, donor: false },
-    { orderId: 'c', amount: 2000, donor: false },
-  ];
-
-  it('gives donors all back and splits the leftover between the rest', () => {
-    const { settlement, refunds } = settleMoney(entries, 2900, 200, false);
-    expect(settlement).toMatchObject({ raised: 6000, donorRefunds: 2000, leftover: 1100, perPerson: 550 });
-    expect(Object.fromEntries(refunds)).toEqual({ a: 2000, b: 550, c: 550 });
-  });
-
-  it('keeps a leftover below the threshold', () => {
-    const { settlement, refunds } = settleMoney(entries, 3700, 200, false);
-    expect(settlement.perPerson).toBe(0);
-    expect(Object.fromEntries(refunds)).toEqual({ a: 2000 });
-  });
-
-  it('sends everything back when no tier was done', () => {
-    const { refunds } = settleMoney(entries, 0, 200, true);
-    expect(Object.fromEntries(refunds)).toEqual({ a: 2000, b: 2000, c: 2000 });
+  it('wants each tier to need more units than the one before', () => {
+    const base = {
+      productId: '8a6e0804-2bd0-4672-b79d-d97027f9071a',
+      variantId: null,
+      lab: 'Lab',
+      contribution: 500,
+      feeMode: 'mandatory' as const,
+    };
+    expect(createTestingRequest.safeParse({ ...base, tiers }).success).toBe(true);
+    const unordered = [tiers[1]!, tiers[0]!];
+    expect(createTestingRequest.safeParse({ ...base, tiers: unordered }).success).toBe(false);
   });
 });

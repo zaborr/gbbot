@@ -60,8 +60,6 @@ import type {
   CreateTestingRequest,
   Testing,
   TestingParticipant,
-  SettlePreview,
-  SettleTestingRequest,
   UpdateTestingRequest,
 } from '@tma-shop/shared';
 import { lang } from '../i18n/index.js';
@@ -605,18 +603,9 @@ export class ApiClient {
     });
   }
 
-  adminSettlePreview(id: string, input: SettleTestingRequest): Promise<SettlePreview> {
-    return this.request<SettlePreview>(`/admin/testings/${id}/settle-preview`, {
-      method: 'POST',
-      body: JSON.stringify(input),
-    });
-  }
-
-  adminSettleTesting(id: string, input: SettleTestingRequest): Promise<{ ok: boolean }> {
-    return this.request<{ ok: boolean }>(`/admin/testings/${id}/settle`, {
-      method: 'POST',
-      body: JSON.stringify(input),
-    });
+  /** Closes a drawn testing: donors get their vial's price back. */
+  adminSettleTesting(id: string): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/testings/${id}/settle`, { method: 'POST' });
   }
 
   adminCancelTesting(id: string): Promise<{ ok: boolean }> {

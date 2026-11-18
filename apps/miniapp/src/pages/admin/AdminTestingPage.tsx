@@ -2,12 +2,11 @@ import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import {
-  DEFAULT_REFUND_THRESHOLD,
   MAX_TESTING_TIERS,
   tierProgress,
   type Product,
-  type SettlePreview,
   type Testing,
+  type TestingFeeMode,
   type TestingTier,
 } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
@@ -32,6 +31,7 @@ const cents = (text: string): number => Math.round(Number(text.trim().replace(',
 interface TierDraft {
   id: string;
   name: string;
+  units: string;
   cost: string;
   vials: string;
 }
@@ -39,9 +39,12 @@ interface TierDraft {
 const newTier = (): TierDraft => ({
   id: Math.random().toString(36).slice(2, 10),
   name: '',
+  units: '',
   cost: '',
   vials: '1',
 });
+
+const FEE_MODES: TestingFeeMode[] = ['mandatory', 'mandatory_non_vip', 'optional'];
 
 /** `/admin/testings/new` (optionally `?product=…&variant=…`) or `/admin/testings/:id`. */
 export function AdminTestingPage(): React.JSX.Element {
@@ -109,45 +112,52 @@ function TestingForm({
 
   const [lab, setLab] = useState(testing?.lab ?? '');
   const [contribution, setContribution] = useState(testing ? toMajor(testing.contribution) : '');
-  const [threshold, setThreshold] = useState(
-    toMajor(testing?.refundThreshold ?? DEFAULT_REFUND_THRESHOLD),
-  );
+  const [feeMode, setFeeMode] = useState<TestingFeeMode>(testing?.feeMode ?? 'mandatory');
   const [tiers, setTiers] = useState<TierDraft[]>(
     testing
       ? testing.tiers.map((tier) => ({
           id: tier.id,
           name: tier.name,
+          units: String(tier.units),
           cost: toMajor(tier.cost),
           vials: String(tier.vials),
         }))
       : [newTier()],
   );
   const editable = testing === null || testing.status === 'open';
-  // Once people take part, what they signed up for stays: same contribution and
+  // Once people take part, what they signed up for stays: same fee, mode and
   // tiers (new ones can be added at the end).
-  const locked = testing !== null && (testing.participants > 0 || testing.pending > 0);
+  const locked = testing !== null && (testing.participants > 0 || testing.pendingUnits > 0);
   const lockedTiers = locked ? (testing?.tiers.length ?? 0) : 0;
   const currency = testing?.currency ?? product?.currency ?? shop.currency;
 
   const contributionOk = MONEY_RE.test(contribution.trim()) && cents(contribution) > 0;
-  const thresholdOk = MONEY_RE.test(threshold.trim());
   const tierOk = (tier: TierDraft): boolean =>
-    tier.name.trim() !== '' && MONEY_RE.test(tier.cost.trim()) && cents(tier.cost) > 0 && COUNT_RE.test(tier.vials.trim());
+    tier.name.trim() !== '' &&
+    COUNT_RE.test(tier.units.trim()) &&
+    Number(tier.units) > 0 &&
+    MONEY_RE.test(tier.cost.trim()) &&
+    cents(tier.cost) > 0 &&
+    COUNT_RE.test(tier.vials.trim());
   const parsedTiers: TestingTier[] = tiers.filter(tierOk).map((tier) => ({
     id: tier.id,
     name: tier.name.trim(),
+    units: Number(tier.units.trim()),
     cost: cents(tier.cost),
     vials: Number(tier.vials.trim()),
   }));
+  const unitsAscending = parsedTiers.every((tier, i) => i === 0 || tier.units > (parsedTiers[i - 1]?.units ?? 0));
 
-  // How many people each tier needs at this contribution.
+  // How many paying buyers cover each tier (and the ones before) at this fee.
+  let cumulative = 0;
   const needs = contributionOk
-    ? tierProgress(parsedTiers, 0, cents(contribution)).map((p) =>
-        t('testing.needs', {
-          tier: p.tier.name,
-          people: tn(p.people, 'testing.people.one', 'testing.people.other'),
-        }),
-      )
+    ? parsedTiers.map((tier) => {
+        cumulative += tier.cost;
+        return t('testing.needsBuyers', {
+          tier: tier.name,
+          buyers: tn(Math.ceil(cumulative / cents(contribution)), 'testing.people.one', 'testing.people.other'),
+        });
+      })
     : [];
 
   const updateTier = (index: number, patch: Partial<TierDraft>): void =>
@@ -163,10 +173,10 @@ function TestingForm({
     ? t('testing.needLab')
     : !contributionOk
       ? t('testing.badContribution')
-      : !thresholdOk
-        ? t('testing.badThreshold')
-        : tiers.length === 0 || parsedTiers.length !== tiers.length
-          ? t('testing.badTiers')
+      : tiers.length === 0 || parsedTiers.length !== tiers.length
+        ? t('testing.badTiers')
+        : !unitsAscending
+          ? t('testing.badUnits')
           : null;
 
   const save = async (): Promise<void> => {
@@ -175,7 +185,7 @@ function TestingForm({
       const body = {
         lab: lab.trim(),
         contribution: cents(contribution),
-        refundThreshold: cents(threshold),
+        feeMode,
         tiers: parsedTiers,
       };
       if (testing) {
@@ -227,15 +237,16 @@ function TestingForm({
           currency,
           lab: lab.trim() || '—',
           contribution: cents(contribution),
-          refundThreshold: thresholdOk ? cents(threshold) : 0,
+          feeMode,
           tiers: parsedTiers,
           status: testing?.status ?? 'open',
+          units: testing?.units ?? 0,
+          pendingUnits: testing?.pendingUnits ?? 0,
           raised: testing?.raised ?? 0,
           participants: testing?.participants ?? 0,
-          pending: testing?.pending ?? 0,
           joined: false,
+          exempt: false,
           draw: null,
-          settlement: null,
           reportSentAt: null,
         }
       : null;
@@ -317,16 +328,22 @@ function TestingForm({
           disabled={!editable || locked}
           onChange={(e) => setContribution(e.target.value)}
         />
-        <Input
-          header={t('testing.thresholdField', { currency })}
-          type="text"
-          inputMode="decimal"
-          placeholder="2.00"
-          status={thresholdOk ? 'default' : 'error'}
-          value={threshold}
-          disabled={!editable}
-          onChange={(e) => setThreshold(e.target.value)}
-        />
+      </Section>
+
+      <Section header={t('testing.feeMode')} footer={t(`testing.feeMode.${feeMode}.hint`)}>
+        <div className="gb-chips" style={{ padding: '12px 16px' }}>
+          {FEE_MODES.map((mode) => (
+            <Button
+              key={mode}
+              size="s"
+              mode={feeMode === mode ? 'filled' : 'bezeled'}
+              disabled={!editable || locked}
+              onClick={() => setFeeMode(mode)}
+            >
+              {t(`testing.feeMode.${mode}`)}
+            </Button>
+          ))}
+        </div>
       </Section>
 
       <Section
@@ -338,6 +355,7 @@ function TestingForm({
         {tiers.map((tier, index) => {
           const fixed = index < lockedTiers;
           const costBad = tier.cost.trim() !== '' && !(MONEY_RE.test(tier.cost.trim()) && cents(tier.cost) > 0);
+          const unitsBad = tier.units.trim() !== '' && !(COUNT_RE.test(tier.units.trim()) && Number(tier.units) > 0);
           const vialsBad = !COUNT_RE.test(tier.vials.trim());
           return (
             <div key={tier.id} className="gb-testing-tier-edit">
@@ -349,6 +367,18 @@ function TestingForm({
                 onChange={(e) => updateTier(index, { name: e.target.value })}
               />
               <div className="gb-testing-tier-row">
+                <div style={{ flex: 2 }}>
+                  <Input
+                    header={t('testing.tierUnits')}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="10"
+                    status={unitsBad ? 'error' : 'default'}
+                    value={tier.units}
+                    disabled={!editable || fixed}
+                    onChange={(e) => updateTier(index, { units: e.target.value })}
+                  />
+                </div>
                 <div style={{ flex: 3 }}>
                   <Input
                     header={t('testing.tierCost', { currency })}
@@ -470,9 +500,10 @@ function Participants({ testing }: { testing: Testing }): React.JSX.Element | nu
   return (
     <Section
       header={t('testing.participants', { count: list.data.length })}
-      footer={t('testing.participantsFooter', {
+      footer={t('testing.participantsUnitsFooter', {
+        units: testing.units,
+        pendingUnits: testing.pendingUnits,
         raised: money(testing.raised),
-        pending: money(testing.pending),
         volunteers,
       })}
     >
@@ -481,10 +512,14 @@ function Participants({ testing }: { testing: Testing }): React.JSX.Element | nu
         <Cell
           key={p.orderId}
           onClick={() => navigate(to(`/admin/orders/${p.orderId}`))}
-          subtitle={[p.paid ? t('testing.paid') : t('testing.unpaid'), p.volunteer ? t('testing.volunteerChip') : null]
+          subtitle={[
+            tn(p.units, 'testing.units.one', 'testing.units.other'),
+            p.paid ? t('testing.paid') : t('testing.unpaid'),
+            p.volunteer ? t('testing.volunteerChip') : null,
+          ]
             .filter(Boolean)
             .join(' · ')}
-          after={money(p.amount)}
+          after={p.exempt ? t('testing.exemptChip') : money(p.amount)}
           multiline
         >
           {p.contact ? `${p.name} · @${p.contact}` : p.name}
@@ -619,148 +654,35 @@ function DrawSection({ testing, onChange }: { testing: Testing; onChange: () => 
 }
 
 /**
- * Settling the money: the real cost of the tests done, maybe an extra tier
- * with the leftover, and what goes back to each participant (shown first).
+ * Closing the testing once drawn (or when no tier was reached): donors get the
+ * price of their vial back on their order; the fees stay.
  */
 function SettleSection({ testing, onChange }: { testing: Testing; onChange: () => void }): React.JSX.Element | null {
-  const navigate = useNavigate();
-  const { to } = useShop();
   const actions = useAdminActions(onChange);
-  const money = (amount: number): string => formatPrice(amount, testing.currency);
-  const doneIds = testing.status === 'drawn' ? (testing.draw?.tiersDone ?? []) : [];
-  const done = testing.tiers.filter((tier) => doneIds.includes(tier.id));
-  const [costs, setCosts] = useState<Record<string, string>>(() =>
-    Object.fromEntries(done.map((tier) => [tier.id, toMajor(tier.realCost ?? tier.cost)])),
-  );
-  const [extraName, setExtraName] = useState('');
-  const [extraCost, setExtraCost] = useState('');
-  const [preview, setPreview] = useState<SettlePreview | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  if (testing.status === 'settled' && testing.settlement) {
-    const s = testing.settlement;
+  const nothingReached = !tierProgress(testing.tiers, testing.units).some((p) => p.reached);
+  if (testing.status === 'settled') {
     return (
-      <Section header={t('testing.settleTitle')} footer={t('testing.settledFooter')}>
-        <SettlementCells settlement={s} money={money} />
-        <Cell onClick={() => navigate(to('/admin/orders?filter=attention'))} after="›" multiline>
-          {t('testing.seeRefunds')}
-        </Cell>
+      <Section header={t('testing.settleTitle')}>
+        <Cell multiline>{t('testing.settledDone')}</Cell>
       </Section>
     );
   }
-  if (testing.status !== 'drawn' && testing.status !== 'closed') return null;
-
-  const costsOk = done.every((tier) => MONEY_RE.test((costs[tier.id] ?? '').trim()));
-  const extraOk =
-    extraName.trim() === '' && extraCost.trim() === ''
-      ? true
-      : extraName.trim() !== '' && MONEY_RE.test(extraCost.trim()) && cents(extraCost) > 0;
-  const body = {
-    realCosts: Object.fromEntries(done.map((tier) => [tier.id, cents(costs[tier.id] ?? '0')])),
-    ...(extraName.trim() !== '' ? { extra: { name: extraName.trim(), cost: cents(extraCost) } } : {}),
-  };
-  const calc = (): void => {
-    setBusy(true);
-    void actions
-      .run(async () => setPreview(await api.adminSettlePreview(testing.id, body)))
-      .finally(() => setBusy(false));
-  };
-
+  if (testing.status !== 'drawn' && !(testing.status === 'closed' && nothingReached)) return null;
   return (
-    <Section header={t('testing.settleTitle')} footer={t('testing.settleFooter')}>
+    <Section
+      header={t('testing.settleTitle')}
+      footer={testing.status === 'closed' ? t('testing.settleNothingFooter') : t('testing.settleVialsFooter')}
+    >
       <ErrorBanner message={actions.error} />
-      {testing.status === 'closed' && <Cell multiline>{t('testing.settleClosed')}</Cell>}
-      {done.map((tier) => (
-        <Input
-          key={tier.id}
-          header={t('testing.realCost', { tier: tier.name, currency: testing.currency })}
-          type="text"
-          inputMode="decimal"
-          value={costs[tier.id] ?? ''}
-          status={MONEY_RE.test((costs[tier.id] ?? '').trim()) ? 'default' : 'error'}
-          onChange={(e) => {
-            setCosts({ ...costs, [tier.id]: e.target.value });
-            setPreview(null);
-          }}
-        />
-      ))}
-      {testing.status === 'drawn' && (
-        <div className="gb-testing-tier-row">
-          <div style={{ flex: 3 }}>
-            <Input
-              header={t('testing.extraName')}
-              placeholder={t('testing.extraPlaceholder')}
-              value={extraName}
-              onChange={(e) => {
-                setExtraName(e.target.value);
-                setPreview(null);
-              }}
-            />
-          </div>
-          <div style={{ flex: 2 }}>
-            <Input
-              header={t('testing.extraCost', { currency: testing.currency })}
-              type="text"
-              inputMode="decimal"
-              value={extraCost}
-              status={extraOk ? 'default' : 'error'}
-              onChange={(e) => {
-                setExtraCost(e.target.value);
-                setPreview(null);
-              }}
-            />
-          </div>
-        </div>
-      )}
-      {preview && <SettlementCells settlement={preview.settlement} money={money} />}
-      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {!preview ? (
-          <Button stretched mode="bezeled" loading={busy} disabled={!costsOk || !extraOk} onClick={calc}>
-            {t('testing.settleCalc')}
-          </Button>
-        ) : (
-          <Button
-            stretched
-            onClick={() => void actions.twoTap('settle', () => api.adminSettleTesting(testing.id, body))}
-          >
-            {actions.tapLabel('settle', t('testing.settleConfirm'))}
-          </Button>
-        )}
+      <div style={{ padding: 16 }}>
+        <Button
+          stretched
+          onClick={() => void actions.twoTap('settle', () => api.adminSettleTesting(testing.id))}
+        >
+          {actions.tapLabel('settle', t('testing.settleClose'))}
+        </Button>
       </div>
     </Section>
-  );
-}
-
-/** The money, line by line. */
-function SettlementCells({
-  settlement,
-  money,
-}: {
-  settlement: SettlePreview['settlement'];
-  money: (amount: number) => string;
-}): React.JSX.Element {
-  return (
-    <>
-      <Cell after={money(settlement.raised)}>{t('testing.settleRaised')}</Cell>
-      {!settlement.allBack && <Cell after={money(settlement.spent)}>{t('testing.settleSpent')}</Cell>}
-      {settlement.donorRefunds > 0 && (
-        <Cell after={money(settlement.donorRefunds)} multiline>
-          {t('testing.settleDonors')}
-        </Cell>
-      )}
-      <Cell multiline after={<strong>{settlement.allBack ? money(settlement.raised) : money(Math.max(settlement.leftover, 0))}</strong>}>
-        {settlement.allBack ? t('testing.settleAllBack') : t('testing.settleLeftover')}
-      </Cell>
-      {!settlement.allBack && (
-        <Cell multiline>
-          {settlement.leftover < 0
-            ? t('testing.settleShort', { amount: money(-settlement.leftover) })
-            : settlement.perPerson > 0
-              ? t('testing.settlePerPerson', { amount: money(settlement.perPerson) })
-              : t('testing.settleBelowThreshold')}
-        </Cell>
-      )}
-    </>
   );
 }
 
@@ -800,7 +722,7 @@ function ReportSection({ testing }: { testing: Testing }): React.JSX.Element | n
 function CancelSection({ testing, onChange }: { testing: Testing; onChange: () => void }): React.JSX.Element | null {
   const actions = useAdminActions(onChange);
   if (testing.status === 'settled' || testing.status === 'cancelled') return null;
-  if (testing.participants === 0 && testing.pending === 0) return null;
+  if (testing.participants === 0 && testing.pendingUnits === 0) return null;
   return (
     <Section footer={t('testing.cancelFooter')}>
       <ErrorBanner message={actions.error} />
