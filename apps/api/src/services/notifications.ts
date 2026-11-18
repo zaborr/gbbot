@@ -68,6 +68,19 @@ export function buildPaymentReviewMessage(lang: Lang, order: Order, customer: st
   return lines.join('\n');
 }
 
+/** Tells admins a customer added details to an order (they read them in the app). */
+export function buildDetailsAddedMessage(lang: Lang, order: Order, customer: string): string {
+  return [
+    tr(lang, 'admin.detailsAdded'),
+    '',
+    tr(lang, 'order.number', { id: shortId(order) }),
+    tr(lang, 'line.customer', { customer }),
+    contactLine(lang, order),
+    '',
+    tr(lang, 'admin.detailsAddedOpen'),
+  ].join('\n');
+}
+
 /** Tells admins a customer wants to modify a paid order. */
 export function buildChangeRequestMessage(lang: Lang, order: Order, customer: string): string {
   const change = order.changeRequest;

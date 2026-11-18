@@ -671,6 +671,14 @@ export class ApiClient {
   }
 
   /** Asks the shop to change a paid order to these lines (needs admin approval). */
+  /** Adds details (encrypted here) to the customer's own order. */
+  addOrderDetails(orderId: string, encrypted: string): Promise<Order> {
+    return this.request<Order>(`/orders/${orderId}/details`, {
+      method: 'POST',
+      body: JSON.stringify({ encrypted }),
+    });
+  }
+
   requestOrderChange(
     orderId: string,
     items: Array<{ productId: string; variantId: string | null; quantity: number }>,

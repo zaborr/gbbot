@@ -183,6 +183,8 @@ const en = {
   'order.reducedTotal': 'New total: {total}.',
   'order.reducedToPay': 'New total to pay: {total}.',
   'testing.vialRefund': '🧪 {shop} · {product}: thank you for the vial for the testing! {amount} go back to you on your order.',
+  'admin.detailsAdded': '📝 A customer added details to their order',
+  'admin.detailsAddedOpen': 'Open the order in the app to read them (they are encrypted).',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -358,6 +360,8 @@ const es: Record<BotMessageKey, string> = {
   'order.reducedTotal': 'Nuevo total: {total}.',
   'order.reducedToPay': 'Nuevo total a pagar: {total}.',
   'testing.vialRefund': '🧪 {shop} · {product}: ¡gracias por el vial para el testing! Se te devuelven {amount} en tu pedido.',
+  'admin.detailsAdded': '📝 Un cliente ha añadido datos a su pedido',
+  'admin.detailsAddedOpen': 'Abre el pedido en la app para leerlos (van cifrados).',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -531,6 +535,8 @@ const it: Record<BotMessageKey, string> = {
   'order.reducedTotal': 'Nuovo totale: {total}.',
   'order.reducedToPay': 'Nuovo totale da pagare: {total}.',
   'testing.vialRefund': '🧪 {shop} · {product}: grazie per la fiala per il testing! Ti vengono restituiti {amount} sul tuo ordine.',
+  'admin.detailsAdded': '📝 Un cliente ha aggiunto dati al suo ordine',
+  'admin.detailsAddedOpen': 'Apri l\'ordine nell\'app per leggerli (sono cifrati).',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -704,6 +710,8 @@ const pt: Record<BotMessageKey, string> = {
   'order.reducedTotal': 'Novo total: {total}.',
   'order.reducedToPay': 'Novo total a pagar: {total}.',
   'testing.vialRefund': '🧪 {shop} · {product}: obrigado pelo frasco para o testing! São-lhe devolvidos {amount} na sua encomenda.',
+  'admin.detailsAdded': '📝 Um cliente acrescentou dados à sua encomenda',
+  'admin.detailsAddedOpen': 'Abra a encomenda na app para os ler (vão cifrados).',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

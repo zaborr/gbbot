@@ -669,6 +669,7 @@ button.gb-banner {
 /* Address fields in an order: long values (emails, streets) wrap instead of overflowing. */
 .gb-address-value {
   overflow-wrap: anywhere;
+  white-space: pre-line;
   user-select: text;
 }
 

@@ -385,6 +385,33 @@ export interface DeliveryAddress {
   notes: string;
 }
 
+/** What a customer can add to an order later: only these, and only to fill gaps. */
+export interface DeliveryExtra {
+  email?: string;
+  phone?: string;
+  notes?: string;
+}
+
+/** How many times details can be added to one order. */
+export const MAX_ADDRESS_EXTRAS = 10;
+
+/**
+ * The address with the details added later: email and phone fill only what was
+ * empty (the first one added wins), notes are appended.
+ */
+export function mergeDelivery(address: DeliveryAddress, extras: readonly DeliveryExtra[]): DeliveryAddress {
+  const merged = { ...address };
+  for (const extra of extras) {
+    const email = extra.email?.trim() ?? '';
+    const phone = extra.phone?.trim() ?? '';
+    const notes = extra.notes?.trim() ?? '';
+    if (email && !merged.email?.trim()) merged.email = email;
+    if (phone && !merged.phone.trim()) merged.phone = phone;
+    if (notes) merged.notes = merged.notes.trim() ? `${merged.notes.trim()}\n${notes}` : notes;
+  }
+  return merged;
+}
+
 /** Shipping cost of an order with `itemsTotal` worth of products in `zone`. */
 export function shippingCost(
   zone: Pick<ShippingZone, 'price' | 'freeFrom'>,

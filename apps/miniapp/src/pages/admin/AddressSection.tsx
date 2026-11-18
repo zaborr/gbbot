@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Cell, Section } from '@telegram-apps/telegram-ui';
 import type { DeliveryAddress, Order } from '@tma-shop/shared';
 import { copyText } from '../../lib/clipboard.js';
-import { decryptAddress, loadPrivateKey } from '../../lib/addressCrypto.js';
+import { decryptOrderDetails, loadPrivateKey, type OrderDetails } from '../../lib/addressCrypto.js';
+import { formatDate } from './common.js';
 import { useShop } from '../../providers/ShopProvider.js';
 import { t, type MessageKey } from '../../i18n/index.js';
 
@@ -12,7 +13,7 @@ type State =
   | { kind: 'no-key' }
   | { kind: 'other-key' }
   | { kind: 'error' }
-  | { kind: 'ok'; address: DeliveryAddress };
+  | { kind: 'ok'; details: OrderDetails };
 
 function addressLines(a: DeliveryAddress): string[] {
   return [
@@ -42,9 +43,9 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
       setState({ kind: 'no-key' });
       return;
     }
-    decryptAddress(envelope, privateKey)
-      .then((address) => {
-        if (!cancelled) setState({ kind: 'ok', address });
+    decryptOrderDetails(order, privateKey)
+      .then((details) => {
+        if (!cancelled) setState({ kind: 'ok', details });
       })
       .catch(() => {
         if (cancelled) return;
@@ -57,7 +58,8 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
     return () => {
       cancelled = true;
     };
-  }, [order.encryptedAddress, order.addressKeyFingerprint, shop.id, shop.addressKeyFingerprint]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the extras change with their count
+  }, [order.encryptedAddress, order.addressExtras.length, order.addressKeyFingerprint, shop.id, shop.addressKeyFingerprint]);
 
   if (!order.encryptedAddress) return null;
 
@@ -107,7 +109,8 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
         </Section>
       );
     case 'ok': {
-      const a = state.address;
+      const { original, extras } = state.details;
+      const a = state.details.merged;
       const lines = addressLines(a);
       const all = [...lines, a.notes ? t('addressSection.notes', { notes: a.notes }) : ''].filter(Boolean).join('\n');
       // Each piece on its own (courier forms ask for them one by one), then everything.
@@ -124,6 +127,21 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
         { key: 'notes', label: 'addressSection.notesLabel', value: a.notes },
       ];
       const fields = every.filter((field) => field.value.trim() !== '');
+      // What the customer added later: which fields it filled, and what it could not replace.
+      const added = new Set<string>();
+      const unused: string[] = [];
+      for (const { extra } of extras) {
+        if (extra.email?.trim()) {
+          if (!original.email?.trim()) added.add('email');
+          if (a.email?.trim() !== extra.email.trim()) unused.push(`✉ ${extra.email.trim()}`);
+        }
+        if (extra.phone?.trim()) {
+          if (!original.phone.trim()) added.add('phone');
+          if (a.phone.trim() !== extra.phone.trim()) unused.push(`☎ ${extra.phone.trim()}`);
+        }
+        if (extra.notes?.trim()) added.add('notes');
+      }
+      const lastAdded = extras.length > 0 ? extras[extras.length - 1]?.at : undefined;
       const copy = (key: string, text: string): void => {
         void copyText(text).then((ok) => setCopied(ok ? key : null));
       };
@@ -133,7 +151,11 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
             <Cell
               key={field.key}
               multiline
-              subtitle={t(field.label)}
+              subtitle={
+                added.has(field.key) && lastAdded
+                  ? `${t(field.label)} · ${t('addressSection.addedByCustomer', { date: formatDate(lastAdded) })}`
+                  : t(field.label)
+              }
               after={
                 <Button size="s" mode="plain" onClick={() => copy(field.key, field.value.trim())}>
                   {copied === field.key ? '✅' : t('addressSection.copyOne')}
@@ -143,6 +165,11 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
               <span className="gb-address-value">{field.value}</span>
             </Cell>
           ))}
+          {unused.length > 0 && (
+            <Cell multiline subtitle={t('addressSection.notReplaced')}>
+              <span className="gb-address-value">{unused.join('\n')}</span>
+            </Cell>
+          )}
           <div style={{ padding: 16 }}>
             <Button size="s" mode="bezeled" onClick={() => copy('all', all)}>
               {copied === 'all' ? t('addressSection.copied') : t('addressSection.copy')}

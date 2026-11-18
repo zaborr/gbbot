@@ -1,5 +1,5 @@
 import type { DeliveryAddress, Order } from '@tma-shop/shared';
-import { decryptAddress, loadPrivateKey } from './addressCrypto.js';
+import { decryptOrderDetails, loadPrivateKey } from './addressCrypto.js';
 import { itemName } from './variants.js';
 import { lang, t } from '../i18n/index.js';
 import { statusLabel } from '../pages/admin/common.js';
@@ -122,7 +122,7 @@ export async function decryptAddresses(
   let missing = 0;
   for (const o of withAddress) {
     try {
-      addresses.set(o.id, await decryptAddress(o.encryptedAddress ?? '', privateKey));
+      addresses.set(o.id, (await decryptOrderDetails(o, privateKey)).merged);
     } catch {
       missing += 1;
     }

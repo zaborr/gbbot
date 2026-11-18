@@ -4,7 +4,7 @@ import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import { isSaleStatus, type ExportRequest, type ExportScope, type Order } from '@tma-shop/shared';
 import { api, ApiClientError } from '../../api/client.js';
 import { Input } from '../../components/Field.js';
-import { decryptAddress, loadPrivateKey } from '../../lib/addressCrypto.js';
+import { decryptOrderDetails, loadPrivateKey } from '../../lib/addressCrypto.js';
 import { shareOrDownload, toCsv } from '../../lib/download.js';
 import { copyText } from '../../lib/clipboard.js';
 import { itemName } from '../../lib/variants.js';
@@ -230,7 +230,7 @@ function AdminExport({ part }: { part: 'files' | 'shipping' }): React.JSX.Elemen
       let failed = 0;
       for (const o of orders) {
         try {
-          const a = await decryptAddress(o.encryptedAddress ?? '', privateKey);
+          const a = (await decryptOrderDetails(o, privateKey)).merged;
           // Vials drawn for a testing are taken out of the package.
           const items = [
             o.items.map((i) => `${i.quantity}× ${itemName(i)}`).join(', '),

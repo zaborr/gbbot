@@ -21,7 +21,7 @@ export const EMPTY_ADDRESS: DeliveryAddress = {
   notes: '',
 };
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Postal fields every delivery needs. */
 export function addressComplete(a: DeliveryAddress): boolean {

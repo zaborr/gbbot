@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import {
+  addOrderDetailsRequest,
   cartTestingRequest,
   createOrderRequest,
   isClosedAt,
@@ -16,6 +17,7 @@ import {
 import type { AppBindings } from '../context.js';
 import { requireAuth, requireTelegramUser } from '../auth/middleware.js';
 import {
+  addOrderDetails,
   createOrderFromCart,
   deleteOrder,
   getOrder,
@@ -24,7 +26,11 @@ import {
   requestOrderChange,
   submitCryptoPayment,
 } from '../services/orders.js';
-import { buildChangeRequestMessage, buildPaymentReviewMessage } from '../services/notifications.js';
+import {
+  buildChangeRequestMessage,
+  buildDetailsAddedMessage,
+  buildPaymentReviewMessage,
+} from '../services/notifications.js';
 import { describeCustomer } from '../services/customers.js';
 import { startPaymentCheck } from '../services/paymentCheck.js';
 import { EVM_TX_RE } from '../chain/evm.js';
@@ -211,6 +217,22 @@ export function orderRoutes(): Hono<AppBindings> {
     if (!order) throw ApiError.notFound('Order not found');
     return c.json(order);
   });
+
+  // Customer adds details (email, phone, notes) to an order not sent yet: they
+  // never replace what it had, and the organiser is told.
+  app.post(
+    '/:id/details',
+    zValidator('param', idParam),
+    zValidator('json', addOrderDetailsRequest),
+    async (c) => {
+      const { sub } = c.get('claims');
+      const db = c.get('db');
+      const order = await addOrderDetails(db, c.get('shop'), c.req.valid('param').id, sub, c.req.valid('json').encrypted);
+      const customer = await describeCustomer(db, sub);
+      await notifyShopTeam(db, c.get('env'), c.get('shop'), (lang) => buildDetailsAddedMessage(lang, order, customer));
+      return c.json(order);
+    },
+  );
 
   // Customer withdraws their pending change request.
   app.delete('/:id/change', zValidator('param', idParam), async (c) => {

@@ -1846,6 +1846,55 @@ describeDb('API integration', () => {
     await db.delete(orders).where(eq(orders.id, orderId));
   });
 
+  it('lets the customer add details to an order not sent yet, never replacing them', async () => {
+    const auth = {
+      Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/cart/items', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ productId, quantity: 1 }),
+    });
+    const placed = await request('/api/orders', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ contactUsername: '@test_user' }),
+    });
+    const { orderId } = (await placed.json()) as { orderId: string };
+    const envelope = (kid: string): string => JSON.stringify({ v: 1, kid, key: 'k', iv: 'i', data: 'd' });
+    const [before] = await db.select().from(shops).where(eq(shops.id, shopId));
+    await db.update(shops).set({ addressKeyFingerprint: 'kid-now' }).where(eq(shops.id, shopId));
+    const add = (encrypted: string): Promise<Response> =>
+      Promise.resolve(
+        request(`/api/orders/${orderId}/details`, { method: 'POST', headers: auth, body: JSON.stringify({ encrypted }) }),
+      );
+
+    // Nothing to add to without delivery details.
+    expect((await add(envelope('kid-now'))).status).toBe(400);
+
+    await db
+      .update(orders)
+      .set({ encryptedAddress: envelope('kid-now'), addressKeyFingerprint: 'kid-now' })
+      .where(eq(orders.id, orderId));
+    // Encrypted with an old key: refused.
+    expect((await add(envelope('kid-old'))).status).toBe(409);
+    const ok = await add(envelope('kid-now'));
+    expect(ok.status).toBe(200);
+    const added = (await ok.json()) as { encryptedAddress: string; addressExtras: Array<{ encrypted: string }> };
+    expect(added.addressExtras).toHaveLength(1);
+    // What the order had stays as it was.
+    expect(added.encryptedAddress).toBe(envelope('kid-now'));
+
+    // Once sent, only through the organiser.
+    await db.update(orders).set({ status: 'shipped' }).where(eq(orders.id, orderId));
+    expect((await add(envelope('kid-now'))).status).toBe(409);
+
+    await db.update(shops).set({ addressKeyFingerprint: before?.addressKeyFingerprint ?? null }).where(eq(shops.id, shopId));
+    await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
+    await db.delete(orders).where(eq(orders.id, orderId));
+  });
+
   it('counts a little overpayment, within the GB margin, as the exact price', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
