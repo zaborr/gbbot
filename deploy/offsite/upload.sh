@@ -10,10 +10,28 @@ CONF=deploy/offsite/config
 . "./$CONF"
 DUMP=${1:?usage: upload.sh backups/gb-….sql.gz}
 
-# Tells the platform administrators through the bot (only when it fails).
+# Tells the platform administrators through the bot (only when it fails): the
+# API sends it with the active bot; if it does not pick it up, BOT_TOKEN does.
 notify() {
-  token=$(sed -n 's/^BOT_TOKEN=//p' .env 2>/dev/null | head -n 1 | tr -d "\"'\r")
   ids=$(sed -n 's/^ADMIN_TELEGRAM_IDS=//p' .env 2>/dev/null | head -n 1 | tr -d "\"'\r" | tr ',' ' ')
+  out=deploy/runtime
+  left=""
+  for id in $ids; do
+    file="$out/outbox-backup-$(date +%s)-$id.msg"
+    if [ -d "$out" ] && printf 'chat=%s\n---\n%s\n' "$id" "$1" >"$file.tmp" && mv "$file.tmp" "$file"; then
+      left="$left $file"
+    fi
+  done
+  i=0
+  while [ "$i" -lt 6 ]; do
+    pending=""
+    for file in $left; do [ -f "$file" ] && pending="$pending $file"; done
+    [ -z "$pending" ] && return 0
+    sleep 5
+    i=$((i + 1))
+  done
+  token=$(sed -n 's/^BOT_TOKEN=//p' .env 2>/dev/null | head -n 1 | tr -d "\"'\r")
+  for file in $left; do rm -f "$file"; done
   [ -n "$token" ] || return 0
   for id in $ids; do
     curl -fsS -o /dev/null --max-time 20 "https://api.telegram.org/bot$token/sendMessage" \
