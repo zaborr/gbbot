@@ -70,7 +70,8 @@ export async function testingTotals(
 ): Promise<Map<string, TestingTotals>> {
   const result = new Map<string, TestingTotals>();
   if (testingIds.length === 0) return result;
-  const paid = sql`${orders.amountPaid} >= ${orders.total}`;
+  // Paid in full, a donation not paid yet aside (it only holds itself back).
+  const paid = sql`${orders.amountPaid} >= ${orders.total} - ${donationOfOrder}`;
   const money = await db
     .select({
       testingId: testingEntries.testingId,
