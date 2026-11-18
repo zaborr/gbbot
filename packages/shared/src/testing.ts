@@ -340,3 +340,9 @@ export function settleDraw(
   const tiersDone = tiersList.filter((tier) => done.has(tier.id)).map((tier) => tier.id);
   return { tiersDone, donors: ranked.slice(0, vials).map((c) => c.ref) };
 }
+
+/** A bar in text for bot messages: "▓▓▓▓▓▓▓░░░" for 0.7. */
+export function textBar(share: number, width = 10): string {
+  const full = Math.min(Math.max(Math.round(share * width), 0), width);
+  return '▓'.repeat(full) + '░'.repeat(width - full);
+}

@@ -75,7 +75,11 @@ export function TestingCard({
         </div>
         <TestingBar testing={testing} />
         <span className="gb-hint">
-          {next ? t('testing.nextTier', { missing: missingText(next), tier: next.name }) : t('testing.allTiers')}
+          {next
+            ? `${t('testing.nextTier', { missing: missingText(next), tier: next.name })}${
+                next.unitsLeft !== null ? ` · ${sharePercent(next)} %` : ''
+              }`
+            : t('testing.allTiers')}
         </span>
         {testing.donationsOpen && testing.donationsUntil && (
           <span className="gb-hint">
