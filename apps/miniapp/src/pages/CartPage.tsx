@@ -373,22 +373,37 @@ export function CartPage(): React.JSX.Element {
             key={x.testingId}
             after={money(x.amount)}
             subtitle={
-              [x.mandatory ? t('testing.mandatoryChip') : null, x.volunteer ? t('testing.volunteerChip') : null]
+              [
+                x.mandatory ? t('testing.mandatoryChip') : null,
+                x.extra > 0 ? t('testing.extraIncluded', { amount: formatPrice(x.extra, cart?.currency ?? '') }) : null,
+                x.volunteer ? t('testing.volunteerChip') : null,
+              ]
                 .filter(Boolean)
                 .join(' · ') || undefined
             }
             description={
-              // A mandatory fee comes with the product: only an optional one can be left out.
-              x.mandatory ? undefined : (
-                <Button
-                  size="s"
-                  mode="plain"
-                  loading={testingBusy === x.testingId}
-                  onClick={() => onTesting(x.testingId, () => leaveTesting(x.testingId))}
-                >
-                  {t('cart.remove')}
-                </Button>
-              )
+              <span className="gb-cart-testing-actions">
+                {/* Anything on top of the fee helps get more tests done. */}
+                {x.amount > 0 && (
+                  <ExtraEditor
+                    extra={x.extra}
+                    currency={cart?.currency ?? ''}
+                    busy={testingBusy === x.testingId}
+                    onSave={(extra) => onTesting(x.testingId, () => joinTesting(x.testingId, x.volunteer, extra))}
+                  />
+                )}
+                {/* A mandatory fee comes with the product: only an optional one can be left out. */}
+                {!x.mandatory && (
+                  <Button
+                    size="s"
+                    mode="plain"
+                    loading={testingBusy === x.testingId}
+                    onClick={() => onTesting(x.testingId, () => leaveTesting(x.testingId))}
+                  >
+                    {t('cart.remove')}
+                  </Button>
+                )}
+              </span>
             }
             multiline
           >
@@ -526,5 +541,58 @@ function CartSteps({
         </Fragment>
       ))}
     </div>
+  );
+}
+
+/** Paying something on top of the testing fee: a small field opened on demand. */
+function ExtraEditor({
+  extra,
+  currency,
+  busy,
+  onSave,
+}: {
+  extra: number;
+  currency: string;
+  busy: boolean;
+  onSave: (extra: number) => void;
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(extra > 0 ? (extra / 100).toFixed(2) : '');
+  const valid = text.trim() === '' || /^\d+([.,]\d{1,2})?$/.test(text.trim());
+  if (!open) {
+    return (
+      <Button size="s" mode="plain" onClick={() => setOpen(true)}>
+        {extra > 0 ? t('testing.extraChange') : t('testing.extraAdd')}
+      </Button>
+    );
+  }
+  return (
+    <span className="gb-cart-testing-extra">
+      <Input
+        header={t('testing.extraField', { currency })}
+        type="text"
+        inputMode="decimal"
+        placeholder="5.00"
+        value={text}
+        status={valid ? 'default' : 'error'}
+        onChange={(e) => setText(e.target.value)}
+      />
+      <span className="gb-cart-testing-actions">
+        <Button
+          size="s"
+          disabled={!valid}
+          loading={busy}
+          onClick={() => {
+            onSave(text.trim() === '' ? 0 : Math.round(Number(text.trim().replace(',', '.')) * 100));
+            setOpen(false);
+          }}
+        >
+          {t('common.save')}
+        </Button>
+        <Button size="s" mode="plain" onClick={() => setOpen(false)}>
+          {t('common.cancel')}
+        </Button>
+      </span>
+    </span>
   );
 }

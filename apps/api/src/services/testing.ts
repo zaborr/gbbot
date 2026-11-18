@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, isNull, ne, notInArray, sql } from 'drizzle-orm';
-import { tierProgress } from '@tma-shop/shared';
+import { tierSteps, unitValue, type TierStep } from '@tma-shop/shared';
 import type {
   CartTesting,
   TestingParticipant,
@@ -41,15 +41,19 @@ type Executor = Pick<Database, 'select'>;
 type Writer = Pick<Database, 'select' | 'insert' | 'update' | 'delete'>;
 
 /**
- * Where each testing stands: units of what is tested bought by people who pay
- * the fee (their whole order paid, or not yet), and the fees paid. A VIP who
- * does not pay the fee (entry of 0) does not count.
+ * The money of each testing: fees paid (and what was paid on top of them) on
+ * orders paid in full, and the units of what is tested sold in the GB — on
+ * every order, fee or not, since the hidden part per unit is the organiser's.
  */
 export interface TestingTotals {
+  fees: number;
+  extras: number;
+  payers: number;
+  /** Everyone on an order not cancelled, paid or not. */
+  entries: number;
   units: number;
   pendingUnits: number;
-  raised: number;
-  participants: number;
+  orders: number;
 }
 
 export async function testingTotals(
@@ -59,51 +63,107 @@ export async function testingTotals(
   const result = new Map<string, TestingTotals>();
   if (testingIds.length === 0) return result;
   const paid = sql`${orders.amountPaid} >= ${orders.total}`;
-  const live = and(
-    inArray(testingEntries.testingId, [...testingIds]),
-    ne(orders.status, 'cancelled'),
-    sql`${testingEntries.amount} > 0`,
-  );
   const money = await db
     .select({
       testingId: testingEntries.testingId,
-      raised: sql<number>`coalesce(sum(case when ${paid} then ${testingEntries.amount} else 0 end), 0)::bigint`,
-      participants: sql<number>`count(*) filter (where ${paid})::int`,
+      amount: sql<number>`coalesce(sum(case when ${paid} then ${testingEntries.amount} else 0 end), 0)::bigint`,
+      extras: sql<number>`coalesce(sum(case when ${paid} then ${testingEntries.extra} else 0 end), 0)::bigint`,
+      payers: sql<number>`count(*) filter (where ${paid} and ${testingEntries.amount} > 0)::int`,
+      entries: sql<number>`count(*)::int`,
     })
     .from(testingEntries)
     .innerJoin(orders, eq(testingEntries.orderId, orders.id))
-    .where(live)
+    .where(and(inArray(testingEntries.testingId, [...testingIds]), ne(orders.status, 'cancelled')))
     .groupBy(testingEntries.testingId);
   const units = await db
     .select({
-      testingId: testingEntries.testingId,
+      testingId: testings.id,
       units: sql<number>`coalesce(sum(case when ${paid} then ${orderItems.quantity} else 0 end), 0)::int`,
       pendingUnits: sql<number>`coalesce(sum(case when ${paid} then 0 else ${orderItems.quantity} end), 0)::int`,
+      orders: sql<number>`count(distinct case when ${paid} then ${orders.id} end)::int`,
     })
-    .from(testingEntries)
-    .innerJoin(orders, eq(testingEntries.orderId, orders.id))
-    .innerJoin(testings, eq(testingEntries.testingId, testings.id))
+    .from(testings)
     .innerJoin(
       orderItems,
       and(
-        eq(orderItems.orderId, orders.id),
         eq(orderItems.productId, testings.productId),
         sql`(${testings.variantId} is null or ${orderItems.variantId} = ${testings.variantId})`,
       ),
     )
-    .where(live)
-    .groupBy(testingEntries.testingId);
+    .innerJoin(orders, and(eq(orderItems.orderId, orders.id), eq(orders.shopId, testings.shopId)))
+    .where(and(inArray(testings.id, [...testingIds]), ne(orders.status, 'cancelled')))
+    .groupBy(testings.id);
   for (const id of testingIds) {
     const m = money.find((r) => r.testingId === id);
     const u = units.find((r) => r.testingId === id);
+    const extras = Number(m?.extras ?? 0);
     result.set(id, {
+      fees: Number(m?.amount ?? 0) - extras,
+      extras,
+      payers: Number(m?.payers ?? 0),
+      entries: Number(m?.entries ?? 0),
       units: Number(u?.units ?? 0),
       pendingUnits: Number(u?.pendingUnits ?? 0),
-      raised: Number(m?.raised ?? 0),
-      participants: Number(m?.participants ?? 0),
+      orders: Number(u?.orders ?? 0),
     });
   }
   return result;
+}
+
+/** The price of one unit of what each testing tests (what a donor gets back for a vial). */
+export async function vialPrices(db: Executor, rows: readonly TestingRow[]): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (rows.length === 0) return result;
+  const productRows = await db
+    .select({ id: products.id, price: products.price })
+    .from(products)
+    .where(inArray(products.id, [...new Set(rows.map((r) => r.productId))]));
+  const variantIds = rows.flatMap((r) => (r.variantId ? [r.variantId] : []));
+  const variantRows =
+    variantIds.length > 0
+      ? await db
+          .select({ id: productVariants.id, price: productVariants.price })
+          .from(productVariants)
+          .where(inArray(productVariants.id, variantIds))
+      : [];
+  for (const row of rows) {
+    const base = productRows.find((p) => p.id === row.productId)?.price ?? 0;
+    const own = row.variantId ? variantRows.find((v) => v.id === row.variantId)?.price : null;
+    result.set(row.id, own ?? base);
+  }
+  return result;
+}
+
+/** The pot: what was paid into the testing and the hidden part of the units sold. */
+export const testingPot = (row: Pick<TestingRow, 'perUnit'>, totals: TestingTotals): number =>
+  totals.fees + totals.extras + row.perUnit * totals.units;
+
+/** Where each tier of a testing stands (fixed by the draw once it is done). */
+export function stepsOf(row: TestingRow, totals: TestingTotals, vialPrice: number): TierStep[] {
+  const drawn = row.status === 'drawn' || row.status === 'settled';
+  return tierSteps({
+    tiers: row.tiers,
+    pot: testingPot(row, totals),
+    vialPrice,
+    unitValue: unitValue({
+      perUnit: row.perUnit,
+      contribution: row.contribution,
+      fees: totals.fees,
+      units: totals.units,
+      orders: totals.orders,
+    }),
+    done: drawn ? (row.draw?.tiersDone ?? []) : null,
+  });
+}
+
+/** The tiers a testing's pot covers now, for one testing (loads what it needs). */
+export async function reachedTiers(db: Executor, row: TestingRow): Promise<string[]> {
+  const totals = (await testingTotals(db, [row.id])).get(row.id);
+  const price = (await vialPrices(db, [row])).get(row.id) ?? 0;
+  if (!totals) return [];
+  return stepsOf({ ...row, status: 'open' }, totals, price)
+    .filter((s) => s.reached)
+    .map((s) => s.tier.id);
 }
 
 /** A VIP does not pay this testing's fee. */
@@ -130,14 +190,22 @@ async function joinedBy(db: Executor, userId: number | undefined, testingIds: re
 /** Testings still running: they keep the product, variant and switch as they are. */
 const FINISHED: TestingStatus[] = ['settled', 'cancelled'];
 
+const EMPTY_TOTALS: TestingTotals = { fees: 0, extras: 0, payers: 0, entries: 0, units: 0, pendingUnits: 0, orders: 0 };
+
 function toTestingDTO(
   row: TestingRow,
   productTitle: string,
   label: string | null,
   totals: TestingTotals | undefined,
+  vialPrice: number,
   joined: boolean,
   isVip: boolean,
+  admin: boolean,
 ): Testing {
+  const t = totals ?? EMPTY_TOTALS;
+  const steps = stepsOf(row, t, vialPrice);
+  const pot = testingPot(row, t);
+  const settled = row.status === 'settled';
   return {
     id: row.id,
     productId: row.productId,
@@ -148,24 +216,75 @@ function toTestingDTO(
     lab: row.lab,
     contribution: row.contribution,
     feeMode: row.feeMode,
-    tiers: row.tiers,
+    // Customers see no money: only how far each tier is.
+    tiers: steps.map((step) => ({
+      id: step.tier.id,
+      name: step.tier.name,
+      vials: step.tier.vials,
+      reached: step.reached,
+      share: step.share,
+      unitsLeft: step.unitsLeft,
+    })),
     status: row.status as TestingStatus,
-    units: totals?.units ?? 0,
-    pendingUnits: totals?.pendingUnits ?? 0,
-    raised: totals?.raised ?? 0,
-    participants: totals?.participants ?? 0,
+    participants: t.payers,
     joined,
     exempt: feeExempt(row, isVip),
     draw: row.draw ?? null,
     reportSentAt: row.report?.sentAt ?? null,
+    money: admin
+      ? {
+          perUnit: row.perUnit,
+          tiers: row.tiers,
+          vialPrice,
+          unitValue: Math.round(
+            unitValue({
+              perUnit: row.perUnit,
+              contribution: row.contribution,
+              fees: t.fees,
+              units: t.units,
+              orders: t.orders,
+            }),
+          ),
+          fees: t.fees,
+          extras: t.extras,
+          perUnitTotal: row.perUnit * t.units,
+          pot,
+          units: t.units,
+          pendingUnits: t.pendingUnits,
+          orders: t.orders,
+          payers: t.payers,
+          entries: t.entries,
+          steps: steps.map((step) => ({
+            id: step.tier.id,
+            cost: step.cost,
+            vialCost: step.vialCost,
+            needed: step.needed,
+            missing: step.missing,
+          })),
+          // Once settled, the vials were already given back out of the pot.
+          balance:
+            pot -
+            steps
+              .filter((step) => step.reached)
+              .reduce((sum, step) => sum + step.cost + (settled ? 0 : step.vialCost), 0),
+        }
+      : null,
   };
 }
 
 /** The shop's testings with their product titles, variant labels and progress. */
-async function withLabels(db: Database, rows: TestingRow[], userId?: number, isVip = false): Promise<Testing[]> {
+async function withLabels(
+  db: Database,
+  rows: TestingRow[],
+  options: { userId?: number | undefined; isVip?: boolean; admin: boolean },
+): Promise<Testing[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
-  const [totals, joined] = await Promise.all([testingTotals(db, ids), joinedBy(db, userId, ids)]);
+  const [totals, joined, prices] = await Promise.all([
+    testingTotals(db, ids),
+    joinedBy(db, options.userId, ids),
+    vialPrices(db, rows),
+  ]);
   const productIds = [...new Set(rows.map((r) => r.productId))];
   const variantIds = rows.flatMap((r) => (r.variantId ? [r.variantId] : []));
   const [productRows, variantRows] = await Promise.all([
@@ -185,8 +304,10 @@ async function withLabels(db: Database, rows: TestingRow[], userId?: number, isV
       titles.get(row.productId) ?? '',
       row.variantId ? (labels.get(row.variantId) ?? null) : null,
       totals.get(row.id),
+      prices.get(row.id) ?? 0,
       joined.has(row.id),
-      isVip,
+      options.isVip ?? false,
+      options.admin,
     ),
   );
 }
@@ -197,7 +318,7 @@ export async function listTestings(db: Database, shopId: string): Promise<Testin
     .from(testings)
     .where(eq(testings.shopId, shopId))
     .orderBy(asc(testings.createdAt));
-  return withLabels(db, rows);
+  return withLabels(db, rows, { admin: true });
 }
 
 /**
@@ -223,7 +344,7 @@ export async function listVisibleTestings(
       ),
     )
     .orderBy(asc(testings.createdAt));
-  return withLabels(db, rows, userId, isVip);
+  return withLabels(db, rows, { userId, isVip, admin: false });
 }
 
 /**
@@ -245,11 +366,16 @@ export async function shopTestingCounts(
     db,
     rows.map((r) => r.testing.id),
   );
+  const prices = await vialPrices(
+    db,
+    rows.map((r) => r.testing),
+  );
   const byShop = new Map<string, { products: Set<string>; reached: Set<string> }>();
   for (const { testing } of rows) {
     const entry = byShop.get(testing.shopId) ?? { products: new Set<string>(), reached: new Set<string>() };
     entry.products.add(testing.productId);
-    if (tierProgress(testing.tiers, totals.get(testing.id)?.units ?? 0).some((p) => p.reached)) {
+    const steps = stepsOf(testing, totals.get(testing.id) ?? EMPTY_TOTALS, prices.get(testing.id) ?? 0);
+    if (steps.some((p) => p.reached)) {
       entry.reached.add(testing.productId);
     }
     byShop.set(testing.shopId, entry);
@@ -307,11 +433,13 @@ export async function cartTestingsFor(
     const exempt = feeExempt(testing, isVip);
     const pays = !exempt && (testing.feeMode !== 'optional' || tick !== undefined);
     if (!pays && !(exempt && tick?.volunteer)) return [];
+    const extra = pays ? (tick?.extra ?? 0) : 0;
     return [
       {
         testingId: testing.id,
         label: line.label,
-        amount: pays ? testing.contribution : 0,
+        amount: pays ? testing.contribution + extra : 0,
+        extra,
         volunteer: tick?.volunteer ?? false,
         mandatory: testing.feeMode !== 'optional' && !exempt,
       },
@@ -328,6 +456,8 @@ export async function tickCartTesting(
   testingId: string,
   volunteer: boolean,
   lines: readonly Line[],
+  /** Paid on top of the fee; left as it was when not given. */
+  extra?: number,
 ): Promise<void> {
   if (!shop.testingEnabled) {
     throw ApiError.conflict('testing_off', 'Turn on product testing in the GB settings first');
@@ -345,8 +475,11 @@ export async function tickCartTesting(
   }
   await db
     .insert(cartTestings)
-    .values({ cartId, testingId, volunteer })
-    .onConflictDoUpdate({ target: [cartTestings.cartId, cartTestings.testingId], set: { volunteer } });
+    .values({ cartId, testingId, volunteer, extra: extra ?? 0 })
+    .onConflictDoUpdate({
+      target: [cartTestings.cartId, cartTestings.testingId],
+      set: extra === undefined ? { volunteer } : { volunteer, extra },
+    });
 }
 
 export async function untickCartTesting(db: Database, cartId: string, testingId: string): Promise<void> {
@@ -388,7 +521,7 @@ async function findTesting(db: Database, shopId: string, id: string): Promise<Te
 }
 
 async function oneTesting(db: Database, row: TestingRow): Promise<Testing> {
-  const [dto] = await withLabels(db, [row]);
+  const [dto] = await withLabels(db, [row], { admin: true });
   if (!dto) throw ApiError.notFound('Testing not found');
   return dto;
 }
@@ -432,6 +565,7 @@ export async function createTesting(
       currency: product.currency,
       lab: input.lab,
       contribution: input.contribution,
+      perUnit: input.perUnit,
       feeMode: input.feeMode,
       tiers: input.tiers,
     })
@@ -447,36 +581,23 @@ export async function updateTesting(
   input: UpdateTestingRequest,
 ): Promise<Testing> {
   const current = await findTesting(db, shopId, id);
-  if (current.status !== 'open') {
+  // The tiers and the hidden part are the organiser's own sums: they can change
+  // until the draw. The fee is what people were charged: it stays once they take part.
+  if (current.status !== 'open' && current.status !== 'closed') {
     throw ApiError.conflict('testing_not_open', 'Only an open testing can be changed');
   }
-  // Once people take part, what they signed up for stays: same fee and mode,
-  // same tiers in the same order (new ones can be added at the end).
-  if (await hasEntries(db, current.id)) {
-    const kept = input.tiers.slice(0, current.tiers.length);
-    const same =
-      input.contribution === current.contribution &&
-      input.feeMode === current.feeMode &&
-      kept.length === current.tiers.length &&
-      current.tiers.every(
-        (tier, i) =>
-          kept[i]?.id === tier.id &&
-          kept[i]?.units === tier.units &&
-          kept[i]?.cost === tier.cost &&
-          kept[i]?.vials === tier.vials,
-      );
-    if (!same) {
-      throw ApiError.conflict(
-        'testing_joined_by_others',
-        'People already take part: only new tiers can be added at the end',
-      );
-    }
+  if (
+    (input.contribution !== current.contribution || input.feeMode !== current.feeMode) &&
+    (await hasEntries(db, current.id))
+  ) {
+    throw ApiError.conflict('testing_fee_locked', 'People already paid this fee: it cannot change');
   }
   const [row] = await db
     .update(testings)
     .set({
       lab: input.lab,
       contribution: input.contribution,
+      perUnit: input.perUnit,
       feeMode: input.feeMode,
       tiers: input.tiers,
       updatedAt: new Date(),
@@ -531,6 +652,7 @@ export async function listParticipants(
     name: user?.firstName ?? '—',
     contact: order.contactUsername ?? user?.username ?? null,
     amount: entry.amount,
+    extra: entry.extra,
     units: unitsOf(order.id),
     paid: order.amountPaid >= order.total,
     volunteer: entry.volunteer,
@@ -631,10 +753,12 @@ export async function announceTestingTiers(db: Database, env: Env, shopId: strin
     db,
     rows.map((r) => r.id),
   );
-  const labels = await withLabels(db, rows);
+  const prices = await vialPrices(db, rows);
+  const labels = await withLabels(db, rows, { admin: false });
   for (const row of rows) {
-    const units = totals.get(row.id)?.units ?? 0;
-    const reached = tierProgress(row.tiers, units).filter((p) => p.reached).length;
+    const reached = stepsOf(row, totals.get(row.id) ?? EMPTY_TOTALS, prices.get(row.id) ?? 0).filter(
+      (p) => p.reached,
+    ).length;
     if (reached <= row.notifiedTiers) continue;
     // Claim it first, so two payments at once do not announce it twice.
     const claimed = await db

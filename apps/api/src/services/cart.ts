@@ -281,10 +281,11 @@ export async function addCartTesting(
   testingId: string,
   volunteer: boolean,
   isVip = false,
+  extra?: number,
 ): Promise<Cart> {
   const cart = await getOrCreateCart(db, shop.id, userId);
   const current = await getCart(db, shop.id, userId, isVip);
-  await tickCartTesting(db, shop, cart.id, userId, testingId, volunteer, cartLinesForTesting(current.lines));
+  await tickCartTesting(db, shop, cart.id, userId, testingId, volunteer, cartLinesForTesting(current.lines), extra);
   return getCart(db, shop.id, userId, isVip);
 }
 

@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import {
   MAX_TESTING_TIERS,
-  tierProgress,
+  tierSteps,
   type Product,
   type Testing,
   type TestingFeeMode,
@@ -26,12 +26,12 @@ import { t, tn } from '../../i18n/index.js';
 const MONEY_RE = /^\d+([.,]\d{1,2})?$/;
 const COUNT_RE = /^\d+$/;
 const cents = (text: string): number => Math.round(Number(text.trim().replace(',', '.')) * 100);
+const units = (n: number): string => tn(n, 'testing.units.one', 'testing.units.other');
 
 /** A tier as typed. */
 interface TierDraft {
   id: string;
   name: string;
-  units: string;
   cost: string;
   vials: string;
 }
@@ -39,7 +39,6 @@ interface TierDraft {
 const newTier = (): TierDraft => ({
   id: Math.random().toString(36).slice(2, 10),
   name: '',
-  units: '',
   cost: '',
   vials: '1',
 });
@@ -110,55 +109,49 @@ function TestingForm({
   const tested = new Set(testings.map((x) => `${x.productId}|${x.variantId ?? ''}`));
   const isTested = (pid: string, vid: string | null): boolean => tested.has(`${pid}|${vid ?? ''}`);
 
+  const money = testing?.money ?? null;
   const [lab, setLab] = useState(testing?.lab ?? '');
   const [contribution, setContribution] = useState(testing ? toMajor(testing.contribution) : '');
+  const [perUnit, setPerUnit] = useState(money ? toMajor(money.perUnit) : '');
   const [feeMode, setFeeMode] = useState<TestingFeeMode>(testing?.feeMode ?? 'mandatory');
   const [tiers, setTiers] = useState<TierDraft[]>(
-    testing
-      ? testing.tiers.map((tier) => ({
+    money
+      ? money.tiers.map((tier) => ({
           id: tier.id,
           name: tier.name,
-          units: String(tier.units),
           cost: toMajor(tier.cost),
           vials: String(tier.vials),
         }))
       : [newTier()],
   );
-  const editable = testing === null || testing.status === 'open';
-  // Once people take part, what they signed up for stays: same fee, mode and
-  // tiers (new ones can be added at the end).
-  const locked = testing !== null && (testing.participants > 0 || testing.pendingUnits > 0);
-  const lockedTiers = locked ? (testing?.tiers.length ?? 0) : 0;
+  // The tiers and the hidden part are the organiser's own sums: they change
+  // until the draw. The fee stays once someone took part.
+  const editable = testing === null || testing.status === 'open' || testing.status === 'closed';
+  const locked = (money?.entries ?? 0) > 0;
   const currency = testing?.currency ?? product?.currency ?? shop.currency;
+  const fmt = (amount: number): string => formatPrice(amount, currency);
 
   const contributionOk = MONEY_RE.test(contribution.trim()) && cents(contribution) > 0;
+  const perUnitOk = perUnit.trim() === '' || MONEY_RE.test(perUnit.trim());
+  const perUnitCents = perUnit.trim() === '' || !perUnitOk ? 0 : cents(perUnit);
   const tierOk = (tier: TierDraft): boolean =>
-    tier.name.trim() !== '' &&
-    COUNT_RE.test(tier.units.trim()) &&
-    Number(tier.units) > 0 &&
-    MONEY_RE.test(tier.cost.trim()) &&
-    cents(tier.cost) > 0 &&
-    COUNT_RE.test(tier.vials.trim());
+    tier.name.trim() !== '' && MONEY_RE.test(tier.cost.trim()) && cents(tier.cost) > 0 && COUNT_RE.test(tier.vials.trim());
   const parsedTiers: TestingTier[] = tiers.filter(tierOk).map((tier) => ({
     id: tier.id,
     name: tier.name.trim(),
-    units: Number(tier.units.trim()),
     cost: cents(tier.cost),
     vials: Number(tier.vials.trim()),
   }));
-  const unitsAscending = parsedTiers.every((tier, i) => i === 0 || tier.units > (parsedTiers[i - 1]?.units ?? 0));
 
-  // How many paying buyers cover each tier (and the ones before) at this fee.
-  let cumulative = 0;
-  const needs = contributionOk
-    ? parsedTiers.map((tier) => {
-        cumulative += tier.cost;
-        return t('testing.needsBuyers', {
-          tier: tier.name,
-          buyers: tn(Math.ceil(cumulative / cents(contribution)), 'testing.people.one', 'testing.people.other'),
-        });
-      })
-    : [];
+  // The price of a vial (what a donor gets back), and what a unit adds.
+  const variant = product?.variants.find((v) => v.id === variantId) ?? null;
+  const vialPrice = money?.vialPrice ?? variant?.price ?? product?.price ?? 0;
+  const pot = money?.pot ?? 0;
+  const draftUnitValue = perUnitCents > 0 ? perUnitCents : contributionOk ? cents(contribution) : 0;
+  const unitValue = money && money.perUnit === perUnitCents ? money.unitValue : draftUnitValue;
+  const steps = tierSteps({ tiers: parsedTiers, pot, vialPrice, unitValue });
+  // From zero: how many units each tier means (with the tiers before it).
+  const fromZero = tierSteps({ tiers: parsedTiers, pot: 0, vialPrice, unitValue: draftUnitValue });
 
   const updateTier = (index: number, patch: Partial<TierDraft>): void =>
     setTiers(tiers.map((tier, i) => (i === index ? { ...tier, ...patch } : tier)));
@@ -173,10 +166,10 @@ function TestingForm({
     ? t('testing.needLab')
     : !contributionOk
       ? t('testing.badContribution')
-      : tiers.length === 0 || parsedTiers.length !== tiers.length
-        ? t('testing.badTiers')
-        : !unitsAscending
-          ? t('testing.badUnits')
+      : !perUnitOk
+        ? t('testing.badPerUnit')
+        : tiers.length === 0 || parsedTiers.length !== tiers.length
+          ? t('testing.badTiers')
           : null;
 
   const save = async (): Promise<void> => {
@@ -185,6 +178,7 @@ function TestingForm({
       const body = {
         lab: lab.trim(),
         contribution: cents(contribution),
+        perUnit: perUnitCents,
         feeMode,
         tiers: parsedTiers,
       };
@@ -225,7 +219,7 @@ function TestingForm({
     );
   }
 
-  const variant = product?.variants.find((v) => v.id === variantId) ?? null;
+  // How customers will see it (no money): the tiers against the pot as it is now.
   const preview: Testing | null =
     parsedTiers.length > 0 && contributionOk
       ? {
@@ -238,16 +232,21 @@ function TestingForm({
           lab: lab.trim() || '—',
           contribution: cents(contribution),
           feeMode,
-          tiers: parsedTiers,
+          tiers: steps.map((step) => ({
+            id: step.tier.id,
+            name: step.tier.name,
+            vials: step.tier.vials,
+            reached: step.reached,
+            share: step.share,
+            unitsLeft: step.unitsLeft,
+          })),
           status: testing?.status ?? 'open',
-          units: testing?.units ?? 0,
-          pendingUnits: testing?.pendingUnits ?? 0,
-          raised: testing?.raised ?? 0,
           participants: testing?.participants ?? 0,
           joined: false,
           exempt: false,
           draw: null,
           reportSentAt: null,
+          money: null,
         }
       : null;
 
@@ -310,6 +309,8 @@ function TestingForm({
         </Section>
       )}
 
+      {money && testing && <PotSection testing={testing} steps={steps} />}
+
       <Section header={t('testing.settings')} footer={t('testing.settingsFooter', { currency })}>
         <Input
           header={t('testing.labField')}
@@ -322,12 +323,25 @@ function TestingForm({
           header={t('testing.contributionField', { currency })}
           type="text"
           inputMode="decimal"
-          placeholder="20.00"
+          placeholder="5.00"
           status={contribution.trim() === '' || contributionOk ? 'default' : 'error'}
           value={contribution}
           disabled={!editable || locked}
           onChange={(e) => setContribution(e.target.value)}
         />
+        <Input
+          header={t('testing.perUnitField', { currency })}
+          type="text"
+          inputMode="decimal"
+          placeholder="0.00"
+          status={perUnitOk ? 'default' : 'error'}
+          value={perUnit}
+          disabled={!editable}
+          onChange={(e) => setPerUnit(e.target.value)}
+        />
+        <Cell multiline>
+          <span className="gb-hint">{locked ? t('testing.feeLockedHint') : t('testing.perUnitHint')}</span>
+        </Cell>
       </Section>
 
       <Section header={t('testing.feeMode')} footer={t(`testing.feeMode.${feeMode}.hint`)}>
@@ -348,15 +362,17 @@ function TestingForm({
 
       <Section
         header={t('testing.tiers')}
-        footer={[locked ? t('testing.lockedFooter') : null, t('testing.tiersFooter'), needs.length > 0 ? `${needs.join(' · ')}.` : null]
+        footer={[
+          t('testing.tiersMoneyFooter'),
+          vialPrice > 0 ? t('testing.vialPriceHint', { amount: fmt(vialPrice) }) : null,
+        ]
           .filter(Boolean)
           .join(' ')}
       >
         {tiers.map((tier, index) => {
-          const fixed = index < lockedTiers;
           const costBad = tier.cost.trim() !== '' && !(MONEY_RE.test(tier.cost.trim()) && cents(tier.cost) > 0);
-          const unitsBad = tier.units.trim() !== '' && !(COUNT_RE.test(tier.units.trim()) && Number(tier.units) > 0);
           const vialsBad = !COUNT_RE.test(tier.vials.trim());
+          const zero = fromZero.find((step) => step.tier.id === tier.id);
           return (
             <div key={tier.id} className="gb-testing-tier-edit">
               <Input
@@ -367,18 +383,6 @@ function TestingForm({
                 onChange={(e) => updateTier(index, { name: e.target.value })}
               />
               <div className="gb-testing-tier-row">
-                <div style={{ flex: 2 }}>
-                  <Input
-                    header={t('testing.tierUnits')}
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="10"
-                    status={unitsBad ? 'error' : 'default'}
-                    value={tier.units}
-                    disabled={!editable || fixed}
-                    onChange={(e) => updateTier(index, { units: e.target.value })}
-                  />
-                </div>
                 <div style={{ flex: 3 }}>
                   <Input
                     header={t('testing.tierCost', { currency })}
@@ -387,7 +391,7 @@ function TestingForm({
                     placeholder="200.00"
                     status={costBad ? 'error' : 'default'}
                     value={tier.cost}
-                    disabled={!editable || fixed}
+                    disabled={!editable}
                     onChange={(e) => updateTier(index, { cost: e.target.value })}
                   />
                 </div>
@@ -399,19 +403,19 @@ function TestingForm({
                     placeholder="1"
                     status={vialsBad ? 'error' : 'default'}
                     value={tier.vials}
-                    disabled={!editable || fixed}
+                    disabled={!editable}
                     onChange={(e) => updateTier(index, { vials: e.target.value })}
                   />
                 </div>
               </div>
-              {editable && !fixed && (
+              {zero && zero.unitsLeft !== null && (
+                <span className="gb-hint gb-testing-tier-hint">
+                  {t('testing.tierEquals', { amount: fmt(zero.needed), units: units(zero.unitsLeft) })}
+                </span>
+              )}
+              {editable && (
                 <div className="gb-testing-tier-actions">
-                  <Button
-                    size="s"
-                    mode="plain"
-                    disabled={index <= lockedTiers}
-                    onClick={() => moveTier(index, -1)}
-                  >
+                  <Button size="s" mode="plain" disabled={index === 0} onClick={() => moveTier(index, -1)}>
                     ↑
                   </Button>
                   <Button
@@ -444,6 +448,16 @@ function TestingForm({
           </div>
         )}
       </Section>
+
+      {parsedTiers.length > 0 && contributionOk && (
+        <Simulator
+          tiers={parsedTiers}
+          fee={cents(contribution)}
+          perUnit={perUnitCents}
+          vialPrice={vialPrice}
+          currency={currency}
+        />
+      )}
 
       {preview && <TestingCard testing={preview} preview />}
 
@@ -489,23 +503,162 @@ function TestingForm({
   );
 }
 
+/** One "label … amount" line of the pot. */
+function Line({ label, value, strong = false }: { label: string; value: string; strong?: boolean }): React.JSX.Element {
+  return (
+    <Cell after={<span className={strong ? 'gb-testing-money gb-testing-money--strong' : 'gb-testing-money'}>{value}</span>}>
+      {strong ? <strong>{label}</strong> : label}
+    </Cell>
+  );
+}
+
+/**
+ * The organiser's view of the money: where the pot comes from, each tier in
+ * money and in units, and what is left once the tiers reached are paid.
+ */
+function PotSection({ testing, steps }: { testing: Testing; steps: ReturnType<typeof tierSteps> }): React.JSX.Element | null {
+  const m = testing.money;
+  if (!m) return null;
+  const fmt = (amount: number): string => formatPrice(amount, testing.currency);
+  const next = steps.find((step) => !step.reached);
+  return (
+    <>
+      <Section
+        header={t('testing.potTitle')}
+        footer={[
+          t('testing.potFooter'),
+          m.pendingUnits > 0 ? t('testing.potPending', { units: units(m.pendingUnits) }) : null,
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        <Line
+          label={t('testing.potFees', { count: m.payers, amount: fmt(testing.contribution) })}
+          value={fmt(m.fees)}
+        />
+        {m.extras > 0 && <Line label={t('testing.potExtras')} value={fmt(m.extras)} />}
+        <Line
+          label={t('testing.potHidden', { units: units(m.units), amount: fmt(m.perUnit) })}
+          value={fmt(m.perUnitTotal)}
+        />
+        <Line label={t('testing.potTotal')} value={fmt(m.pot)} strong />
+      </Section>
+      <Section
+        header={t('testing.potTiers')}
+        footer={t('testing.potUnitValue', { amount: fmt(m.unitValue), orders: m.orders })}
+      >
+        {steps.map((step) => (
+          <Cell
+            key={step.tier.id}
+            before={
+              <span className="gb-testing-tier-icon" aria-hidden="true">
+                {step.reached ? '✅' : step === next ? '⏳' : '🔒'}
+              </span>
+            }
+            after={<span className="gb-testing-money">{fmt(step.cost + step.vialCost)}</span>}
+            subtitle={
+              step.reached
+                ? t('testing.tierReached')
+                : step.unitsLeft !== null
+                  ? t('testing.potMissingUnits', { amount: fmt(step.missing), units: units(step.unitsLeft) })
+                  : t('testing.potMissing', { amount: fmt(step.missing) })
+            }
+            multiline
+          >
+            {step.tier.name}
+          </Cell>
+        ))}
+        <Line label={t('testing.potBalance')} value={fmt(m.balance)} strong />
+      </Section>
+    </>
+  );
+}
+
+/**
+ * Trying numbers before opening (or while open): units and orders expected,
+ * and which tiers the pot would cover.
+ */
+function Simulator({
+  tiers,
+  fee,
+  perUnit,
+  vialPrice,
+  currency,
+}: {
+  tiers: readonly TestingTier[];
+  fee: number;
+  perUnit: number;
+  vialPrice: number;
+  currency: string;
+}): React.JSX.Element {
+  const [unitsText, setUnitsText] = useState('');
+  const [ordersText, setOrdersText] = useState('');
+  const fmt = (amount: number): string => formatPrice(amount, currency);
+  const u = COUNT_RE.test(unitsText.trim()) ? Number(unitsText) : 0;
+  const o = COUNT_RE.test(ordersText.trim()) ? Number(ordersText) : 0;
+  const pot = o * fee + u * perUnit;
+  const steps = tierSteps({ tiers, pot, vialPrice, unitValue: perUnit > 0 ? perUnit : fee });
+  return (
+    <Section header={t('testing.simTitle')} footer={t('testing.simFooter')}>
+      <div className="gb-testing-tier-row">
+        <div style={{ flex: 1 }}>
+          <Input
+            header={t('testing.simUnits')}
+            type="text"
+            inputMode="numeric"
+            placeholder="80"
+            value={unitsText}
+            onChange={(e) => setUnitsText(e.target.value)}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <Input
+            header={t('testing.simOrders')}
+            type="text"
+            inputMode="numeric"
+            placeholder="35"
+            value={ordersText}
+            onChange={(e) => setOrdersText(e.target.value)}
+          />
+        </div>
+      </div>
+      {(u > 0 || o > 0) && (
+        <>
+          <Line label={t('testing.simPot')} value={fmt(pot)} strong />
+          {steps.map((step) => (
+            <Cell
+              key={step.tier.id}
+              before={
+                <span className="gb-testing-tier-icon" aria-hidden="true">
+                  {step.reached ? '✅' : '⏳'}
+                </span>
+              }
+              after={<span className="gb-testing-money">{fmt(step.needed)}</span>}
+              subtitle={step.reached ? undefined : t('testing.potMissing', { amount: fmt(step.missing) })}
+              multiline
+            >
+              {step.tier.name}
+            </Cell>
+          ))}
+        </>
+      )}
+    </Section>
+  );
+}
+
 /** Who takes part: paid first, then those still to pay; tap one to see the order. */
 function Participants({ testing }: { testing: Testing }): React.JSX.Element | null {
   const navigate = useNavigate();
   const { to } = useShop();
   const list = useAsync(() => api.adminGetTestingParticipants(testing.id), [testing.id]);
   if (!list.data) return null;
-  const money = (amount: number): string => formatPrice(amount, testing.currency);
+  const fmt = (amount: number): string => formatPrice(amount, testing.currency);
   const volunteers = list.data.filter((p) => p.volunteer).length;
+  const perUnit = testing.money?.perUnit ?? 0;
   return (
     <Section
       header={t('testing.participants', { count: list.data.length })}
-      footer={t('testing.participantsUnitsFooter', {
-        units: testing.units,
-        pendingUnits: testing.pendingUnits,
-        raised: money(testing.raised),
-        volunteers,
-      })}
+      footer={t('testing.participantsMoneyFooter', { payers: testing.participants, volunteers })}
     >
       {list.data.length === 0 && <Cell multiline>{t('testing.noParticipants')}</Cell>}
       {list.data.map((p) => (
@@ -513,13 +666,15 @@ function Participants({ testing }: { testing: Testing }): React.JSX.Element | nu
           key={p.orderId}
           onClick={() => navigate(to(`/admin/orders/${p.orderId}`))}
           subtitle={[
-            tn(p.units, 'testing.units.one', 'testing.units.other'),
+            units(p.units),
+            p.extra > 0 ? t('testing.participantExtra', { amount: fmt(p.extra) }) : null,
+            perUnit > 0 ? t('testing.participantHidden', { amount: fmt(perUnit * p.units) }) : null,
             p.paid ? t('testing.paid') : t('testing.unpaid'),
             p.volunteer ? t('testing.volunteerChip') : null,
           ]
             .filter(Boolean)
             .join(' · ')}
-          after={p.exempt ? t('testing.exemptChip') : money(p.amount)}
+          after={p.exempt ? t('testing.exemptChip') : fmt(p.amount)}
           multiline
         >
           {p.contact ? `${p.name} · @${p.contact}` : p.name}
@@ -659,7 +814,7 @@ function DrawSection({ testing, onChange }: { testing: Testing; onChange: () => 
  */
 function SettleSection({ testing, onChange }: { testing: Testing; onChange: () => void }): React.JSX.Element | null {
   const actions = useAdminActions(onChange);
-  const nothingReached = !tierProgress(testing.tiers, testing.units).some((p) => p.reached);
+  const nothingReached = !testing.tiers.some((tier) => tier.reached);
   if (testing.status === 'settled') {
     return (
       <Section header={t('testing.settleTitle')}>
@@ -722,7 +877,7 @@ function ReportSection({ testing }: { testing: Testing }): React.JSX.Element | n
 function CancelSection({ testing, onChange }: { testing: Testing; onChange: () => void }): React.JSX.Element | null {
   const actions = useAdminActions(onChange);
   if (testing.status === 'settled' || testing.status === 'cancelled') return null;
-  if (testing.participants === 0 && testing.pendingUnits === 0) return null;
+  if ((testing.money?.entries ?? 0) === 0) return null;
   return (
     <Section footer={t('testing.cancelFooter')}>
       <ErrorBanner message={actions.error} />

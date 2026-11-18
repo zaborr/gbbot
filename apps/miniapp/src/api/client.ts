@@ -564,10 +564,10 @@ export class ApiClient {
   }
 
   /** Joins a product testing with this cart (or changes the vial offer). */
-  joinTesting(testingId: string, volunteer: boolean): Promise<Cart> {
+  joinTesting(testingId: string, volunteer: boolean, extra?: number): Promise<Cart> {
     return this.request<Cart>('/cart/testings', {
       method: 'POST',
-      body: JSON.stringify({ testingId, volunteer }),
+      body: JSON.stringify({ testingId, volunteer, ...(extra !== undefined ? { extra } : {}) }),
     });
   }
 

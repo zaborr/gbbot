@@ -390,6 +390,8 @@ export const testings = pgTable(
     contribution: integer('contribution').notNull(),
     /** Who pays the fee: everyone, whoever chooses to, or everyone but VIPs. */
     feeMode: text('fee_mode').$type<TestingFeeMode>().notNull().default('mandatory'),
+    /** Hidden: what the organiser puts in the pot for each unit sold (minor units). */
+    perUnit: integer('per_unit').notNull().default(0),
     /** Leftovers below this per person are not sent back. */
     refundThreshold: integer('refund_threshold').notNull().default(200),
     tiers: jsonb('tiers').$type<TestingTier[]>().notNull(),
@@ -428,8 +430,10 @@ export const testingEntries = pgTable(
     userId: bigint('user_id', { mode: 'number' }).references(() => users.telegramId, {
       onDelete: 'set null',
     }),
-    /** What it adds to the order (minor units of the testing's currency). */
+    /** What it adds to the order (minor units of the testing's currency): the fee and `extra`. */
     amount: integer('amount').notNull(),
+    /** Paid on top of the fee, to help. */
+    extra: integer('extra').notNull().default(0),
     /** Offers to donate a vial. */
     volunteer: boolean('volunteer').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -451,6 +455,8 @@ export const cartTestings = pgTable(
       .notNull()
       .references(() => testings.id, { onDelete: 'cascade' }),
     volunteer: boolean('volunteer').notNull().default(false),
+    /** Paid on top of the fee, to help. */
+    extra: integer('extra').notNull().default(0),
   },
   (table) => [primaryKey({ columns: [table.cartId, table.testingId] })],
 );

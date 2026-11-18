@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Cell, List, Section, Switch } from '@telegram-apps/telegram-ui';
-import { testingMaxUnits, type Testing } from '@tma-shop/shared';
+import type { Testing } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
 import { useShop } from '../../providers/ShopProvider.js';
@@ -59,7 +59,10 @@ function AdminTestings(): React.JSX.Element {
                   <span className="gb-chips" style={{ marginTop: 4 }}>
                     <TestingStatusChip status={testing.status} />
                     <span className="gb-chip">
-                      {t('testing.unitsOf', { units: testing.units, max: testingMaxUnits(testing.tiers) })}
+                      {t('testing.tiersOf', {
+                        reached: testing.tiers.filter((tier) => tier.reached).length,
+                        count: testing.tiers.length,
+                      })}
                     </span>
                   </span>
                 }

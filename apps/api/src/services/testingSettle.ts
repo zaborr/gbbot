@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
-import { tierProgress, type Lang } from '@tma-shop/shared';
+import type { Lang } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { orderItems, orders, testingEntries, testings } from '../db/schema.js';
@@ -10,7 +10,7 @@ import { languagesOf, notifyUsers } from './notifications.js';
 import type { ShopRow } from './shop.js';
 import { audience, testedLabel } from './testingDraw.js';
 import { botToken } from './activeBot.js';
-import { testingTotals } from './testing.js';
+import { reachedTiers } from './testing.js';
 
 /**
  * The end of a testing: closing it (donors get their vial's price back),
@@ -105,10 +105,9 @@ export async function settleTesting(db: Database, env: Env, shop: ShopRow, id: s
   return row;
 }
 
-/** Whether the units paid reach at least the first tier. */
+/** Whether the pot covers at least the first tier. */
 async function anyTierReached(db: Database, testing: TestingRow): Promise<boolean> {
-  const units = (await testingTotals(db, [testing.id])).get(testing.id)?.units ?? 0;
-  return tierProgress(testing.tiers, units).some((p) => p.reached);
+  return (await reachedTiers(db, testing)).length > 0;
 }
 
 /**

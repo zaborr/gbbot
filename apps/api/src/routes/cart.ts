@@ -61,10 +61,18 @@ export function cartRoutes(): Hono<AppBindings> {
 
   // Product testings joined with this cart (they go on the order).
   app.post('/testings', zValidator('json', cartTestingRequest), async (c) => {
-    const { testingId, volunteer } = c.req.valid('json');
+    const { testingId, volunteer, extra } = c.req.valid('json');
     assertOpen(c.get('shop'));
     return c.json(
-      await addCartTesting(c.get('db'), c.get('shop'), c.get('claims').sub, testingId, volunteer, c.get('isVip')),
+      await addCartTesting(
+        c.get('db'),
+        c.get('shop'),
+        c.get('claims').sub,
+        testingId,
+        volunteer,
+        c.get('isVip'),
+        extra,
+      ),
     );
   });
   app.delete('/testings/:testingId', zValidator('param', z.object({ testingId: z.uuid() })), async (c) =>
