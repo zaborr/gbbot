@@ -28,6 +28,7 @@ import {
 import {
   cryptoAvailable,
   encryptAddress,
+  saveOrderDetails,
   loadSavedAddress,
   saveAddress,
 } from '../lib/addressCrypto.js';
@@ -160,6 +161,7 @@ export function CartPage(): React.JSX.Element {
         return;
       }
       let details: { shippingZoneId?: string; encryptedAddress: string } | null = null;
+      let sentDetails: DeliveryAddress | null = null;
       if (needsShipping) {
         if (!zone) {
           missing(t('cart.needZone'));
@@ -182,6 +184,7 @@ export function CartPage(): React.JSX.Element {
           return;
         }
         const clean = cleanDetails(address, fields, needsShipping);
+        sentDetails = clean;
         details = {
           ...(zone ? { shippingZoneId: zone.id } : {}),
           encryptedAddress: await encryptAddress(
@@ -194,6 +197,8 @@ export function CartPage(): React.JSX.Element {
         saveAddress(remember ? { ...address, ...clean } : null);
       }
       const { orderId } = await api.createOrder(contactName || null, details);
+      // A copy on this device only, so the customer can see what they sent.
+      if (sentDetails) saveOrderDetails(orderId, sentDetails);
       // The server empties the cart when it creates the order.
       void refresh();
       // So the bot can tell the customer how the order goes.

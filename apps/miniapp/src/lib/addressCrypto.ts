@@ -1,4 +1,4 @@
-import type { DeliveryAddress } from '@tma-shop/shared';
+import { mergeDelivery, type DeliveryAddress, type DeliveryExtra, type Order } from '@tma-shop/shared';
 
 /**
  * Delivery addresses are encrypted on the customer's device and only the shop
@@ -84,7 +84,7 @@ export async function generateAddressKeys(): Promise<{
 
 /** Encrypts an address for the shop whose public key (base64 SPKI) is given. */
 export async function encryptAddress(
-  address: DeliveryAddress,
+  address: DeliveryAddress | DeliveryExtra,
   publicKey: string,
   kid: string,
 ): Promise<string> {
@@ -123,10 +123,35 @@ async function importPrivateKey(privateKeyPem: string): Promise<CryptoKey> {
 }
 
 /** Reads an address envelope with the admin's private key. */
-export async function decryptAddress(
-  envelopeJson: string,
+export async function decryptAddress(envelopeJson: string, privateKeyPem: string): Promise<DeliveryAddress> {
+  return decryptJson<DeliveryAddress>(envelopeJson, privateKeyPem);
+}
+
+/** An order's details as sent, what was added later, and both together. */
+export interface OrderDetails {
+  original: DeliveryAddress;
+  extras: Array<{ at: string; extra: DeliveryExtra }>;
+  merged: DeliveryAddress;
+}
+
+/** Reads an order's details and the ones added later (those that cannot be read are skipped). */
+export async function decryptOrderDetails(
+  order: Pick<Order, 'encryptedAddress' | 'addressExtras'>,
   privateKeyPem: string,
-): Promise<DeliveryAddress> {
+): Promise<OrderDetails> {
+  const original = await decryptAddress(order.encryptedAddress ?? '', privateKeyPem);
+  const extras: OrderDetails['extras'] = [];
+  for (const entry of order.addressExtras) {
+    try {
+      extras.push({ at: entry.at, extra: await decryptJson<DeliveryExtra>(entry.encrypted, privateKeyPem) });
+    } catch {
+      // Encrypted with a key replaced since: left out.
+    }
+  }
+  return { original, extras, merged: mergeDelivery(original, extras.map((e) => e.extra)) };
+}
+
+async function decryptJson<T>(envelopeJson: string, privateKeyPem: string): Promise<T> {
   const envelope = JSON.parse(envelopeJson) as AddressEnvelope;
   const rsaKey = await importPrivateKey(privateKeyPem);
   const rawKey = await crypto.subtle.decrypt(RSA, rsaKey, fromBase64(envelope.key));
@@ -136,7 +161,7 @@ export async function decryptAddress(
     aesKey,
     fromBase64(envelope.data),
   );
-  return JSON.parse(new TextDecoder().decode(plain)) as DeliveryAddress;
+  return JSON.parse(new TextDecoder().decode(plain)) as T;
 }
 
 /** Whether a private key (PEM) belongs to the given public key (base64 SPKI). */
@@ -198,4 +223,24 @@ export function loadSavedAddress(): DeliveryAddress | null {
 
 export function saveAddress(address: DeliveryAddress | null): void {
   storageSet(SAVED_ADDRESS_KEY, address ? JSON.stringify(address) : null);
+}
+
+const ORDER_DETAILS_PREFIX = 'tma-shop:order-details:';
+
+/**
+ * The details sent with an order, kept only on the device that placed it so the
+ * customer can see them (the server cannot read them, and neither can they elsewhere).
+ */
+export function loadOrderDetails(orderId: string): DeliveryAddress | null {
+  const raw = storageGet(ORDER_DETAILS_PREFIX + orderId);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as DeliveryAddress;
+  } catch {
+    return null;
+  }
+}
+
+export function saveOrderDetails(orderId: string, details: DeliveryAddress): void {
+  storageSet(ORDER_DETAILS_PREFIX + orderId, JSON.stringify(details));
 }

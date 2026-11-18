@@ -6,6 +6,7 @@ import {
   editableDirectly,
   exchangeRateFor,
   type ExchangeRates,
+  MAX_ADDRESS_EXTRAS,
   shippingCost,
   type Order,
   type OrderStatus,
@@ -13,6 +14,7 @@ import {
   type PaymentLogEntry,
 } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
+import type { ShopRow } from './shop.js';
 import {
   cartItems,
   cartTestings,
@@ -323,6 +325,49 @@ export async function listOrders(db: Database, shopId: string, userId: number): 
     .where(and(eq(orders.shopId, shopId), eq(orders.userId, userId)))
     .orderBy(desc(orders.createdAt));
   return attachItems(db, rows);
+}
+
+/** Order states where the customer can still add details (not sent yet). */
+const DETAILS_OPEN: readonly OrderStatus[] = ['pending', 'awaiting_payment', 'paid'];
+
+/**
+ * The customer adds details (email, phone, notes) to their order, encrypted on
+ * their device with the GB's key. What the order had is never touched.
+ */
+export async function addOrderDetails(
+  db: Database,
+  shop: Pick<ShopRow, 'id' | 'addressKeyFingerprint'>,
+  orderId: string,
+  userId: number,
+  encrypted: string,
+): Promise<Order> {
+  const order = await db.query.orders.findFirst({
+    where: and(eq(orders.shopId, shop.id), eq(orders.id, orderId), eq(orders.userId, userId)),
+  });
+  if (!order) throw ApiError.notFound('Order not found');
+  if (!DETAILS_OPEN.includes(order.status)) {
+    throw ApiError.conflict('order_sent', 'This order was already sent: write to the organiser');
+  }
+  if (!order.encryptedAddress) throw ApiError.badRequest('no_details', 'This order has no delivery details');
+  if (order.addressExtras.length >= MAX_ADDRESS_EXTRAS) {
+    throw ApiError.conflict('too_many_extras', 'You cannot add more details: write to the organiser');
+  }
+  const envelope = parseEnvelope(encrypted);
+  if (!envelope) throw ApiError.badRequest('bad_details', 'Invalid details');
+  if (envelope.kid !== shop.addressKeyFingerprint) {
+    throw ApiError.conflict(
+      'stale_key',
+      'The shop updated its security key. Please reopen the shop and try again.',
+    );
+  }
+  const now = new Date();
+  await db
+    .update(orders)
+    .set({ addressExtras: [...order.addressExtras, { encrypted, at: now.toISOString() }], updatedAt: now })
+    .where(eq(orders.id, order.id));
+  const updated = await getOrder(db, shop.id, order.id);
+  if (!updated) throw ApiError.notFound('Order not found');
+  return updated;
 }
 
 export async function getOrder(

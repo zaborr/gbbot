@@ -317,3 +317,7 @@ export interface BlacklistCheck {
   /** Platform blacklist: how many GBs they have something in. */
   shops: number;
 }
+
+/** The customer adds details to an order (encrypted on their device, like the address). */
+export const addOrderDetailsRequest = z.object({ encrypted: z.string().min(1).max(16_000) });
+export type AddOrderDetailsRequest = z.infer<typeof addOrderDetailsRequest>;

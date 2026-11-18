@@ -62,6 +62,7 @@ export async function runRetention(db: Database, now = new Date()): Promise<Rete
       userId: null,
       encryptedAddress: null,
       addressKeyFingerprint: null,
+      addressExtras: [],
       anonymizedAt: now,
       updatedAt: now,
     })

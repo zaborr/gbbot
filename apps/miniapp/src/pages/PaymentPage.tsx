@@ -17,6 +17,7 @@ import {
   type ShippingZone,
 } from '@tma-shop/shared';
 import { api, ApiClientError } from '../api/client.js';
+import { OrderDetailsSection } from '../components/OrderDetailsSection.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useMainButton } from '../hooks/useMainButton.js';
 import { useLiveRefresh } from '../hooks/useLiveRefresh.js';
@@ -159,6 +160,8 @@ export function PaymentPage(): React.JSX.Element {
       {!closed && shop.data.testingEnabled && <OrderTestingOffers order={current} onAdded={reload} />}
 
       {!done && <StatusSection order={current} autoCancelHours={shop.data.autoCancelHours} />}
+
+      <OrderDetailsSection order={current} shop={shop.data} onAdded={reload} />
 
       {needsPayment && canPay && !editing && anyMethod && (
         <PaymentForm

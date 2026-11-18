@@ -283,6 +283,8 @@ export const orders = pgTable('orders', {
   /** Address encrypted on the customer's device; the server cannot read it. */
   encryptedAddress: text('encrypted_address'),
   addressKeyFingerprint: text('address_key_fingerprint'),
+  /** Details the customer added later, each encrypted on their device (they only fill gaps). */
+  addressExtras: jsonb('address_extras').$type<Array<{ encrypted: string; at: string }>>().notNull().default([]),
   currency: text('currency').notNull(),
   /** Crypto payment method label chosen by the customer, e.g. "USDC · Base". */
   paymentNetwork: text('payment_network'),

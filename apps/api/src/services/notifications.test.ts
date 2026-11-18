@@ -16,6 +16,7 @@ const base: Order = {
   shippingZoneName: 'Spain',
   encryptedAddress: null,
   addressKeyFingerprint: null,
+  addressExtras: [],
   currency: 'USDC',
   paymentNetwork: 'USDC · Base',
   paymentTxHash: '0xabc',

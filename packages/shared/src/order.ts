@@ -113,6 +113,11 @@ export const order = z.object({
   encryptedAddress: z.string().nullable(),
   /** Fingerprint of the key the address was encrypted with. */
   addressKeyFingerprint: z.string().nullable(),
+  /**
+   * Details the customer added later (email, phone, notes), each encrypted the
+   * same way. They never replace what the order had: they only fill gaps.
+   */
+  addressExtras: z.array(z.object({ encrypted: z.string(), at: isoDateTime })),
   currency: currencyCode,
   /** Crypto payment method chosen by the customer, e.g. "USDC · Base". */
   paymentNetwork: z.string().nullable(),
