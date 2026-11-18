@@ -23,16 +23,30 @@ else
 $(tail -n 15 "$LOG" | cut -c 1-200)"
 fi
 
-# Reported through the bot itself: the API may be restarting right now.
-TOKEN=$(sed -n 's/^BOT_TOKEN=//p' .env | head -n 1 | tr -d "\"'\r")
-telegram() {
-  method=$1
-  shift
-  curl -fsS -o /dev/null --max-time 20 "https://api.telegram.org/bot$TOKEN/$method" \
-    --data-urlencode "chat_id=$CHAT" --data-urlencode "text=$TEXT" "$@"
-}
-if [ -n "$TOKEN" ] && [ -n "$CHAT" ]; then
-  { [ -n "$MESSAGE" ] && telegram editMessageText --data-urlencode "message_id=$MESSAGE"; } ||
-    telegram sendMessage || echo "Could not report the result through the bot."
+# Reported by the API through the active bot (the one in .env may be an old
+# one): it picks the file up within seconds, also right after restarting.
+if [ -n "$CHAT" ]; then
+  OUT="$DIR/outbox-update-$(date +%s).msg"
+  printf 'chat=%s\nmessage=%s\n---\n%s\n' "$CHAT" "$MESSAGE" "$TEXT" >"$OUT.tmp" && mv "$OUT.tmp" "$OUT"
+  # The API is down (the update broke it): told with BOT_TOKEN instead.
+  i=0
+  while [ -f "$OUT" ] && [ "$i" -lt 18 ]; do
+    sleep 5
+    i=$((i + 1))
+  done
+  if [ -f "$OUT" ]; then
+    rm -f "$OUT"
+    TOKEN=$(sed -n 's/^BOT_TOKEN=//p' .env | head -n 1 | tr -d "\"'\r")
+    telegram() {
+      method=$1
+      shift
+      curl -fsS -o /dev/null --max-time 20 "https://api.telegram.org/bot$TOKEN/$method" \
+        --data-urlencode "chat_id=$CHAT" --data-urlencode "text=$TEXT" "$@"
+    }
+    if [ -n "$TOKEN" ]; then
+      { [ -n "$MESSAGE" ] && telegram editMessageText --data-urlencode "message_id=$MESSAGE"; } ||
+        telegram sendMessage || echo "Could not report the result through the bot."
+    fi
+  fi
 fi
 rm -f "$DIR/running"
