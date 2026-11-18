@@ -13,7 +13,8 @@ export async function listAllProducts(db: Database, shopId: string): Promise<Pro
   const rows = await db
     .select()
     .from(products)
-    .where(eq(products.shopId, shopId))
+    // Donation products (made with testings) are not managed here.
+    .where(and(eq(products.shopId, shopId), eq(products.kind, 'sale')))
     .orderBy(asc(products.createdAt));
   const variants = await loadVariants(
     db,
@@ -133,7 +134,10 @@ export async function deleteAllProducts(
   confirmCount: number,
 ): Promise<{ deleted: number; archived: number }> {
   return db.transaction(async (tx) => {
-    const rows = await tx.select({ id: products.id }).from(products).where(eq(products.shopId, shopId));
+    const rows = await tx
+      .select({ id: products.id })
+      .from(products)
+      .where(and(eq(products.shopId, shopId), eq(products.kind, 'sale')));
     if (rows.length !== confirmCount) {
       throw ApiError.conflict(
         'count_changed',

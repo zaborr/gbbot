@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, isNull, ne, notInArray, sql } from 'drizzle-orm';
-import { tierSteps, unitValue, type TierStep } from '@tma-shop/shared';
+import { DONATION_UNIT, tierSteps, unitValue, type TierStep } from '@tma-shop/shared';
 import type {
   CartTesting,
   TestingParticipant,
@@ -41,6 +41,12 @@ type Executor = Pick<Database, 'select'>;
 type Writer = Pick<Database, 'select' | 'insert' | 'update' | 'delete'>;
 
 /**
+ * What an order has given to testings and not paid yet, for sums in SQL where
+ * `orders` is in the query.
+ */
+export const donationOfOrder = sql<number>`(select coalesce(sum(di.donation_unpaid * di.unit_price), 0) from order_items di where di.order_id = "orders"."id")`;
+
+/**
  * The money of each testing: fees paid (and what was paid on top of them) on
  * orders paid in full, and the units of what is tested sold in the GB — on
  * every order, fee or not, since the hidden part per unit is the organiser's.
@@ -51,6 +57,8 @@ export interface TestingTotals {
   payers: number;
   /** Everyone on an order not cancelled, paid or not. */
   entries: number;
+  /** Given once the GB closed, on orders paid. */
+  donations: number;
   units: number;
   pendingUnits: number;
   orders: number;
@@ -62,7 +70,8 @@ export async function testingTotals(
 ): Promise<Map<string, TestingTotals>> {
   const result = new Map<string, TestingTotals>();
   if (testingIds.length === 0) return result;
-  const paid = sql`${orders.amountPaid} >= ${orders.total}`;
+  // Paid in full, a donation not paid yet aside (it only holds itself back).
+  const paid = sql`${orders.amountPaid} >= ${orders.total} - ${donationOfOrder}`;
   const money = await db
     .select({
       testingId: testingEntries.testingId,
@@ -93,6 +102,17 @@ export async function testingTotals(
     .innerJoin(orders, and(eq(orderItems.orderId, orders.id), eq(orders.shopId, testings.shopId)))
     .where(and(inArray(testings.id, [...testingIds]), ne(orders.status, 'cancelled')))
     .groupBy(testings.id);
+  const given = await db
+    .select({
+      testingId: testings.id,
+      donations: sql<number>`coalesce(sum((${orderItems.quantity} - ${orderItems.donationUnpaid}) * ${orderItems.unitPrice}), 0)::bigint`,
+    })
+    .from(testings)
+    .innerJoin(orderItems, eq(orderItems.productId, testings.donationProductId))
+    .innerJoin(orders, eq(orderItems.orderId, orders.id))
+    // Each gift counts once paid (an order can owe a newer one).
+    .where(and(inArray(testings.id, [...testingIds]), ne(orders.status, 'cancelled')))
+    .groupBy(testings.id);
   for (const id of testingIds) {
     const m = money.find((r) => r.testingId === id);
     const u = units.find((r) => r.testingId === id);
@@ -102,6 +122,7 @@ export async function testingTotals(
       extras,
       payers: Number(m?.payers ?? 0),
       entries: Number(m?.entries ?? 0),
+      donations: Number(given.find((r) => r.testingId === id)?.donations ?? 0),
       units: Number(u?.units ?? 0),
       pendingUnits: Number(u?.pendingUnits ?? 0),
       orders: Number(u?.orders ?? 0),
@@ -136,7 +157,11 @@ export async function vialPrices(db: Executor, rows: readonly TestingRow[]): Pro
 
 /** The pot: what was paid into the testing and the hidden part of the units sold. */
 export const testingPot = (row: Pick<TestingRow, 'perUnit'>, totals: TestingTotals): number =>
-  totals.fees + totals.extras + row.perUnit * totals.units;
+  totals.fees + totals.extras + totals.donations + row.perUnit * totals.units;
+
+/** Buyers can give to it now: the GB closed, its time to give not over. */
+export const donationsOpen = (row: Pick<TestingRow, 'status' | 'donationsUntil' | 'donationsDone'>, now = new Date()): boolean =>
+  row.status === 'closed' && !row.donationsDone && row.donationsUntil !== null && row.donationsUntil > now;
 
 /** Where each tier of a testing stands (fixed by the draw once it is done). */
 export function stepsOf(row: TestingRow, totals: TestingTotals, vialPrice: number): TierStep[] {
@@ -190,7 +215,16 @@ async function joinedBy(db: Executor, userId: number | undefined, testingIds: re
 /** Testings still running: they keep the product, variant and switch as they are. */
 const FINISHED: TestingStatus[] = ['settled', 'cancelled'];
 
-const EMPTY_TOTALS: TestingTotals = { fees: 0, extras: 0, payers: 0, entries: 0, units: 0, pendingUnits: 0, orders: 0 };
+const EMPTY_TOTALS: TestingTotals = {
+  fees: 0,
+  extras: 0,
+  payers: 0,
+  entries: 0,
+  donations: 0,
+  units: 0,
+  pendingUnits: 0,
+  orders: 0,
+};
 
 function toTestingDTO(
   row: TestingRow,
@@ -231,6 +265,10 @@ function toTestingDTO(
     exempt: feeExempt(row, isVip),
     draw: row.draw ?? null,
     reportSentAt: row.report?.sentAt ?? null,
+    donationHours: row.donationHours,
+    donationsUntil: row.donationsUntil?.toISOString() ?? null,
+    donationsOpen: donationsOpen(row),
+    donationProductId: row.donationProductId,
     money: admin
       ? {
           perUnit: row.perUnit,
@@ -248,6 +286,7 @@ function toTestingDTO(
           fees: t.fees,
           extras: t.extras,
           perUnitTotal: row.perUnit * t.units,
+          donations: t.donations,
           pot,
           units: t.units,
           pendingUnits: t.pendingUnits,
@@ -556,20 +595,46 @@ export async function createTesting(
   if (taken) {
     throw ApiError.conflict('testing_exists', 'This product or variant already has a testing');
   }
-  const [row] = await db
-    .insert(testings)
-    .values({
-      shopId: shop.id,
-      productId: product.id,
-      variantId: input.variantId,
-      currency: product.currency,
-      lab: input.lab,
-      contribution: input.contribution,
-      perUnit: input.perUnit,
-      feeMode: input.feeMode,
-      tiers: input.tiers,
-    })
-    .returning();
+  const variant = input.variantId
+    ? await db.query.productVariants.findFirst({ where: eq(productVariants.id, input.variantId) })
+    : undefined;
+  const what = variant ? `${product.title} · ${variantLabel(variant.optionValues)}` : product.title;
+  const whatEn = variant
+    ? `${product.titleEn ?? product.title} · ${variantLabel(variant.optionValues)}`
+    : (product.titleEn ?? product.title);
+  const row = await db.transaction(async (tx) => {
+    // What buyers give goes on their orders as lines of a hidden product, 1 a unit.
+    const [donation] = await tx
+      .insert(products)
+      .values({
+        shopId: shop.id,
+        slug: `donation-${product.slug}-${Math.random().toString(36).slice(2, 8)}`,
+        title: `Donación · ${what} (testing)`,
+        titleEn: `Donation · ${whatEn} (testing)`,
+        price: DONATION_UNIT,
+        currency: product.currency,
+        isActive: false,
+        kind: 'donation',
+      })
+      .returning({ id: products.id });
+    const [created] = await tx
+      .insert(testings)
+      .values({
+        shopId: shop.id,
+        productId: product.id,
+        variantId: input.variantId,
+        currency: product.currency,
+        lab: input.lab,
+        contribution: input.contribution,
+        perUnit: input.perUnit,
+        feeMode: input.feeMode,
+        tiers: input.tiers,
+        donationHours: input.donationHours,
+        donationProductId: donation?.id ?? null,
+      })
+      .returning();
+    return created;
+  });
   if (!row) throw new Error('Failed to create the testing');
   return oneTesting(db, row);
 }
@@ -600,6 +665,7 @@ export async function updateTesting(
       perUnit: input.perUnit,
       feeMode: input.feeMode,
       tiers: input.tiers,
+      donationHours: input.donationHours,
       updatedAt: new Date(),
     })
     .where(eq(testings.id, current.id))
@@ -670,7 +736,18 @@ export async function deleteTesting(db: Database, shopId: string, id: string): P
   if (await hasEntries(db, current.id)) {
     throw ApiError.conflict('testing_has_entries', 'People already take part in this testing');
   }
-  await db.delete(testings).where(eq(testings.id, current.id));
+  await db.transaction(async (tx) => {
+    await tx.delete(testings).where(eq(testings.id, current.id));
+    // Its donation product goes with it (nobody gave: nobody took part).
+    if (current.donationProductId) {
+      const [line] = await tx
+        .select({ id: orderItems.id })
+        .from(orderItems)
+        .where(eq(orderItems.productId, current.donationProductId))
+        .limit(1);
+      if (!line) await tx.delete(products).where(eq(products.id, current.donationProductId));
+    }
+  });
 }
 
 /** Turning testing on or off for the GB; off only once its testings are finished. */
@@ -812,8 +889,9 @@ export async function dropUnpaidTesting(db: Database, shopId: string, orderId?: 
         eq(orders.amountSubmitted, 0),
         sql`${orders.testing} > 0`,
         sql`${orders.amountPaid} > 0`,
-        sql`${orders.amountPaid} >= ${orders.total} - ${orders.testing}`,
-        sql`${orders.amountPaid} < ${orders.total}`,
+        sql`${orders.amountPaid} >= ${orders.total} - ${orders.testing} - ${donationOfOrder}`,
+        // What is missing is (part of) the testing, not only something given.
+        sql`${orders.amountPaid} < ${orders.total} - ${donationOfOrder}`,
       ),
     );
   for (const row of rows) {
@@ -821,7 +899,12 @@ export async function dropUnpaidTesting(db: Database, shopId: string, orderId?: 
       await tx.delete(testingEntries).where(eq(testingEntries.orderId, row.id));
       await tx
         .update(orders)
-        .set({ total: row.total - row.testing, testing: 0, status: 'paid', updatedAt: new Date() })
+        .set({
+          total: row.total - row.testing,
+          testing: 0,
+          status: row.amountPaid >= row.total - row.testing ? 'paid' : 'pending',
+          updatedAt: new Date(),
+        })
         .where(eq(orders.id, row.id));
     });
   }

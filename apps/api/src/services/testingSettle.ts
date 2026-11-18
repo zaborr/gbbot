@@ -11,6 +11,7 @@ import type { ShopRow } from './shop.js';
 import { audience, testedLabel } from './testingDraw.js';
 import { botToken } from './activeBot.js';
 import { reachedTiers } from './testing.js';
+import { refundDonations } from './testingDonations.js';
 
 /**
  * The end of a testing: closing it (donors get their vial's price back),
@@ -147,6 +148,8 @@ export async function cancelTesting(db: Database, env: Env, shop: ShopRow, id: s
         .set({ donatedVials: sql`${orders.donatedVials} - ${what}::text` })
         .where(inArray(orders.id, donorOrders));
     }
+    // What was given goes back too.
+    await refundDonations(tx, testing);
     return tx
       .update(testings)
       .set({ status: 'cancelled', updatedAt: new Date() })

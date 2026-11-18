@@ -442,6 +442,13 @@
       "when": 1795377600000,
       "tag": "0062_testing_money",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1795464000000,
+      "tag": "0063_testing_donations",
+      "breakpoints": true
     }
   ]
 }

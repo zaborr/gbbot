@@ -2,12 +2,13 @@ import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { isSaleStatus, type GoalProgress, type Lang, type OrderStatus } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
-import { orderItems, orders, shops } from '../db/schema.js';
+import { orderItems, orders, products, shops } from '../db/schema.js';
 import { tr } from '../i18n/messages.js';
 import { notifyUsers } from './notifications.js';
 import type { ShopRow } from './shop.js';
 import { withoutBlocked } from './blacklist.js';
 import { botToken } from './activeBot.js';
+import { donationOfOrder } from './testing.js';
 
 /**
  * A GB's minimum: what its orders add up to (products only, cancelled ones
@@ -28,7 +29,7 @@ export async function goalTotals(
   if (shopIds.length === 0) return result;
   // Products count as paid when the order is, or when all but its testing is
   // paid (a testing added to a paid order is waiting for its own payment).
-  const productsPaid = sql<boolean>`(${orders.amountPaid} > 0 and ${orders.amountPaid} >= ${orders.total} - ${orders.testing})`;
+  const productsPaid = sql<boolean>`(${orders.amountPaid} > 0 and ${orders.amountPaid} >= ${orders.total} - ${orders.testing} - ${donationOfOrder})`;
   const rows = await db
     .select({
       shopId: orders.shopId,
@@ -38,7 +39,9 @@ export async function goalTotals(
     })
     .from(orderItems)
     .innerJoin(orders, eq(orderItems.orderId, orders.id))
-    .where(and(inArray(orders.shopId, [...shopIds]), ne(orders.status, 'cancelled')))
+    .innerJoin(products, eq(orderItems.productId, products.id))
+    // What was given to testings is not a sale.
+    .where(and(inArray(orders.shopId, [...shopIds]), ne(orders.status, 'cancelled'), eq(products.kind, 'sale')))
     .groupBy(orders.shopId, orders.status, productsPaid);
   for (const row of rows) {
     const totals = result.get(row.shopId) ?? { paid: 0, pending: 0 };

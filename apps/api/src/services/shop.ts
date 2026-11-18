@@ -1,4 +1,4 @@
-import { asc, eq, or, sql } from 'drizzle-orm';
+import { and, asc, eq, or, sql } from 'drizzle-orm';
 import { createHash, createPublicKey, randomUUID } from 'node:crypto';
 import type {
   CheckoutFields,
@@ -547,7 +547,10 @@ export async function shopContents(db: Database, shopId: string): Promise<ShopCo
   if (!shop) throw ApiError.notFound('Shop not found');
   const n = sql<number>`count(*)::int`;
   const [o] = await db.select({ n }).from(orders).where(eq(orders.shopId, shopId));
-  const [p] = await db.select({ n }).from(products).where(eq(products.shopId, shopId));
+  const [p] = await db
+    .select({ n })
+    .from(products)
+    .where(and(eq(products.shopId, shopId), eq(products.kind, 'sale')));
   const [k] = await db.select({ n }).from(categories).where(eq(categories.shopId, shopId));
   const [c] = await db.select({ n }).from(carts).where(eq(carts.shopId, shopId));
   return { orders: o?.n ?? 0, products: p?.n ?? 0, categories: k?.n ?? 0, carts: c?.n ?? 0 };

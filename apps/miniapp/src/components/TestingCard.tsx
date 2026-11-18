@@ -77,6 +77,11 @@ export function TestingCard({
         <span className="gb-hint">
           {next ? t('testing.nextTier', { missing: missingText(next), tier: next.name }) : t('testing.allTiers')}
         </span>
+        {testing.donationsOpen && testing.donationsUntil && (
+          <span className="gb-hint">
+            {t('testing.cardDonations', { date: new Date(testing.donationsUntil).toLocaleString() })}
+          </span>
+        )}
         {testing.status === 'settled' && <span className="gb-hint">{t('testing.cardSettled')}</span>}
         {testing.status === 'cancelled' && <span className="gb-hint">{t('testing.cardCancelled')}</span>}
         {testing.reportSentAt && (

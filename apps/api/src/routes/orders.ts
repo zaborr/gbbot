@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import {
+  addDonationRequest,
   addOrderDetailsRequest,
   cartTestingRequest,
   createOrderRequest,
@@ -42,6 +43,7 @@ import { users } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 import { assertOpen } from '../services/closing.js';
 import { joinTestingWithOrder } from '../services/testing.js';
+import { addDonation, removeDonation } from '../services/testingDonations.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -203,6 +205,22 @@ export function orderRoutes(): Hono<AppBindings> {
         );
       }
       return c.json(order);
+    },
+  );
+
+  // Giving to a testing once the GB is closed: a line added to the order, paid the usual way.
+  app.post('/:id/donations', zValidator('param', idParam), zValidator('json', addDonationRequest), async (c) => {
+    const { testingId, amount } = c.req.valid('json');
+    return c.json(
+      await addDonation(c.get('db'), c.get('shop'), c.get('claims').sub, c.req.valid('param').id, testingId, amount),
+    );
+  });
+  app.delete(
+    '/:id/donations/:testingId',
+    zValidator('param', z.object({ id: z.uuid(), testingId: z.uuid() })),
+    async (c) => {
+      const { id, testingId } = c.req.valid('param');
+      return c.json(await removeDonation(c.get('db'), c.get('shop'), c.get('claims').sub, id, testingId));
     },
   );
 

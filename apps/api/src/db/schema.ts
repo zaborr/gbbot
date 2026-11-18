@@ -173,6 +173,11 @@ export const products = pgTable(
     isActive: boolean('is_active').notNull().default(true),
     /** Only the GB's VIPs see it and can buy it; for everyone else it does not exist. */
     vipOnly: boolean('vip_only').notNull().default(false),
+    /**
+     * `donation`: made with a testing (at 1 a unit) for what its buyers give;
+     * hidden everywhere products are listed, it only shows as order lines.
+     */
+    kind: text('kind').$type<'sale' | 'donation'>().notNull().default('sale'),
     /** Minimum units per order, all variants together (1 = none). */
     minQuantity: integer('min_quantity').notNull().default(1),
     /** Option groups (Color, Size…); empty for a product without variants. */
@@ -364,6 +369,8 @@ export const orderItems = pgTable('order_items', {
   unitPrice: integer('unit_price').notNull(),
   quantity: integer('quantity').notNull(),
   subtotal: integer('subtotal').notNull(),
+  /** A donation to a testing: its units not paid yet (they come off if not paid in time). */
+  donationUnpaid: integer('donation_unpaid').notNull().default(0),
 });
 
 /**
@@ -392,6 +399,13 @@ export const testings = pgTable(
     feeMode: text('fee_mode').$type<TestingFeeMode>().notNull().default('mandatory'),
     /** Hidden: what the organiser puts in the pot for each unit sold (minor units). */
     perUnit: integer('per_unit').notNull().default(0),
+    /** Its donation product (order lines of what buyers give, 1 a unit). */
+    donationProductId: uuid('donation_product_id').references(() => products.id, { onDelete: 'set null' }),
+    /** How long buyers can give once the GB closes, and until when (set at closing). */
+    donationHours: integer('donation_hours').notNull().default(48),
+    donationsUntil: timestamp('donations_until', { withTimezone: true }),
+    /** The time to give is over: what was not paid was taken off the orders. */
+    donationsDone: boolean('donations_done').notNull().default(false),
     /** Leftovers below this per person are not sent back. */
     refundThreshold: integer('refund_threshold').notNull().default(200),
     tiers: jsonb('tiers').$type<TestingTier[]>().notNull(),

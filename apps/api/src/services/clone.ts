@@ -40,7 +40,7 @@ export async function listCloneSources(
     db
       .select()
       .from(products)
-      .where(inArray(products.shopId, shopIds))
+      .where(and(inArray(products.shopId, shopIds), eq(products.kind, 'sale')))
       .orderBy(asc(products.createdAt)),
   ]);
   const variantRows =

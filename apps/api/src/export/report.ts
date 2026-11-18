@@ -69,6 +69,7 @@ const TEXT = {
     'tcol.fees': 'Fees',
     'tcol.extras': 'Paid on top',
     'tcol.hidden': 'Hidden part',
+    'tcol.donations': 'Given',
     'tcol.pot': 'Pot',
     'tcol.balance': 'Balance',
     'tcol.tier': 'Tier',
@@ -150,6 +151,7 @@ const TEXT = {
     'tcol.fees': 'Tarifas',
     'tcol.extras': 'Pagado de más',
     'tcol.hidden': 'Parte oculta',
+    'tcol.donations': 'Donado',
     'tcol.pot': 'Bote',
     'tcol.balance': 'Saldo',
     'tcol.tier': 'Tramo',
@@ -231,6 +233,7 @@ const TEXT = {
     'tcol.fees': 'Quote',
     'tcol.extras': 'Pagato in più',
     'tcol.hidden': 'Parte nascosta',
+    'tcol.donations': 'Donato',
     'tcol.pot': 'Fondo',
     'tcol.balance': 'Saldo',
     'tcol.tier': 'Livello',
@@ -312,6 +315,7 @@ const TEXT = {
     'tcol.fees': 'Taxas',
     'tcol.extras': 'Pago a mais',
     'tcol.hidden': 'Parte oculta',
+    'tcol.donations': 'Doado',
     'tcol.pot': 'Fundo',
     'tcol.balance': 'Saldo',
     'tcol.tier': 'Nível',
@@ -653,6 +657,7 @@ function testingSheet(input: ReportInput, testings: readonly Testing[]): Sheet {
       L('tcol.fees'),
       L('tcol.extras'),
       L('tcol.hidden'),
+      L('tcol.donations'),
       L('tcol.pot'),
       L('tcol.balance'),
     ],
@@ -672,6 +677,7 @@ function testingSheet(input: ReportInput, testings: readonly Testing[]): Sheet {
       money(m.fees),
       money(m.extras),
       money(m.perUnitTotal),
+      money(m.donations),
       money(m.pot),
       money(m.balance),
     ]);
@@ -700,7 +706,7 @@ function testingSheet(input: ReportInput, testings: readonly Testing[]): Sheet {
       ]);
     }
   }
-  return { name: L('sheet.testing'), rows, widths: [28, 18, 12, 10, 12, 10, 10, 10, 12, 12, 12, 12, 12], filter: false };
+  return { name: L('sheet.testing'), rows, widths: [28, 18, 12, 10, 12, 10, 10, 10, 12, 12, 12, 12, 12, 12], filter: false };
 }
 
 function dateStamp(now: Date, timeZone: string): string {

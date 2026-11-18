@@ -18,7 +18,8 @@ import { withoutBlocked } from './blacklist.js';
 import { notifyUsers } from './notifications.js';
 import type { ShopRow } from './shop.js';
 import { botToken } from './activeBot.js';
-import { reachedTiers } from './testing.js';
+import { donationsOpen, reachedTiers } from './testing.js';
+import { closeDonationWindows, donationsBeingChecked } from './testingDonations.js';
 
 /**
  * The draw of donors for a testing: the organiser launches it once the GB is
@@ -91,7 +92,9 @@ async function unpaidEntries(db: Database, testingId: string): Promise<number> {
 export async function drawBlocker(db: Database, shop: ShopRow, testing: TestingRow): Promise<string | null> {
   if (!shop.closedAt) return 'gb_open';
   if (testing.status !== 'closed') return 'not_closed';
+  if (donationsOpen(testing)) return 'donations_open';
   if ((await unpaidEntries(db, testing.id)) > 0) return 'unpaid';
+  if (await donationsBeingChecked(db, testing)) return 'unpaid';
   return null;
 }
 
@@ -178,6 +181,9 @@ export async function launchDraw(
   if (blocker === 'gb_open') throw ApiError.conflict('draw_gb_open', 'Close the GB before the draw');
   if (blocker === 'not_closed') throw ApiError.conflict('draw_done', 'This testing was already drawn');
   if (blocker === 'unpaid') throw ApiError.conflict('draw_unpaid', 'Some contributions are not paid yet');
+  if (blocker === 'donations_open') {
+    throw ApiError.conflict('draw_donations_open', 'Buyers can still give: wait until that time is over');
+  }
 
   const candidates = await loadCandidates(db, env, shop, testing);
   const tip = Number(await explorer('/blocks/tip/height', fetchImpl));
@@ -300,6 +306,11 @@ export async function finishDraw(
 
 /** Checks the draws waiting for their block (every minute while the server runs). */
 export async function watchDraws(db: Database, env: Env): Promise<void> {
+  try {
+    await closeDonationWindows(db, env);
+  } catch (error) {
+    console.error('Closing the time to give failed:', error);
+  }
   const waiting = await db.select().from(testings).where(eq(testings.status, 'drawing'));
   for (const testing of waiting) {
     try {

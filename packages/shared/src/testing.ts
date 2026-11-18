@@ -23,6 +23,18 @@ export type TestingTier = z.infer<typeof testingTier>;
 
 export const MAX_TESTING_TIERS = 10;
 
+/** Donations are whole units of the token (a line of a hidden product at 1 a unit). */
+export const DONATION_UNIT = 100;
+export const MAX_DONATION = 999 * DONATION_UNIT;
+export const MAX_DONATION_HOURS = 168;
+
+/** Giving to a testing once the GB is closed (whole units, added to the order to pay). */
+export const addDonationRequest = z.object({
+  testingId: z.uuid(),
+  amount: z.number().int().min(DONATION_UNIT).max(MAX_DONATION).multipleOf(DONATION_UNIT),
+});
+export type AddDonationRequest = z.infer<typeof addDonationRequest>;
+
 /**
  * Who pays the fee: every buyer, only those who choose to, or every buyer but
  * VIPs (they see every result for free).
@@ -51,6 +63,8 @@ export const createTestingRequest = z.object({
   perUnit: z.number().int().min(0).max(100_000_000),
   feeMode: testingFeeMode,
   tiers,
+  /** Hours buyers can give once the GB closes. */
+  donationHours: z.number().int().min(1).max(MAX_DONATION_HOURS).default(48),
 });
 export type CreateTestingRequest = z.infer<typeof createTestingRequest>;
 
@@ -83,6 +97,8 @@ export interface TestingMoney {
   fees: number;
   extras: number;
   perUnitTotal: number;
+  /** Given once the GB closed (orders paid). */
+  donations: number;
   pot: number;
   /** Units sold (orders paid), and on orders not paid yet. */
   units: number;
@@ -122,6 +138,12 @@ export const testing = z.object({
   draw: z.custom<TestingDraw>().nullable(),
   /** When the lab report was sent. */
   reportSentAt: z.string().nullable(),
+  /** Hours to give once the GB closes, until when (set at closing), and whether one can give now. */
+  donationHours: z.number().int(),
+  donationsUntil: z.string().nullable(),
+  donationsOpen: z.boolean(),
+  /** The hidden product whose order lines are what was given. */
+  donationProductId: z.string().nullable(),
   /** Only for the organiser. */
   money: z.custom<TestingMoney>().nullable(),
 });
