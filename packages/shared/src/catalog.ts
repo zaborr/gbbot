@@ -93,6 +93,8 @@ export type Product = z.infer<typeof product>;
 export const catalogQuery = paginationQuery.extend({
   categoryId: id.optional(),
   search: z.string().trim().min(1).max(128).optional(),
+  /** Only products with a testing ("1"). */
+  testing: z.literal('1').optional(),
 });
 export type CatalogQuery = z.infer<typeof catalogQuery>;
 

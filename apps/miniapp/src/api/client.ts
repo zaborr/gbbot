@@ -531,6 +531,7 @@ export class ApiClient {
     const params = new URLSearchParams();
     if (query.categoryId) params.set('categoryId', query.categoryId);
     if (query.search) params.set('search', query.search);
+    if (query.testing) params.set('testing', query.testing);
     if (query.page) params.set('page', String(query.page));
     if (query.limit) params.set('limit', String(query.limit));
     const qs = params.toString();

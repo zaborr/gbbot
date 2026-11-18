@@ -706,3 +706,57 @@ button.gb-banner {
   gap: 8px;
   padding: 8px 16px 12px;
 }
+
+/* Testing mark on a product's picture, and the line under its title. */
+.gb-product-thumb {
+  position: relative;
+  display: inline-flex;
+}
+.gb-testing-badge {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  padding: 1px 4px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  background: var(--tgui--secondary_bg_color, #efeff4);
+  border: 1px solid var(--tgui--outline, rgba(0, 0, 0, 0.12));
+}
+.gb-testing-badge--reached {
+  background: #e3f6e6;
+  border-color: #31b545;
+}
+.gb-testing-badge--hot {
+  background: #fff0e0;
+  border-color: #f08c00;
+}
+.gb-testing-badge-inline .gb-testing-badge {
+  position: static;
+}
+.gb-testing-line {
+  font-size: 13px;
+  color: var(--tgui--hint_color, #8e8e93);
+}
+.gb-testing-line--reached {
+  color: #31b545;
+}
+.gb-testing-line--hot {
+  color: #f08c00;
+  font-weight: 500;
+}
+html[data-theme='dark'] .gb-testing-badge--reached {
+  background: #1d3a22;
+}
+html[data-theme='dark'] .gb-testing-badge--hot {
+  background: #3d2a10;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .gb-testing-badge--reached {
+    background: #1d3a22;
+  }
+  html:not([data-theme]) .gb-testing-badge--hot {
+    background: #3d2a10;
+  }
+}

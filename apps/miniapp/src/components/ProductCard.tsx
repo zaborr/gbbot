@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Cell } from '@telegram-apps/telegram-ui';
-import { testingMaxUnits, type Product, type Testing } from '@tma-shop/shared';
+import type { Product, Testing } from '@tma-shop/shared';
 import { formatPrice } from '../lib/format.js';
 import { productDescription, productTitle } from '../lib/localize.js';
 import { ProductImage } from './ProductImage.js';
@@ -8,6 +8,7 @@ import { hasVipPrice, isSoldOut, priceRange } from '../lib/variants.js';
 import { useShop, useShopPath } from '../providers/ShopProvider.js';
 import { t } from '../i18n/index.js';
 import { useCart } from '../providers/CartProvider.js';
+import { productTestingState } from '../lib/testingState.js';
 
 export function ProductCard({
   product,
@@ -32,10 +33,25 @@ export function ProductCard({
     .filter((line) => line.product.id === product.id)
     .reduce((sum, line) => sum + line.quantity, 0);
 
-  // An open testing of it: how far the units bought have got towards the last tier.
-  const testing = testings.find((x) => x.productId === product.id && x.status === 'open');
-  const testingPercent = testing
-    ? Math.min(100, Math.floor((testing.units * 100) / Math.max(testingMaxUnits(testing.tiers), 1)))
+  // Its open testing: a mark on the picture, and a line with where it stands.
+  const testing = productTestingState(product.id, testings);
+  const badge = testing ? (
+    <span className={`gb-testing-badge gb-testing-badge--${testing.level}`} aria-hidden="true">
+      {testing.level === 'hot' ? '🧪🔥' : testing.level === 'reached' ? '🧪✅' : '🧪'}
+    </span>
+  ) : null;
+  const testingLine = testing
+    ? [
+        testing.reached.length > 0 ? `${testing.reached[testing.reached.length - 1]?.tier.name ?? ''} ✅` : null,
+        testing.next
+          ? t('catalog.testingNext', {
+              units: testing.next.missing,
+              tier: testing.next.tier.name,
+            })
+          : t('catalog.testingAll'),
+      ]
+        .filter(Boolean)
+        .join(' · ')
     : null;
   const chips = [
     inCart > 0 ? (
@@ -43,18 +59,27 @@ export function ProductCard({
         {t('catalog.inCart', { count: inCart })}
       </span>
     ) : null,
-    testingPercent !== null ? (
-      <span key="testing" className="gb-chip gb-chip--ok">
-        {t('catalog.testing', { percent: testingPercent })}
-      </span>
-    ) : null,
   ].filter(Boolean);
 
   return (
     <Cell
       onClick={() => navigate(to(`/product/${product.id}`))}
-      before={product.imageUrl ? <ProductImage url={product.imageUrl} alt={productTitle(product)} size={56} /> : undefined}
+      before={
+        product.imageUrl ? (
+          <span className="gb-product-thumb">
+            <ProductImage url={product.imageUrl} alt={productTitle(product)} size={56} />
+            {badge}
+          </span>
+        ) : badge ? (
+          <span className="gb-testing-badge-inline">{badge}</span>
+        ) : undefined
+      }
       subtitle={productDescription(product)}
+      description={
+        testingLine ? (
+          <span className={`gb-testing-line gb-testing-line--${testing?.level ?? 'none'}`}>{testingLine}</span>
+        ) : undefined
+      }
       after={
         chips.length > 0 ? (
           <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>

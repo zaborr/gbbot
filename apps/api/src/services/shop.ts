@@ -20,7 +20,7 @@ import { toShopAdminDTO, toShopConfigDTO, toShopSummaryDTO } from '../db/mappers
 import { ApiError } from '../lib/errors.js';
 import { getPlatformBlacklist } from './blacklist.js';
 import { createClubChecker, createVipChecker } from './vip.js';
-import { shopsWithOpenTesting } from './testing.js';
+import { shopTestingCounts } from './testing.js';
 import { loadPeople, organizerTags, resolvePeople } from './team.js';
 import { goalProgressOf, goalTotals } from './goal.js';
 
@@ -86,7 +86,7 @@ export async function listShops(db: Database, env: Env, userId: number): Promise
     db,
     rows.filter((row) => row.goalAmount).map((row) => row.id),
   );
-  const withTesting = await shopsWithOpenTesting(
+  const withTesting = await shopTestingCounts(
     db,
     rows.filter((row) => row.testingEnabled && !isClosedAt(row)).map((row) => row.id),
   );
@@ -110,7 +110,7 @@ export async function listShops(db: Database, env: Env, userId: number): Promise
           // Hidden by the GB: customers do not even receive the names.
           canManage || row.showOrganizers ? organizerTags(row, people) : [],
           goalProgressOf(row, totals.get(row.id), canManage),
-          withTesting.has(row.id),
+          withTesting.get(row.id) ?? null,
         ),
       );
     }
