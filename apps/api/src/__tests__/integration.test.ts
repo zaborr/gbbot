@@ -1722,6 +1722,83 @@ describeDb('API integration', () => {
     }
   });
 
+  it('reopens the time to join on a closed testing, and on one settled with nothing reached', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const [seed] = await db.select().from(products).where(eq(products.id, productId));
+    const [own] = await db
+      .insert(products)
+      .values({
+        shopId,
+        categoryId: seed!.categoryId,
+        slug: 'bancha-reopen',
+        title: 'Bancha',
+        description: '',
+        price: 150,
+        currency: 'USDC',
+        stock: 10,
+        isActive: true,
+      })
+      .returning();
+    const tested = own!.id;
+    await db.update(shops).set({ closedAt: new Date() }).where(eq(shops.id, shopId));
+    const made: string[] = [];
+    const hidden: string[] = [];
+    const body = {
+      productId: tested,
+      variantId: null,
+      lab: 'Lab',
+      contribution: 1000,
+      perUnit: 0,
+      feeMode: 'mandatory',
+      donationHours: 2,
+      tiers: [{ id: 'mp', name: 'M&P', cost: 5000, vials: 0 }],
+    };
+    const create = async (): Promise<string> => {
+      const created = await request('/api/admin/testings', { method: 'POST', headers: admin, body: JSON.stringify(body) });
+      expect(created.status).toBe(201);
+      const x = (await created.json()) as { id: string; donationProductId: string | null };
+      made.push(x.id);
+      if (x.donationProductId) hidden.push(x.donationProductId);
+      return x.id;
+    };
+    const state = async (id: string): Promise<{ status: string; donationsOpen: boolean }> =>
+      ((await (await request('/api/admin/testings', { headers: admin })).json()) as Array<{
+        id: string;
+        status: string;
+        donationsOpen: boolean;
+      }>).find((x) => x.id === id)!;
+    const reopen = (id: string): Promise<Response> =>
+      Promise.resolve(
+        request(`/api/admin/testings/${id}/reopen`, { method: 'POST', headers: admin, body: JSON.stringify({ hours: 5 }) }),
+      );
+    try {
+      const id = await create();
+      await closeDonationWindows(db, testEnv, new Date(Date.now() + 3 * 3600_000));
+      expect(await state(id)).toMatchObject({ status: 'closed', donationsOpen: false });
+      expect((await reopen(id)).status).toBe(200);
+      expect(await state(id)).toMatchObject({ status: 'closed', donationsOpen: true });
+
+      // Settled with nothing reached: it comes back, unless a newer testing of the product exists.
+      await closeDonationWindows(db, testEnv, new Date(Date.now() + 6 * 3600_000));
+      expect((await request(`/api/admin/testings/${id}/settle`, { method: 'POST', headers: admin })).status).toBe(200);
+      expect((await state(id)).status).toBe('settled');
+      const newer = await create();
+      expect((await reopen(id)).status).toBe(409);
+      await db.delete(testings).where(eq(testings.id, newer));
+      expect((await reopen(id)).status).toBe(200);
+      expect(await state(id)).toMatchObject({ status: 'closed', donationsOpen: true });
+    } finally {
+      await db.update(shops).set({ closedAt: null }).where(eq(shops.id, shopId));
+      if (made.length > 0) await db.delete(testings).where(inArray(testings.id, made));
+      await db.delete(products).where(inArray(products.id, [tested, ...hidden]));
+      await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
+    }
+  });
+
   it('runs the extra round: equal shares within caps, only for the tests still missing', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,

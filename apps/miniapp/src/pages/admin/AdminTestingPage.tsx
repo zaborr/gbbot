@@ -709,6 +709,7 @@ function TestingForm({
 
       {testing && <DrawSection testing={testing} onChange={onChange} />}
 
+      {testing && <ReopenSection testing={testing} onChange={onChange} />}
       {testing && <SettleSection testing={testing} onChange={onChange} />}
 
       {testing && <ReportSection testing={testing} />}
@@ -1090,6 +1091,40 @@ function SettleSection({ testing, onChange }: { testing: Testing; onChange: () =
           onClick={() => void actions.twoTap('settle', () => api.adminSettleTesting(testing.id))}
         >
           {actions.tapLabel('settle', t('testing.settleClose'))}
+        </Button>
+      </div>
+    </Section>
+  );
+}
+
+/**
+ * The time to join and give opens again: on a closed testing before the draw
+ * and the extra round, or on one settled with nothing reached.
+ */
+function ReopenSection({ testing, onChange }: { testing: Testing; onChange: () => void }): React.JSX.Element | null {
+  const actions = useAdminActions(onChange);
+  const [hours, setHours] = useState(String(testing.donationHours > 0 ? testing.donationHours : 24));
+  const fresh = testing.draw === null && testing.extra === null;
+  const closedNow = testing.status === 'closed' && !testing.donationsOpen;
+  if (!fresh || !(closedNow || testing.status === 'settled')) return null;
+  const valid = /^\d+$/.test(hours) && Number(hours) >= 1 && Number(hours) <= MAX_DONATION_HOURS;
+  return (
+    <Section header={t('testing.reopenTitle')} footer={t('testing.reopenFooter')}>
+      <ErrorBanner message={actions.error} />
+      <Input
+        header={t('testing.reopenHours')}
+        inputMode="numeric"
+        value={hours}
+        status={valid ? 'default' : 'error'}
+        onChange={(e) => setHours(e.target.value)}
+      />
+      <div style={{ padding: 16 }}>
+        <Button
+          stretched
+          disabled={!valid}
+          onClick={() => void actions.twoTap('reopen', () => api.adminReopenTesting(testing.id, Number(hours)))}
+        >
+          {actions.tapLabel('reopen', t('testing.reopen'))}
         </Button>
       </div>
     </Section>

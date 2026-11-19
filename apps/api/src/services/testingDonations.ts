@@ -1,5 +1,5 @@
 import { and, eq, gt, inArray, isNull, lte, ne } from 'drizzle-orm';
-import { DONATION_UNIT, MAX_DONATION, type Lang, type Order } from '@tma-shop/shared';
+import { DONATION_UNIT, MAX_DONATION, MAX_DONATION_HOURS, type Lang, type Order } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { orderItems, orders, testingEntries, testings } from '../db/schema.js';
@@ -383,7 +383,14 @@ async function remindDonations(db: Database, env: Env, now: Date): Promise<void>
  * A testing has just been created in an open GB: those who already bought
  * what it tests hear they can join it from their order (and then give).
  */
-export async function announceNewTesting(db: Database, env: Env, shop: ShopRow, testingId: string): Promise<void> {
+export async function announceNewTesting(
+  db: Database,
+  env: Env,
+  shop: ShopRow,
+  testingId: string,
+  /** Reopened: for these hours, and only to those not in yet. */
+  reopened?: { hours: number },
+): Promise<void> {
   const row = await db.query.testings.findFirst({ where: eq(testings.id, testingId) });
   if (!row || (shop.closedAt && !row.posterior)) return;
   const buyers = await db
@@ -398,25 +405,47 @@ export async function announceNewTesting(db: Database, env: Env, shop: ShopRow, 
         row.variantId ? eq(orderItems.variantId, row.variantId) : undefined,
       ),
     );
-  if (buyers.length === 0) return;
+  const inAlready = reopened
+    ? new Set(
+        (
+          await db
+            .select({ orderId: testingEntries.orderId })
+            .from(testingEntries)
+            .where(eq(testingEntries.testingId, row.id))
+        ).map((e) => e.orderId),
+      )
+    : new Set<string>();
+  const left = buyers.filter((b) => !inAlready.has(b.id));
+  if (left.length === 0) return;
   const ids = await audience(
     db,
     env,
     shop,
-    buyers.map((b) => b.id),
+    left.map((b) => b.id),
   );
   const what = await testedLabel(db, row);
   const totals = (await testingTotals(db, [row.id])).get(row.id);
   const steps = totals ? stepsOf(row, totals, (await vialPrices(db, [row])).get(row.id) ?? 0) : [];
   await notifyUsers(db, botToken(env), ids, (lang: Lang) =>
     [
-      tr(lang, row.posterior ? 'testing.announcedAfter' : 'testing.announced', {
-        shop: shop.name,
-        product: what,
-        lab: row.lab,
-        amount: formatMoney(row.contribution, row.currency),
-        hours: row.donationHours,
-      }),
+      tr(
+        lang,
+        // With no fee: joining is free.
+        row.posterior
+          ? row.contribution > 0
+            ? 'testing.announcedAfter'
+            : 'testing.announcedAfterFree'
+          : row.contribution > 0
+            ? 'testing.announced'
+            : 'testing.announcedFree',
+        {
+          shop: shop.name,
+          product: what,
+          lab: row.lab,
+          amount: formatMoney(row.contribution, row.currency),
+          hours: reopened?.hours ?? row.donationHours,
+        },
+      ),
       progressText(lang, steps, true),
     ].join('\n\n'),
   );
@@ -494,4 +523,64 @@ export async function refundDonations(tx: Writer, testing: TestingRow): Promise<
     .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
     .where(and(eq(orderItems.productId, testing.donationProductId), ne(orders.status, 'cancelled')));
   for (const { order } of rows) await takeOff(tx, order, [testing.donationProductId], false);
+}
+
+/**
+ * The time to join and give opens again on a closed testing (the GB closed):
+ * buyers join from their order, people from outside if it takes them, and
+ * when it is over it goes on as usual (extra round, draw). Only before the
+ * draw and the extra round. A testing settled with nothing reached (no money
+ * moved, no report) can come back this way too, unless another testing of
+ * the product was made after it.
+ */
+export async function reopenTesting(
+  db: Database,
+  env: Env,
+  shop: ShopRow,
+  id: string,
+  hours: number,
+): Promise<void> {
+  if (hours < 1 || hours > MAX_DONATION_HOURS) {
+    throw ApiError.badRequest('bad_hours', 'Hours out of range');
+  }
+  const row = await db.query.testings.findFirst({ where: and(eq(testings.shopId, shop.id), eq(testings.id, id)) });
+  if (!row) throw ApiError.notFound('Testing not found');
+  if (!shop.closedAt) throw ApiError.conflict('testing_gb_open', 'The GB is open: the testing is open too');
+  const fresh = row.draw === null && row.extra === null;
+  if (!fresh || (row.status !== 'closed' && row.status !== 'settled')) {
+    throw ApiError.conflict('testing_not_reopenable', 'Only before the draw and the extra round');
+  }
+  if (row.status === 'settled') {
+    const [later] = await db
+      .select({ id: testings.id })
+      .from(testings)
+      .where(
+        and(
+          eq(testings.shopId, shop.id),
+          eq(testings.productId, row.productId),
+          row.variantId ? eq(testings.variantId, row.variantId) : isNull(testings.variantId),
+          ne(testings.id, row.id),
+          ne(testings.status, 'cancelled'),
+          gt(testings.createdAt, row.createdAt),
+        ),
+      )
+      .limit(1);
+    if (later) throw ApiError.conflict('testing_newer', 'There is a newer testing of this product');
+  }
+  await db
+    .update(testings)
+    .set({
+      status: 'closed',
+      // Joining with an order after closing, as a testing made then.
+      posterior: true,
+      donationsUntil: new Date(Date.now() + hours * 3600_000),
+      donationsDone: false,
+      donationsReminded: false,
+      updatedAt: new Date(),
+    })
+    .where(eq(testings.id, row.id));
+  // Those who bought it hear it is open again (in the background).
+  void announceNewTesting(db, env, shop, row.id, { hours }).catch((error: unknown) =>
+    console.error('Testing announcement failed:', error),
+  );
 }

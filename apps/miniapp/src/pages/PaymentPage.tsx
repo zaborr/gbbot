@@ -996,7 +996,10 @@ function OrderTestingOffers({ order, onAdded }: { order: Order; onAdded: () => v
         <Cell
           key={x.id}
           subtitle={[
-            t('testing.offerSubtitle', { lab: x.lab, amount: formatPrice(x.contribution, x.currency) }),
+            t('testing.offerSubtitle', {
+              lab: x.lab,
+              amount: x.contribution > 0 ? formatPrice(x.contribution, x.currency) : t('testing.free'),
+            }),
             x.posterior && x.donationsUntil
               ? t('testing.joinUntil', { date: new Date(x.donationsUntil).toLocaleString() })
               : null,
@@ -1006,7 +1009,9 @@ function OrderTestingOffers({ order, onAdded }: { order: Order; onAdded: () => v
           after={
             <Button size="s" mode="bezeled" loading={busy === x.id} onClick={() => add(x.id)}>
               {x.posterior
-                ? t('testing.participate', { amount: formatPrice(x.contribution, x.currency) })
+                ? x.contribution > 0
+                  ? t('testing.participate', { amount: formatPrice(x.contribution, x.currency) })
+                  : t('testing.participateFree')
                 : t('testing.join')}
             </Button>
           }
