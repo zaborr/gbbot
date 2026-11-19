@@ -63,7 +63,7 @@ export function OrderTracker({ order }: { order: Order }): React.JSX.Element | n
   };
   // Waiting only for a donation: where it really is.
   const shown = order.resumeStatus && order.resumeStatus !== 'cancelled' ? order.resumeStatus : order.status;
-  const done = doneCount[shown === 'cancelled' ? 'pending' : shown];
+  const done = doneCount[shown];
   const steps = [
     t('track.ordered'),
     t('track.paid'),
