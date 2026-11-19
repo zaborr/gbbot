@@ -297,6 +297,7 @@ function toTestingDTO(
         : { ...row.draw, candidates: row.draw.candidates.map((c) => ({ ...c, orderId: '', vialPrice: 0 })) }
       : null,
     vialsPerUnit: row.vialsPerUnit,
+    posterior: row.posterior,
     reportSentAt: row.report?.sentAt ?? null,
     donationHours: row.donationHours,
     donationsUntil: row.donationsUntil?.toISOString() ?? null,
@@ -611,6 +612,10 @@ export async function createTesting(
     where: and(eq(products.shopId, shop.id), eq(products.id, input.productId)),
   });
   if (!product) throw ApiError.notFound('Product not found');
+  const posterior = shop.closedAt !== null;
+  if (posterior && input.donationHours < 1) {
+    throw ApiError.badRequest('posterior_hours', 'A testing after closing needs some hours to join');
+  }
   if (product.options.length > 0) {
     if (!input.variantId) throw ApiError.badRequest('variant_required', 'Choose the variant to test');
     const variant = await db.query.productVariants.findFirst({
@@ -620,10 +625,12 @@ export async function createTesting(
   } else if (input.variantId) {
     throw ApiError.badRequest('no_variants', 'This product has no variants');
   }
+  // One at a time: another one once the last is settled or cancelled.
   const taken = await db.query.testings.findFirst({
     where: and(
       eq(testings.productId, product.id),
       input.variantId ? eq(testings.variantId, input.variantId) : isNull(testings.variantId),
+      notInArray(testings.status, ['settled', 'cancelled']),
     ),
   });
   if (taken) {
@@ -666,6 +673,16 @@ export async function createTesting(
         donationHours: input.donationHours,
         vialsPerUnit: input.vialsPerUnit,
         donationProductId: donation?.id ?? null,
+        // The GB is closed: a testing afterwards. Joining (with the fee) and
+        // giving are open from now until its time to give ends.
+        ...(posterior
+          ? {
+              posterior: true,
+              status: 'closed' as const,
+              feeMode: input.feeMode === 'optional' ? ('mandatory' as const) : input.feeMode,
+              donationsUntil: new Date(Date.now() + input.donationHours * 3600_000),
+            }
+          : {}),
       })
       .returning();
     return created;
@@ -931,21 +948,32 @@ export async function dropUnpaidTesting(db: Database, shopId: string, orderId?: 
         sql`${orders.amountPaid} < ${orders.total} - ${donationOfOrder}`,
       ),
     );
+  let dropped = 0;
   for (const row of rows) {
+    // A testing made after closing still takes people: its part can be paid until then.
+    const live = await db
+      .select({ testing: testings })
+      .from(testingEntries)
+      .innerJoin(testings, eq(testingEntries.testingId, testings.id))
+      .where(eq(testingEntries.orderId, row.id));
+    if (live.some(({ testing }) => testing.posterior && donationsOpen(testing))) continue;
+    dropped += 1;
     await db.transaction(async (tx) => {
       await tx.delete(testingEntries).where(eq(testingEntries.orderId, row.id));
+      const paid = row.amountPaid >= row.total - row.testing;
       await tx
         .update(orders)
         .set({
           total: row.total - row.testing,
           testing: 0,
-          status: row.amountPaid >= row.total - row.testing ? 'paid' : 'pending',
+          status: paid ? (row.resumeStatus ?? 'paid') : 'pending',
+          resumeStatus: paid ? null : row.resumeStatus,
           updatedAt: new Date(),
         })
         .where(eq(orders.id, row.id));
     });
   }
-  return rows.length;
+  return dropped;
 }
 
 /**
@@ -970,15 +998,19 @@ export async function joinTestingWithOrder(
       .where(and(eq(orders.shopId, shop.id), eq(orders.id, orderId), eq(orders.userId, userId)))
       .for('update');
     if (!order) throw ApiError.notFound('Order not found');
-    // Not while a payment is being checked: its amount would not match any more.
-    if (order.status !== 'paid' && !(order.status === 'pending' && order.amountSubmitted === 0)) {
-      throw ApiError.conflict('testing_order_state', 'A testing cannot be added to this order now');
-    }
     const testing = await tx.query.testings.findFirst({
       where: and(eq(testings.shopId, shop.id), eq(testings.id, testingId)),
     });
     if (!testing) throw ApiError.notFound('Testing not found');
-    if (testing.status !== 'open') throw ApiError.conflict('testing_not_open', 'This testing is closed');
+    // Open, or one made after closing while its time is not over.
+    const joinable = testing.status === 'open' || (testing.posterior && donationsOpen(testing));
+    if (!joinable) throw ApiError.conflict('testing_not_open', 'This testing is closed');
+    // Not while a payment is being checked: its amount would not match any more.
+    // Sent orders only for a testing after closing (they go back to sent once paid).
+    const sent = order.status === 'shipped' || order.status === 'fulfilled';
+    const state =
+      order.status === 'paid' || (order.status === 'pending' && order.amountSubmitted === 0) || (sent && testing.posterior);
+    if (!state) throw ApiError.conflict('testing_order_state', 'A testing cannot be added to this order now');
     if (testing.currency !== order.currency) {
       throw ApiError.conflict('mixed_currency', `This order is in ${order.currency}`);
     }
@@ -1012,6 +1044,7 @@ export async function joinTestingWithOrder(
         total: order.total + testing.contribution,
         // Paid already: back to waiting for the difference (the testing).
         status: 'pending',
+        resumeStatus: sent ? order.status : order.resumeStatus,
         updatedAt: new Date(),
       })
       .where(eq(orders.id, order.id));

@@ -416,6 +416,11 @@ export const testings = pgTable(
     donationsDone: boolean('donations_done').notNull().default(false),
     /** The reminder a day before the time to give ends was sent. */
     donationsReminded: boolean('donations_reminded').notNull().default(false),
+    /**
+     * Made once the GB was closed: no fee at buying; those who bought join
+     * with their part (the fee) until its time to give ends.
+     */
+    posterior: boolean('posterior').notNull().default(false),
     /** Leftovers below this per person are not sent back. */
     refundThreshold: integer('refund_threshold').notNull().default(200),
     tiers: jsonb('tiers').$type<TestingTier[]>().notNull(),
@@ -434,7 +439,6 @@ export const testings = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    unique('testings_product_variant_unique').on(table.productId, table.variantId).nullsNotDistinct(),
     index('testings_shop_idx').on(table.shopId),
   ],
 );

@@ -229,7 +229,7 @@ export function orderRoutes(): Hono<AppBindings> {
     const { sub } = c.get('claims');
     const { id } = c.req.valid('param');
     const { testingId, volunteer } = c.req.valid('json');
-    assertOpen(c.get('shop'));
+    // An open testing (open GB), or one made after closing while its time lasts: checked there.
     await joinTestingWithOrder(c.get('db'), c.get('shop'), sub, id, testingId, volunteer);
     const order = await getOrder(c.get('db'), c.get('shopId'), id, sub);
     if (!order) throw ApiError.notFound('Order not found');

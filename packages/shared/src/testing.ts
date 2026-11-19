@@ -162,6 +162,8 @@ export const testing = z.object({
   /** Hours to give once the GB closes, until when (set at closing), and whether one can give now. */
   donationHours: z.number().int(),
   vialsPerUnit: z.number().int(),
+  /** Made once the GB was closed: the fee is paid to join (from an order), until the time to give ends. */
+  posterior: z.boolean(),
   donationsUntil: z.string().nullable(),
   donationsOpen: z.boolean(),
   /** The hidden product whose order lines are what was given. */
