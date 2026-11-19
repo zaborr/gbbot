@@ -288,20 +288,41 @@ export const blacklist = z.object({
   userIds: z.array(z.number().int()),
   /** Lowercase, without "@". */
   usernames: z.array(z.string()),
+  /** Why and by whom, keyed by the id ("123") or the pending "@username". */
+  notes: z
+    .record(z.string(), z.object({ reason: z.string(), by: z.number().int(), at: z.string() }))
+    .optional(),
 });
 export type Blacklist = z.infer<typeof blacklist>;
+
+/** Why someone was blocked, and by whom (named). */
+export interface BlacklistNote {
+  reason: string;
+  by: string;
+  at: string;
+}
 
 export interface BlacklistView {
   people: { telegramId: number; username: string | null; firstName: string | null }[];
   /** Added by @username, not seen in the app yet. */
   pendingUsernames: string[];
+  /** Keyed like the list's own: "123" or "@username". */
+  notes: Record<string, BlacklistNote>;
+  /** A GB's view: who is blocked in every GB (read only; the platform admins lift it). */
+  platform?: BlacklistView;
 }
+
+/** The reason is needed to block in every GB, so the other organisers know why. */
+export const BLACKLIST_REASON_MAX = 300;
 
 /** "@ana", "ana" or a Telegram id. */
 export const blacklistWho = z.object({ who: z.string().trim().min(1).max(64) });
 export const addToBlacklistRequest = blacklistWho.extend({
   /** Also delete their cart and orders without payment (paid ones always stay). */
   removeData: z.boolean(),
+  reason: z.string().trim().max(BLACKLIST_REASON_MAX).default(''),
+  /** A GB's organiser: only in their GB, or in every GB (the reason is then needed). */
+  scope: z.enum(['shop', 'platform']).default('shop'),
 });
 
 /** What someone has before being blocked: shown so the admin decides. */
@@ -316,6 +337,8 @@ export interface BlacklistCheck {
   paidOrders: number;
   /** Platform blacklist: how many GBs they have something in. */
   shops: number;
+  /** Already blocked in every GB: why and by whom. */
+  platformNote: BlacklistNote | null;
 }
 
 /** The customer adds details to an order (encrypted on their device, like the address). */

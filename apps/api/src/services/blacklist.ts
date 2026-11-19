@@ -3,6 +3,7 @@ import {
   isSaleStatus,
   type Blacklist,
   type BlacklistCheck,
+  type BlacklistNote,
   type BlacklistView,
   type OrderStatus,
 } from '@tma-shop/shared';
@@ -13,6 +14,8 @@ import { ApiError } from '../lib/errors.js';
 import { deleteOrder } from './orders.js';
 import { canManageShop, isSuperAdmin, type ShopRow } from './shop.js';
 import { describeUser, loadPeople, resolvePeople } from './team.js';
+import { notifyPlatform } from './webNotices.js';
+import { tr } from '../i18n/messages.js';
 
 /*
  * Blacklists: for the people in them the GB (or, in the platform one, every
@@ -20,11 +23,17 @@ import { describeUser, loadPeople, resolvePeople } from './team.js';
  * GB's team and the platform admins are never affected.
  */
 
-const EMPTY: Blacklist = { userIds: [], usernames: [] };
+const EMPTY: Blacklist = { userIds: [], usernames: [], notes: {} };
 
 function normalize(list: Blacklist | null | undefined): Blacklist {
-  return { userIds: list?.userIds ?? [], usernames: list?.usernames ?? [] };
+  return { userIds: list?.userIds ?? [], usernames: list?.usernames ?? [], notes: list?.notes ?? {} };
 }
+
+type Person = { id: number | null; username: string | null };
+type Note = NonNullable<Blacklist['notes']>[string];
+
+/** How an entry is keyed in the notes: its id, or the pending "@username". */
+const keyOf = (person: Person): string => (person.id !== null ? String(person.id) : `@${person.username ?? ''}`);
 
 let platformCache: { list: Blacklist; until: number } | null = null;
 
@@ -91,10 +100,15 @@ export async function claimBlacklisted(
 ): Promise<void> {
   if (!username) return;
   const name = username.toLowerCase();
-  const claim = (list: Blacklist): Blacklist => ({
-    usernames: list.usernames.filter((u) => u !== name),
-    userIds: list.userIds.includes(userId) ? list.userIds : [...list.userIds, userId],
-  });
+  const claim = (list: Blacklist): Blacklist => {
+    // The note follows them from the @username to the id.
+    const { [`@${name}`]: note, ...notes } = list.notes ?? {};
+    return {
+      usernames: list.usernames.filter((u) => u !== name),
+      userIds: list.userIds.includes(userId) ? list.userIds : [...list.userIds, userId],
+      notes: note ? { ...notes, [String(userId)]: note } : notes,
+    };
+  };
   const pending = await db
     .select({ id: shops.id, blacklist: shops.blacklist })
     .from(shops)
@@ -109,9 +123,19 @@ export async function claimBlacklisted(
   if (platform.usernames.includes(name)) await savePlatformBlacklist(db, claim(platform));
 }
 
+/** The notes with whoever blocked named. */
+async function namedNotes(db: Database, notes: Record<string, Note>): Promise<Record<string, BlacklistNote>> {
+  const names = new Map<number, string>();
+  for (const by of new Set(Object.values(notes).map((n) => n.by))) names.set(by, await describeUser(db, by));
+  return Object.fromEntries(
+    Object.entries(notes).map(([key, n]) => [key, { reason: n.reason, at: n.at, by: names.get(n.by) ?? String(n.by) }]),
+  );
+}
+
 async function view(db: Database, list: Blacklist): Promise<BlacklistView> {
   const people = await loadPeople(db, list.userIds);
   return {
+    notes: await namedNotes(db, list.notes ?? {}),
     people: list.userIds.map((id) => ({
       telegramId: id,
       username: people.get(id)?.username ?? null,
@@ -121,8 +145,11 @@ async function view(db: Database, list: Blacklist): Promise<BlacklistView> {
   };
 }
 
-export const shopBlacklistView = (db: Database, shop: ShopRow): Promise<BlacklistView> =>
-  view(db, normalize(shop.blacklist));
+/** A GB's list, and (read only) who is blocked in every GB. */
+export const shopBlacklistView = async (db: Database, shop: ShopRow): Promise<BlacklistView> => ({
+  ...(await view(db, normalize(shop.blacklist))),
+  platform: await view(db, await getPlatformBlacklist(db)),
+});
 export const platformBlacklistView = async (db: Database): Promise<BlacklistView> =>
   view(db, await getPlatformBlacklist(db));
 
@@ -130,7 +157,7 @@ export const platformBlacklistView = async (db: Database): Promise<BlacklistView
 async function resolveWho(
   db: Database,
   who: string,
-): Promise<{ id: number | null; username: string | null }> {
+): Promise<Person> {
   const { ids, pending } = await resolvePeople(db, [who]);
   const id = ids[0];
   if (id !== undefined) return { id, username: null };
@@ -186,6 +213,15 @@ export async function checkBlacklist(
   shopId: string | null,
 ): Promise<BlacklistCheck> {
   const person = await resolveWho(db, who);
+  const platform = await getPlatformBlacklist(db);
+  const inPlatform =
+    person.id !== null ? platform.userIds.includes(person.id) : platform.usernames.includes(person.username ?? '');
+  const raw = platform.notes?.[keyOf(person)];
+  const platformNote = inPlatform
+    ? raw
+      ? ((await namedNotes(db, { n: raw })).n ?? null)
+      : { reason: '', by: '', at: '' }
+    : null;
   if (person.id === null) {
     return {
       label: `@${person.username}`,
@@ -194,10 +230,12 @@ export async function checkBlacklist(
       unpaidOrders: 0,
       paidOrders: 0,
       shops: 0,
+      platformNote,
     };
   }
   const has = await holdings(db, person.id, shopId);
   return {
+    platformNote,
     label: await describeUser(db, person.id),
     telegramId: person.id,
     cartItems: has.cartItems,
@@ -216,36 +254,69 @@ async function removeData(db: Database, userId: number, shopId: string | null): 
     .where(and(eq(carts.userId, userId), shopId ? eq(carts.shopId, shopId) : undefined));
 }
 
-function added(list: Blacklist, person: { id: number | null; username: string | null }): Blacklist {
+function added(list: Blacklist, person: Person, note: Note | null): Blacklist {
+  const notes = note ? { ...list.notes, [keyOf(person)]: note } : (list.notes ?? {});
   if (person.id !== null) {
-    return list.userIds.includes(person.id) ? list : { ...list, userIds: [...list.userIds, person.id] };
+    return { ...list, notes, userIds: list.userIds.includes(person.id) ? list.userIds : [...list.userIds, person.id] };
   }
   const name = person.username ?? '';
-  return list.usernames.includes(name) ? list : { ...list, usernames: [...list.usernames, name] };
+  return { ...list, notes, usernames: list.usernames.includes(name) ? list.usernames : [...list.usernames, name] };
 }
 
-function removed(list: Blacklist, person: { id: number | null; username: string | null }): Blacklist {
+function removed(list: Blacklist, person: Person): Blacklist {
+  const { [keyOf(person)]: _gone, ...notes } = list.notes ?? {};
   return {
     userIds: list.userIds.filter((id) => id !== person.id),
     usernames: list.usernames.filter((u) => u !== person.username),
+    notes,
   };
 }
 
+const noteOf = (reason: string, by: number): Note | null =>
+  reason.trim() ? { reason: reason.trim(), by, at: new Date().toISOString() } : null;
+
+function needReason(reason: string): void {
+  if (!reason.trim()) throw ApiError.badRequest('reason_required', 'Write why they are blocked');
+}
+
+/**
+ * A GB's organiser blocks someone: only in their GB, or in every GB (with a
+ * reason the other organisers see, and the platform admins are told). In
+ * every GB replaces their GB's own entry. Their data goes only in this GB.
+ */
 export async function addToShopBlacklist(
   db: Database,
   env: Env,
   shop: ShopRow,
-  who: string,
-  deleteTheirData: boolean,
+  by: number,
+  input: { who: string; removeData: boolean; reason: string; scope: 'shop' | 'platform' },
 ): Promise<BlacklistView> {
-  const person = await resolveWho(db, who);
+  const person = await resolveWho(db, input.who);
   if (person.id !== null && canManageShop(env, shop, person.id)) {
     throw ApiError.badRequest('team_member', "The GB's team cannot be blacklisted");
   }
-  const list = added(normalize(shop.blacklist), person);
-  await db.update(shops).set({ blacklist: list }).where(eq(shops.id, shop.id));
-  if (deleteTheirData && person.id !== null) await removeData(db, person.id, shop.id);
-  return view(db, list);
+  const own = normalize(shop.blacklist);
+  if (input.scope === 'platform') {
+    needReason(input.reason);
+    if (person.id !== null && isSuperAdmin(env, person.id)) {
+      throw ApiError.badRequest('team_member', 'Platform admins cannot be blacklisted');
+    }
+    await savePlatformBlacklist(db, added(await getPlatformBlacklist(db), person, noteOf(input.reason, by)));
+    await db.update(shops).set({ blacklist: removed(own, person) }).where(eq(shops.id, shop.id));
+    const label = person.id !== null ? await describeUser(db, person.id) : `@${person.username}`;
+    const blocker = await describeUser(db, by);
+    await notifyPlatform(db, env, (lang) =>
+      tr(lang, 'platform.blocked', { who: label, by: blocker, shop: shop.name, reason: input.reason.trim() }),
+    ).catch((error: unknown) => console.error('Block notice failed:', error));
+  } else {
+    await db
+      .update(shops)
+      .set({ blacklist: added(own, person, noteOf(input.reason, by)) })
+      .where(eq(shops.id, shop.id));
+  }
+  if (input.removeData && person.id !== null) await removeData(db, person.id, shop.id);
+  const fresh = await db.query.shops.findFirst({ where: eq(shops.id, shop.id) });
+  return shopBlacklistView(db, fresh ?? shop);
 }
 
 export async function removeFromShopBlacklist(
@@ -256,20 +327,23 @@ export async function removeFromShopBlacklist(
   const person = await resolveWho(db, who);
   const list = removed(normalize(shop.blacklist), person);
   await db.update(shops).set({ blacklist: list }).where(eq(shops.id, shop.id));
-  return view(db, list);
+  return shopBlacklistView(db, { ...shop, blacklist: list });
 }
 
 export async function addToPlatformBlacklist(
   db: Database,
   env: Env,
+  by: number,
   who: string,
   deleteTheirData: boolean,
+  reason: string,
 ): Promise<BlacklistView> {
+  needReason(reason);
   const person = await resolveWho(db, who);
   if (person.id !== null && isSuperAdmin(env, person.id)) {
     throw ApiError.badRequest('team_member', 'Platform admins cannot be blacklisted');
   }
-  const list = added(await getPlatformBlacklist(db), person);
+  const list = added(await getPlatformBlacklist(db), person, noteOf(reason, by));
   await savePlatformBlacklist(db, list);
   if (deleteTheirData && person.id !== null) await removeData(db, person.id, null);
   return view(db, list);

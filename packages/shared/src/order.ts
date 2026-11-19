@@ -88,6 +88,8 @@ export const order = z.object({
   shopId: id,
   /** Team views: the customer is blacklisted (the GB does not exist for them). */
   customerBlocked: z.boolean().optional(),
+  /** Team views: what was tested in extra rounds whose share this customer did not pay. */
+  extraUnpaid: z.array(z.string()).optional(),
   /** Customer; null once the order is anonymized (data retention). */
   userId: telegramUserId.nullable(),
   status: orderStatus,

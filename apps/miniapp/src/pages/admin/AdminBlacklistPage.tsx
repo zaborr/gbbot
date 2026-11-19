@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client.js';
 import { useShop } from '../../providers/ShopProvider.js';
 import { BlacklistEditor } from '../../components/BlacklistEditor.js';
@@ -8,7 +9,8 @@ import { t } from '../../i18n/index.js';
 const shopApi = {
   load: () => api.adminBlacklist(),
   check: (who: string) => api.adminBlacklistCheck(who),
-  add: (who: string, removeData: boolean) => api.adminBlacklistAdd(who, removeData),
+  add: (who: string, removeData: boolean, reason: string, scope: 'shop' | 'platform') =>
+    api.adminBlacklistAdd(who, removeData, reason, scope),
   remove: (who: string) => api.adminBlacklistRemove(who),
 };
 
@@ -23,6 +25,8 @@ export function AdminBlacklistPage(): React.JSX.Element {
 
 function Blacklist(): React.JSX.Element {
   const { shop } = useShop();
+  // From an order: who, and the reason already written (the organiser still decides).
+  const [params] = useSearchParams();
   if (!shop.canOwn) return <ErrorView message={t('blacklist.ownersOnly')} />;
   return (
     <BlacklistEditor
@@ -30,6 +34,8 @@ function Blacklist(): React.JSX.Element {
       footer={t('blacklist.footer')}
       platform={false}
       api={shopApi}
+      initialWho={params.get('who') ?? ''}
+      initialReason={params.get('reason') ?? ''}
     />
   );
 }

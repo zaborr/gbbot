@@ -7,7 +7,7 @@ import { t } from '../../i18n/index.js';
 const platformApi = {
   load: () => api.platformBlacklist(),
   check: (who: string) => api.platformBlacklistCheck(who),
-  add: (who: string, removeData: boolean) => api.platformBlacklistAdd(who, removeData),
+  add: (who: string, removeData: boolean, reason: string) => api.platformBlacklistAdd(who, removeData, reason),
   remove: (who: string) => api.platformBlacklistRemove(who),
 };
 

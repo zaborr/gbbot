@@ -865,11 +865,60 @@ describeDb('API integration', () => {
     });
     expect(await sees()).toBe(true);
 
-    // The platform blacklist hides every GB.
-    await app.request('/api/platform/blacklist', {
+    // The platform blacklist hides every GB, and needs a reason.
+    const bare = await app.request('/api/platform/blacklist', {
       method: 'POST',
       headers: admin,
       body: JSON.stringify({ who: String(CUSTOMER_ID), removeData: false }),
+    });
+    expect(bare.status).toBe(400);
+    await app.request('/api/platform/blacklist', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ who: String(CUSTOMER_ID), removeData: false, reason: 'Scam' }),
+    });
+    expect(await sees()).toBe(false);
+    await app.request('/api/platform/blacklist/remove', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ who: String(CUSTOMER_ID) }),
+    });
+    expect(await sees()).toBe(true);
+
+    // An organiser blocks in every GB from theirs: it replaces their own entry,
+    // and the others see why and who.
+    await request('/api/admin/blacklist', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ who: String(CUSTOMER_ID), removeData: false }),
+    });
+    const noReason = await request('/api/admin/blacklist', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ who: String(CUSTOMER_ID), removeData: false, scope: 'platform' }),
+    });
+    expect(noReason.status).toBe(400);
+    const global = await request('/api/admin/blacklist', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ who: String(CUSTOMER_ID), removeData: false, scope: 'platform', reason: 'Did not pay' }),
+    });
+    expect(global.status).toBe(200);
+    const listed = (await global.json()) as {
+      people: Array<{ telegramId: number }>;
+      platform: { people: Array<{ telegramId: number }>; notes: Record<string, { reason: string; by: string }> };
+    };
+    expect(listed.people.some((p) => p.telegramId === CUSTOMER_ID)).toBe(false);
+    expect(listed.platform.people.some((p) => p.telegramId === CUSTOMER_ID)).toBe(true);
+    expect(listed.platform.notes[String(CUSTOMER_ID)]).toMatchObject({ reason: 'Did not pay' });
+    expect(listed.platform.notes[String(CUSTOMER_ID)]?.by).toBeTruthy();
+    const known = await request('/api/admin/blacklist/check', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ who: String(CUSTOMER_ID) }),
+    });
+    expect(((await known.json()) as { platformNote: { reason: string } | null }).platformNote).toMatchObject({
+      reason: 'Did not pay',
     });
     expect(await sees()).toBe(false);
     await app.request('/api/platform/blacklist/remove', {
