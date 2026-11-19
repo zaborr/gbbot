@@ -18,7 +18,7 @@ import { withoutBlocked } from './blacklist.js';
 import { notifyUsers } from './notifications.js';
 import type { ShopRow } from './shop.js';
 import { botToken } from './activeBot.js';
-import { donationsOpen, reachedTiers } from './testing.js';
+import { donationsOpen, reachedTiers, vialShare } from './testing.js';
 import { closeDonationWindows, donationsBeingChecked } from './testingDonations.js';
 
 /**
@@ -98,6 +98,44 @@ export async function drawBlocker(db: Database, shop: ShopRow, testing: TestingR
   return null;
 }
 
+/** The mark on a donor's order: what is tested, and which part of a unit a vial is ("Sencha · 1/10"). */
+export async function vialLabel(db: Database, testing: TestingRow): Promise<string> {
+  const what = await testedLabel(db, testing);
+  return testing.vialsPerUnit > 1 ? `${what} · 1/${testing.vialsPerUnit}` : what;
+}
+
+/**
+ * The places to give a vial, in ranking order: everyone once, then, only if
+ * vials are still missing, again those with more vials on their order.
+ */
+async function vialSlots(db: Database, testing: TestingRow, ranked: readonly DrawCandidate[]): Promise<DrawCandidate[]> {
+  const needed = testing.tiers.reduce((sum, tier) => sum + tier.vials, 0);
+  if (needed <= ranked.length || ranked.length === 0) return [...ranked];
+  const items = await db
+    .select({ orderId: orderItems.orderId, quantity: orderItems.quantity, variantId: orderItems.variantId })
+    .from(orderItems)
+    .where(
+      and(
+        inArray(
+          orderItems.orderId,
+          ranked.map((c) => c.orderId),
+        ),
+        eq(orderItems.productId, testing.productId),
+      ),
+    );
+  const vialsOf = (orderId: string): number =>
+    items
+      .filter((i) => i.orderId === orderId && (testing.variantId === null || i.variantId === testing.variantId))
+      .reduce((sum, i) => sum + i.quantity, 0) * testing.vialsPerUnit;
+  const slots = [...ranked];
+  for (let round = 2; slots.length < needed; round += 1) {
+    const more = ranked.filter((c) => vialsOf(c.orderId) >= round);
+    if (more.length === 0) break;
+    slots.push(...more);
+  }
+  return slots;
+}
+
 /**
  * Who can be drawn: those who paid the fee (their order paid in full), and VIPs
  * exempt from it who offered a vial. One place per person, blacklisted
@@ -132,7 +170,7 @@ async function loadCandidates(db: Database, env: Env, shop: ShopRow, testing: Te
       orderId: order.id,
       ref: shortRef(order.id),
       volunteer: entry.volunteer,
-      vialPrice: priceOf(order.id),
+      vialPrice: vialShare(priceOf(order.id), testing.vialsPerUnit),
     });
   }
   const allowed = new Set(await withoutBlocked(db, env, shop, [...people.keys()]));
@@ -246,7 +284,10 @@ export async function finishDraw(
   if (!shop) return false;
   const reached = await reachedTiers(db, testing);
   const ranked = rankCandidates(hash, draw.candidates);
-  const { tiersDone, donors } = settleDraw(testing.tiers, reached, ranked);
+  // One vial each, in ranking order; only when there are not enough people
+  // does the ranking go round again (no one gives more vials than they have).
+  const slots = await vialSlots(db, testing, ranked);
+  const { tiersDone, donors } = settleDraw(testing.tiers, reached, slots);
   const done: TestingDraw = {
     ...draw,
     hash,
@@ -255,7 +296,7 @@ export async function finishDraw(
     donors,
     tiersDone,
   };
-  const what = await testedLabel(db, testing);
+  const what = await vialLabel(db, testing);
   const donorOrders = ranked.filter((c) => donors.includes(c.ref)).map((c) => c.orderId);
 
   const claimed = await db.transaction(async (tx) => {
@@ -265,11 +306,14 @@ export async function finishDraw(
       .where(and(eq(testings.id, testing.id), eq(testings.status, 'drawing')))
       .returning({ id: testings.id });
     if (!row) return false;
-    if (donorOrders.length > 0) {
+    // A mark per vial given (two when the ranking went round twice).
+    for (const candidate of ranked) {
+      const count = donors.filter((r) => r === candidate.ref).length;
+      if (count === 0) continue;
       await tx
         .update(orders)
-        .set({ donatedVials: sql`${orders.donatedVials} || ${JSON.stringify([what])}::jsonb` })
-        .where(inArray(orders.id, donorOrders));
+        .set({ donatedVials: sql`${orders.donatedVials} || ${JSON.stringify(Array(count).fill(what))}::jsonb` })
+        .where(eq(orders.id, candidate.orderId));
     }
     return true;
   });
@@ -350,7 +394,7 @@ export async function substituteDonor(
   const next = draw.ranking.find((r) => !draw.donors.includes(r) && on.has(byRef.get(r)?.orderId ?? ''));
   if (!next) throw ApiError.conflict('draw_no_substitute', 'Nobody else can donate');
 
-  const what = await testedLabel(db, testing);
+  const what = await vialLabel(db, testing);
   const out = byRef.get(ref);
   const inn = byRef.get(next);
   const donors = draw.donors.map((r) => (r === ref ? next : r));
@@ -362,9 +406,10 @@ export async function substituteDonor(
         .where(eq(orders.id, out.orderId));
     }
     if (inn) {
+      const count = draw.donors.filter((r) => r === ref).length;
       await tx
         .update(orders)
-        .set({ donatedVials: sql`${orders.donatedVials} || ${JSON.stringify([what])}::jsonb` })
+        .set({ donatedVials: sql`${orders.donatedVials} || ${JSON.stringify(Array(count).fill(what))}::jsonb` })
         .where(eq(orders.id, inn.orderId));
     }
     return tx
@@ -396,7 +441,7 @@ export async function cancelDrawsOnReopen(db: Database, env: Env, shop: ShopRow)
   for (const testing of rows) {
     const draw = testing.draw;
     if (!draw) continue;
-    const what = await testedLabel(db, testing);
+    const what = await vialLabel(db, testing);
     const donorOrders = draw.candidates.filter((c) => draw.donors.includes(c.ref)).map((c) => c.orderId);
     await db.transaction(async (tx) => {
       if (donorOrders.length > 0) {

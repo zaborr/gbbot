@@ -79,6 +79,8 @@ export const createTestingRequest = z.object({
   tiers,
   /** Hours buyers can give once the GB closes. */
   donationHours: z.number().int().min(1).max(MAX_DONATION_HOURS).default(48),
+  /** Vials in each unit (a kit): a donor gives one of them. */
+  vialsPerUnit: z.number().int().min(1).max(100).default(10),
 });
 export type CreateTestingRequest = z.infer<typeof createTestingRequest>;
 
@@ -108,7 +110,7 @@ export interface TestingMoney {
   perUnit: number;
   /** The tiers as set (with their cost). */
   tiers: TestingTier[];
-  /** The price of one unit of what is tested: what a donor gets back for a vial. */
+  /** The price of one vial (a unit's price ÷ its vials): what a donor gets back for it. */
   vialPrice: number;
   /** What one more unit sold adds, on average (used to turn money into units). */
   unitValue: number;
@@ -159,6 +161,7 @@ export const testing = z.object({
   reportSentAt: z.string().nullable(),
   /** Hours to give once the GB closes, until when (set at closing), and whether one can give now. */
   donationHours: z.number().int(),
+  vialsPerUnit: z.number().int(),
   donationsUntil: z.string().nullable(),
   donationsOpen: z.boolean(),
   /** The hidden product whose order lines are what was given. */
@@ -278,7 +281,7 @@ export interface DrawCandidate {
   ref: string;
   /** Offered to donate. */
   volunteer: boolean;
-  /** The price of one unit of what is tested on their order: a donor gets it back. */
+  /** The price of one vial of what is tested on their order (unit price ÷ vials in it): a donor gets it back. */
   vialPrice: number;
 }
 

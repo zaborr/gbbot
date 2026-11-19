@@ -403,6 +403,8 @@ export const testings = pgTable(
     donationProductId: uuid('donation_product_id').references(() => products.id, { onDelete: 'set null' }),
     /** How long buyers can give once the GB closes, and until when (set at closing). */
     donationHours: integer('donation_hours').notNull().default(48),
+    /** Vials in each unit sold (a kit of 10): a donor gives one, and gets its share of the price back. */
+    vialsPerUnit: integer('vials_per_unit').notNull().default(10),
     donationsUntil: timestamp('donations_until', { withTimezone: true }),
     /** The time to give is over: what was not paid was taken off the orders. */
     donationsDone: boolean('donations_done').notNull().default(false),
