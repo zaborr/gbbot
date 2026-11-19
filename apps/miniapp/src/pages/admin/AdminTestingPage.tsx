@@ -52,6 +52,10 @@ const newTier = (): TierDraft => ({
 
 const FEE_MODES: TestingFeeMode[] = ['mandatory', 'mandatory_non_vip', 'optional'];
 
+/** Hours typed for a stage: whole, from 1 to the most allowed. */
+const hoursField = (text: string): boolean =>
+  /^\d+$/.test(text.trim()) && Number(text) >= 1 && Number(text) <= MAX_DONATION_HOURS;
+
 /** `/admin/testings/new` (optionally `?product=…&variant=…`) or `/admin/testings/:id`. */
 export function AdminTestingPage(): React.JSX.Element {
   return (
@@ -124,12 +128,15 @@ function TestingForm({
   const money = testing?.money ?? null;
   const [lab, setLab] = useState(testing?.lab ?? '');
   const [contribution, setContribution] = useState(testing ? toMajor(testing.contribution) : '');
-  const [perUnit, setPerUnit] = useState(money ? toMajor(money.perUnit) : '');
+  // A testing after closing: the GB is already paid, so nothing per unit unless set.
+  const [perUnit, setPerUnit] = useState(money ? toMajor(money.perUnit) : shop.isClosed ? '0' : '');
   const [feeMode, setFeeMode] = useState<TestingFeeMode>(testing?.feeMode ?? 'mandatory');
   const [donationHours, setDonationHours] = useState(String(testing?.donationHours ?? 48));
   const [vialsPerUnit, setVialsPerUnit] = useState(String(testing?.vialsPerUnit ?? 10));
   const [extraEnabled, setExtraEnabled] = useState(testing?.extraEnabled ?? false);
   const [extraMinText, setExtraMinText] = useState(testing && testing.extraMin > 0 ? toMajor(testing.extraMin) : '');
+  const [signupHours, setSignupHours] = useState(String(testing?.extraSignupHours ?? 24));
+  const [payHours, setPayHours] = useState(String(testing?.extraPayHours ?? 48));
   const [tiers, setTiers] = useState<TierDraft[]>(
     money
       ? money.tiers.map((tier) => ({
@@ -215,7 +222,9 @@ function TestingForm({
             ? t('testing.badDonationHours', { max: MAX_DONATION_HOURS })
             : !vialsOk
               ? t('testing.badVialsPerUnit')
-              : null;
+              : extraEnabled && (!hoursField(signupHours) || !hoursField(payHours))
+                ? t('testing.badExtraHours', { max: MAX_DONATION_HOURS })
+                : null;
 
   const save = async (): Promise<void> => {
     setBusy(true);
@@ -230,6 +239,8 @@ function TestingForm({
         vialsPerUnit: vialsNumber,
         extraEnabled,
         extraMin: extraMinText.trim() === '' || !MONEY_RE.test(extraMinText.trim()) ? 0 : cents(extraMinText),
+        extraSignupHours: Number(signupHours) || 24,
+        extraPayHours: Number(payHours) || 48,
       };
       if (testing) {
         await api.adminUpdateTesting(testing.id, body);
@@ -304,6 +315,8 @@ function TestingForm({
           vialsPerUnit: vialsNumber,
           extraEnabled,
           extraMin: 0,
+          extraSignupHours: 24,
+          extraPayHours: 48,
           extra: null,
           extraReportSentAt: null,
           posterior,
@@ -411,7 +424,9 @@ function TestingForm({
           onChange={(e) => setPerUnit(e.target.value)}
         />
         <Cell multiline>
-          <span className="gb-hint">{locked ? t('testing.feeLockedHint') : t('testing.perUnitHint')}</span>
+          <span className="gb-hint">
+            {locked ? t('testing.feeLockedHint') : posterior ? t('testing.perUnitPosteriorHint') : t('testing.perUnitHint')}
+          </span>
         </Cell>
         <Input
           header={t('testing.vialsPerUnitField')}
@@ -623,6 +638,34 @@ function TestingForm({
             disabled={!editable || Boolean(testing?.extra)}
             onChange={(e) => setExtraMinText(e.target.value)}
           />
+        )}
+        {extraEnabled && (
+          <div className="gb-testing-tier-row">
+            <div style={{ flex: 1 }}>
+              <Input
+                header={t('testing.extraSignupHours')}
+                type="text"
+                inputMode="numeric"
+                placeholder="24"
+                status={hoursField(signupHours) ? 'default' : 'error'}
+                value={signupHours}
+                disabled={!editable || Boolean(testing?.extra)}
+                onChange={(e) => setSignupHours(e.target.value)}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <Input
+                header={t('testing.extraPayHours')}
+                type="text"
+                inputMode="numeric"
+                placeholder="48"
+                status={hoursField(payHours) ? 'default' : 'error'}
+                value={payHours}
+                disabled={!editable || Boolean(testing?.extra)}
+                onChange={(e) => setPayHours(e.target.value)}
+              />
+            </div>
+          </div>
         )}
       </Section>
 

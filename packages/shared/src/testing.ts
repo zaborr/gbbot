@@ -84,6 +84,8 @@ export const createTestingRequest = z.object({
   /** The extra round after the time to give, and the lowest cap to sign up (0: the fee). */
   extraEnabled: z.boolean().default(false),
   extraMin: z.number().int().min(0).max(100_000_000).default(0),
+  extraSignupHours: z.number().int().min(1).max(MAX_DONATION_HOURS).default(24),
+  extraPayHours: z.number().int().min(1).max(MAX_DONATION_HOURS).default(48),
 });
 export type CreateTestingRequest = z.infer<typeof createTestingRequest>;
 
@@ -171,8 +173,10 @@ export const testing = z.object({
   /** Made once the GB was closed: the fee is paid to join (from an order), until the time to give ends. */
   posterior: z.boolean(),
   extraEnabled: z.boolean(),
-  /** The lowest cap to sign up to it (0: the fee). */
+  /** The lowest cap to sign up to it (0: the fee), and its hours to sign up and to pay. */
   extraMin: z.number().int(),
+  extraSignupHours: z.number().int(),
+  extraPayHours: z.number().int(),
   /** The extra round, once it started (with money: what is missing is shown to those in it). */
   extra: z.custom<TestingExtraView>().nullable(),
   donationsUntil: z.string().nullable(),
@@ -363,9 +367,6 @@ export function textBar(share: number, width = 10): string {
   return '▓'.repeat(full) + '░'.repeat(width - full);
 }
 
-/** Hours to sign up to the extra round, and to pay one's share. */
-export const EXTRA_SIGNUP_HOURS = 24;
-export const EXTRA_PAY_HOURS = 48;
 
 /** The extra round as stored. */
 export interface TestingExtraState {

@@ -2562,6 +2562,20 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
+        },
+        "extra_signup_hours": {
+          "name": "extra_signup_hours",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 24
+        },
+        "extra_pay_hours": {
+          "name": "extra_pay_hours",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 48
         }
       },
       "indexes": {

@@ -333,6 +333,8 @@ function toTestingDTO(
     donationProductId: row.donationProductId,
     extraEnabled: row.extraEnabled,
     extraMin: row.extraMin,
+    extraSignupHours: row.extraSignupHours,
+    extraPayHours: row.extraPayHours,
     extra: null,
     money: admin
       ? {
@@ -721,6 +723,8 @@ export async function createTesting(
         vialsPerUnit: input.vialsPerUnit,
         extraEnabled: input.extraEnabled,
         extraMin: input.extraMin,
+        extraSignupHours: input.extraSignupHours,
+        extraPayHours: input.extraPayHours,
         extraProductId: extraProduct?.id ?? null,
         donationProductId: donation?.id ?? null,
         // The GB is closed: a testing afterwards. Joining (with the fee) and
@@ -777,7 +781,14 @@ export async function updateTesting(
       donationHours: input.donationHours,
       vialsPerUnit: input.vialsPerUnit,
       // Once the extra round started, it stays as it was.
-      ...(current.extra ? {} : { extraEnabled: input.extraEnabled, extraMin: input.extraMin }),
+      ...(current.extra
+        ? {}
+        : {
+            extraEnabled: input.extraEnabled,
+            extraMin: input.extraMin,
+            extraSignupHours: input.extraSignupHours,
+            extraPayHours: input.extraPayHours,
+          }),
       updatedAt: new Date(),
     })
     .where(eq(testings.id, current.id))
