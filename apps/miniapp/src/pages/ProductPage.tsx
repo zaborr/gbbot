@@ -356,6 +356,8 @@ function TestingActions({
   onChoice: (choice: TestingChoice) => void;
 }): React.JSX.Element {
   const { cart, joinTesting, leaveTesting } = useCart();
+  const navigate = useNavigate();
+  const to = useShopPath();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const run = (action: () => Promise<void>): void => {
@@ -376,6 +378,29 @@ function TestingActions({
   const what = testing.variantLabel ?? productTitle(product);
 
   if (testing.joined) return <Cell multiline>{t('testing.joinedAlready')}</Cell>;
+  // The GB closed, but the time to join lasts: buyers join from their order,
+  // people from outside from «My orders» too.
+  const lateJoin =
+    testing.status === 'closed' &&
+    testing.donationsOpen &&
+    testing.extra === null &&
+    (testing.posterior || testing.externalOpen);
+  if (lateJoin) {
+    return (
+      <>
+        <Cell multiline>
+          {t('testing.joinFromOrders', {
+            date: testing.donationsUntil ? new Date(testing.donationsUntil).toLocaleString() : '',
+          })}
+        </Cell>
+        <div style={{ padding: '4px 16px 16px' }}>
+          <Button stretched mode="bezeled" onClick={() => navigate(to('/orders'))}>
+            {t('testing.goToOrders')}
+          </Button>
+        </div>
+      </>
+    );
+  }
   if (closed || testing.status !== 'open') return <Cell multiline>{t('testing.closedNow')}</Cell>;
 
   const volunteer = inCart ? (ticked?.volunteer ?? false) : choice.volunteer;
