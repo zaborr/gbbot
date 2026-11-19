@@ -47,7 +47,7 @@ export function TestingsInProgress({
     );
   /** The order they took part with: from outside, or one with the product. */
   const inWith = (x: Testing): Order | undefined =>
-    withProduct(x)[0] ?? orders.find((o) => o.external && o.status !== 'cancelled');
+    withProduct(x)[0] ?? orders.find((o) => o.externalTestingId === x.id && o.status !== 'cancelled');
 
   const actionOf = (x: Testing): Action | null => {
     if (x.joined) {

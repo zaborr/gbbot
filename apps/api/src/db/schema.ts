@@ -278,6 +278,8 @@ export const orders = pgTable('orders', {
   isVip: boolean('is_vip').notNull().default(false),
   /** Only to take part in a testing from outside: no products, nothing to send. */
   external: boolean('external').notNull().default(false),
+  /** The testing an order from outside is for. */
+  externalTestingId: uuid('external_testing_id'),
   /** Total including `fee`. */
   total: integer('total').notNull(),
   /** Per-order fee charged once, frozen at creation. */

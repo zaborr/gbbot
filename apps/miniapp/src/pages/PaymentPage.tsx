@@ -975,9 +975,11 @@ function OrderTestingOffers({ order, onAdded }: { order: Order; onAdded: () => v
       !x.joined &&
       !x.exempt &&
       x.currency === order.currency &&
-      order.items.some(
-        (item) => item.productId === x.productId && (x.variantId === null || item.variantId === x.variantId),
-      ),
+      // From outside: the order is for that testing, with no product.
+      (order.externalTestingId === x.id ||
+        order.items.some(
+          (item) => item.productId === x.productId && (x.variantId === null || item.variantId === x.variantId),
+        )),
   );
   if (offers.length === 0) return null;
 
@@ -1048,9 +1050,11 @@ function DonationSection({ order, onChanged }: { order: Order; onChanged: () => 
       x.donationsOpen &&
       (x.joined || x.exempt) &&
       x.currency === order.currency &&
-      order.items.some(
-        (item) => item.productId === x.productId && (x.variantId === null || item.variantId === x.variantId),
-      ),
+      // From outside: the order is for that testing, with no product.
+      (order.externalTestingId === x.id ||
+        order.items.some(
+          (item) => item.productId === x.productId && (x.variantId === null || item.variantId === x.variantId),
+        )),
   );
   if (open.length === 0) return null;
   // A payment being checked: nothing can be added until it is done.
@@ -1160,9 +1164,10 @@ function ExtraSection({ order, onChanged }: { order: Order; onChanged: () => voi
       x.extra &&
       x.joined &&
       !x.exempt &&
-      order.items.some(
-        (item) => item.productId === x.productId && (x.variantId === null || item.variantId === x.variantId),
-      ) &&
+      (order.externalTestingId === x.id ||
+        order.items.some(
+          (item) => item.productId === x.productId && (x.variantId === null || item.variantId === x.variantId),
+        )) &&
       (x.extra.stage === 'signup' || x.extra.mine),
   );
   if (list.length === 0) return null;

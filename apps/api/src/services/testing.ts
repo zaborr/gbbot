@@ -1215,6 +1215,7 @@ export async function joinTestingExternal(
         shopId: shop.id,
         userId,
         external: true,
+        externalTestingId: testing.id,
         status: fee > 0 ? 'pending' : 'paid',
         total: fee,
         testing: fee,
