@@ -601,6 +601,14 @@ export class ApiClient {
     });
   }
 
+  /** Joins a testing from outside (bought elsewhere): an order of only the fee. */
+  joinExternalTesting(testingId: string, volunteer: boolean, contactUsername: string | null): Promise<CreateOrderResponse> {
+    return this.request<CreateOrderResponse>(`/orders/external-testing/${testingId}`, {
+      method: 'POST',
+      body: JSON.stringify({ volunteer, contactUsername }),
+    });
+  }
+
   /** The GB's product testings (for the catalog). */
   getTestings(): Promise<Testing[]> {
     return this.request<Testing[]>('/products/testings');

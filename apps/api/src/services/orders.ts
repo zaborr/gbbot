@@ -819,6 +819,8 @@ export async function requestOrderChange(
     where: and(eq(orders.shopId, shopId), eq(orders.id, orderId), eq(orders.userId, userId)),
   });
   if (!order) throw ApiError.notFound('Order not found');
+  // Only to take part in a testing from outside: it has no products to change.
+  if (order.external) throw ApiError.conflict('not_changeable', 'This order is only for a testing');
   const direct = editableDirectly(order);
   if (!direct && !CHANGEABLE.includes(order.status)) {
     throw ApiError.conflict(

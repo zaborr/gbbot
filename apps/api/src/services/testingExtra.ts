@@ -19,7 +19,7 @@ import { getOrder } from './orders.js';
 import type { ShopRow } from './shop.js';
 import { botToken } from './activeBot.js';
 import { audience, testedLabel } from './testingDraw.js';
-import { feeExempt, stepsOf, testingTotals, vialPrices } from './testing.js';
+import { feeExempt, stepsOf, takesPart, testingTotals, vialPrices } from './testing.js';
 import { dropUnpaidDonations, giversOf, takeOff } from './testingDonations.js';
 
 /**
@@ -91,7 +91,8 @@ async function isIn(db: Pick<Database, 'select'>, row: TestingRow, order: typeof
     .select({ amount: testingEntries.amount })
     .from(testingEntries)
     .where(and(eq(testingEntries.testingId, row.id), eq(testingEntries.orderId, order.id)));
-  return entry !== undefined && entry.amount > 0 && order.amountPaid > 0;
+  // Something paid on the order (nothing to pay when the fee is 0 from outside).
+  return entry !== undefined && takesPart(row, order.isVip, entry.amount) && (order.amountPaid > 0 || order.total <= 0);
 }
 
 /** Signs up (or changes the cap) from an order, while sign-up is open. */

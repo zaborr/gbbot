@@ -20,7 +20,7 @@ import { toShopAdminDTO, toShopConfigDTO, toShopSummaryDTO } from '../db/mappers
 import { ApiError } from '../lib/errors.js';
 import { getPlatformBlacklist } from './blacklist.js';
 import { createClubChecker, createVipChecker } from './vip.js';
-import { shopTestingCounts } from './testing.js';
+import { shopTestingCounts, shopsOpenToOutside } from './testing.js';
 import { loadPeople, organizerTags, resolvePeople } from './team.js';
 import { goalProgressOf, goalTotals } from './goal.js';
 
@@ -90,6 +90,11 @@ export async function listShops(db: Database, env: Env, userId: number): Promise
     db,
     rows.filter((row) => row.testingEnabled && !isClosedAt(row)).map((row) => row.id),
   );
+  // Closed, but with a testing open to people from outside: they see it too.
+  const outside = await shopsOpenToOutside(
+    db,
+    rows.filter((row) => row.testingEnabled && isClosedAt(row)).map((row) => row.id),
+  );
   const result: ShopSummary[] = [];
   for (const row of rows) {
     const canManage = canManageShop(env, row, userId);
@@ -99,7 +104,7 @@ export async function listShops(db: Database, env: Env, userId: number): Promise
     const admitted = !row.vipOnly || vip || (row.allowGuests && !canManage && (await isGuest(row)));
     const mine = activity.get(row.id);
     // A closed GB stays listed only for those who have orders in it.
-    const closedForThem = isClosedAt(row) && (mine?.orders ?? 0) === 0;
+    const closedForThem = isClosedAt(row) && (mine?.orders ?? 0) === 0 && !outside.has(row.id);
     if (canManage || (row.isVisible && admitted && !closedForThem)) {
       result.push(
         toShopSummaryDTO(

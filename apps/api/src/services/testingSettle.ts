@@ -10,7 +10,7 @@ import { languagesOf, notifyUsers } from './notifications.js';
 import type { ShopRow } from './shop.js';
 import { audience, testedLabel, vialLabel } from './testingDraw.js';
 import { botToken } from './activeBot.js';
-import { reachedTiers } from './testing.js';
+import { takesPart, reachedTiers } from './testing.js';
 import { refundDonations } from './testingDonations.js';
 import { cancelExtra, extraPayers } from './testingExtra.js';
 
@@ -187,7 +187,7 @@ async function reportAudience(
     .filter((c) => testing.draw?.donors.includes(c.ref))
     .map((c) => c.orderId);
   const paid = rows
-    .filter(({ entry, order }) => entry.amount > 0 && order.amountPaid >= order.total)
+    .filter(({ entry, order }) => takesPart(testing, order.isVip, entry.amount) && order.amountPaid >= order.total)
     .map(({ order }) => order.id);
   const vips =
     testing.feeMode === 'mandatory_non_vip'

@@ -13,9 +13,11 @@ import { botToken } from './activeBot.js';
 import { audience, testedLabel } from './testingDraw.js';
 import { cancelExtra, startExtra } from './testingExtra.js';
 import {
+  dropUnpaidExternal,
   dropUnpaidTesting,
   donationsOpen,
   feeExempt,
+  takesPart,
   progressText,
   stepsOf,
   testingTotals,
@@ -45,13 +47,14 @@ async function mayGive(tx: Writer, testing: TestingRow, order: typeof orders.$in
   const bought = items.some(
     (i) => i.productId === testing.productId && (testing.variantId === null || i.variantId === testing.variantId),
   );
-  if (!bought) return false;
+  // From outside: no product here, the order is only for the testing.
+  if (!bought && !order.external) return false;
   if (feeExempt(testing, order.isVip)) return true;
   const [entry] = await tx
     .select({ amount: testingEntries.amount })
     .from(testingEntries)
     .where(and(eq(testingEntries.testingId, testing.id), eq(testingEntries.orderId, order.id)));
-  return entry !== undefined && entry.amount > 0;
+  return entry !== undefined && takesPart(testing, order.isVip, entry.amount);
 }
 
 /**
@@ -442,6 +445,8 @@ export async function closeDonationWindows(db: Database, env: Env, now = new Dat
     await dropUnpaidDonations(db, [claimed]);
     // After closing: parts not paid in time drop out too.
     if (claimed.posterior) await dropUnpaidTesting(db, claimed.shopId);
+    // From outside and not paid in time: their order goes.
+    await dropUnpaidExternal(db, claimed.id);
     // Tests still missing: the extra round starts (when it is on).
     const fresh = await db.query.testings.findFirst({ where: eq(testings.id, claimed.id) });
     if (fresh) await startExtra(db, env, fresh).catch((error: unknown) => console.error('Extra round failed to start:', error));

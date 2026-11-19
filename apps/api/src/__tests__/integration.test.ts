@@ -1604,6 +1604,124 @@ describeDb('API integration', () => {
     }
   });
 
+  it('lets people from outside join a testing, for free when the fee is 0', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const [seed] = await db.select().from(products).where(eq(products.id, productId));
+    const [own] = await db
+      .insert(products)
+      .values({
+        shopId,
+        categoryId: seed!.categoryId,
+        slug: 'genmaicha-outside',
+        title: 'Genmaicha',
+        description: '',
+        price: 150,
+        currency: 'USDC',
+        stock: 10,
+        isActive: true,
+      })
+      .returning();
+    const tested = own!.id;
+    const buyer = { Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}`, 'content-type': 'application/json' };
+    await db.delete(carts).where(eq(carts.userId, CUSTOMER_ID));
+    await request('/api/cart/items', { method: 'POST', headers: buyer, body: JSON.stringify({ productId: tested, quantity: 1 }) });
+    const placed = await request('/api/orders', {
+      method: 'POST',
+      headers: buyer,
+      body: JSON.stringify({ contactUsername: '@alice_test' }),
+    });
+    const { orderId: bought } = (await placed.json()) as { orderId: string };
+    await db.update(shops).set({ closedAt: new Date() }).where(eq(shops.id, shopId));
+    const outside = { Authorization: `Bearer ${await authToken(555002001, 'Olga')}`, 'content-type': 'application/json' };
+    let testingId = '';
+    const made: string[] = [];
+    let extraIds: string[] = [];
+    try {
+      const body = {
+        productId: tested,
+        variantId: null,
+        lab: 'Lab',
+        contribution: 0,
+        perUnit: 0,
+        feeMode: 'mandatory',
+        donationHours: 2,
+        allowExternal: true,
+        extraEnabled: true,
+        tiers: [{ id: 'mp', name: 'M&P', cost: 5000, vials: 1 }],
+      };
+      // No fee: the extra round needs its lowest cap set by hand.
+      const bare = await request('/api/admin/testings', { method: 'POST', headers: admin, body: JSON.stringify(body) });
+      expect(bare.status).toBe(400);
+      const created = await request('/api/admin/testings', {
+        method: 'POST',
+        headers: admin,
+        body: JSON.stringify({ ...body, extraMin: 500 }),
+      });
+      expect(created.status).toBe(201);
+      const testing = (await created.json()) as { id: string; donationProductId: string; extraProductId?: string };
+      testingId = testing.id;
+      extraIds = [testing.donationProductId].filter(Boolean);
+      const seen = ((await (await request(`/api/products/${tested}/testings`, { headers: outside })).json()) as Array<{
+        externalOpen: boolean;
+        joined: boolean;
+      }>)[0];
+      expect(seen).toMatchObject({ externalOpen: true, joined: false });
+
+      const join = (headers: Record<string, string>): Promise<Response> =>
+        Promise.resolve(
+          request(`/api/orders/external-testing/${testingId}`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ volunteer: true, contactUsername: 'olga_test' }),
+          }),
+        );
+      // Bought here: from that order instead.
+      expect((await join(buyer)).status).toBe(409);
+      const joined = await join(outside);
+      expect(joined.status).toBe(201);
+      const { orderId } = (await joined.json()) as { orderId: string };
+      made.push(orderId);
+      const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+      // Free: in at once, nothing to pay nor send.
+      expect(order).toMatchObject({ external: true, status: 'paid', total: 0 });
+      expect((await join(outside)).status).toBe(409);
+      const after = ((await (await request(`/api/products/${tested}/testings`, { headers: outside })).json()) as Array<{
+        joined: boolean;
+        participants: number;
+      }>)[0];
+      expect(after).toMatchObject({ joined: true, participants: 1 });
+      // In like anyone: they can give from that order.
+      const gift = await request(`/api/orders/${orderId}/donations`, {
+        method: 'POST',
+        headers: outside,
+        body: JSON.stringify({ testingId, amount: 1000 }),
+      });
+      expect(gift.status).toBe(200);
+      // And it cannot be changed (no products).
+      const change = await request(`/api/orders/${orderId}/change`, {
+        method: 'POST',
+        headers: outside,
+        body: JSON.stringify({ items: [{ productId: tested, quantity: 1 }] }),
+      });
+      expect(change.status).toBeGreaterThanOrEqual(400);
+    } finally {
+      await db.update(shops).set({ closedAt: null }).where(eq(shops.id, shopId));
+      const all = [bought, ...made];
+      await db.delete(orderItems).where(inArray(orderItems.orderId, all));
+      await db.delete(testingEntries).where(inArray(testingEntries.orderId, all));
+      await db.delete(orders).where(inArray(orders.id, all));
+      const [row] = testingId ? await db.select().from(testings).where(eq(testings.id, testingId)) : [];
+      if (testingId) await db.delete(testings).where(eq(testings.id, testingId));
+      const extraProduct = row?.extraProductId ? [row.extraProductId] : [];
+      await db.delete(products).where(inArray(products.id, [tested, ...extraIds, ...extraProduct]));
+      await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
+    }
+  });
+
   it('runs the extra round: equal shares within caps, only for the tests still missing', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,

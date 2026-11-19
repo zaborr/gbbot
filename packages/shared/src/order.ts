@@ -93,7 +93,10 @@ export const order = z.object({
   /** Customer; null once the order is anonymized (data retention). */
   userId: telegramUserId.nullable(),
   status: orderStatus,
-  items: z.array(orderItem).min(1),
+  /** Empty for an order only to take part in a testing from outside. */
+  items: z.array(orderItem),
+  /** Only to take part in a testing from outside: nothing to send. */
+  external: z.boolean(),
   /** Placed by a VIP: VIP prices apply to it, also when it is changed later. */
   isVip: z.boolean(),
   /** Total including `fee`. */

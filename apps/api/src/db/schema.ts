@@ -276,6 +276,8 @@ export const orders = pgTable('orders', {
   status: orderStatusEnum('status').notNull().default('pending'),
   /** Placed by a VIP: VIP prices apply to it, also when it is changed later. */
   isVip: boolean('is_vip').notNull().default(false),
+  /** Only to take part in a testing from outside: no products, nothing to send. */
+  external: boolean('external').notNull().default(false),
   /** Total including `fee`. */
   total: integer('total').notNull(),
   /** Per-order fee charged once, frozen at creation. */
@@ -422,6 +424,8 @@ export const testings = pgTable(
      * with their part (the fee) until its time to give ends.
      */
     posterior: boolean('posterior').notNull().default(false),
+    /** People who bought elsewhere (or nothing) can join with an order of only the fee. */
+    allowExternal: boolean('allow_external').notNull().default(false),
     /**
      * The extra round: once the time to give ends, those in it sign up (with a
      * cap) to cover the tests still missing, at equal shares. Its money only

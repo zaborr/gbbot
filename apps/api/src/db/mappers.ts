@@ -240,6 +240,7 @@ export function toOrderDTO(row: OrderRow, items: OrderItemRow[]): Order {
     status: row.status,
     items: items.map(toOrderItemDTO),
     isVip: row.isVip,
+    external: row.external,
     total: row.total,
     fee: row.fee,
     shipping: row.shipping,

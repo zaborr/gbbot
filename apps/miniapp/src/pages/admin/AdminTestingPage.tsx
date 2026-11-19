@@ -134,6 +134,7 @@ function TestingForm({
   const [donationHours, setDonationHours] = useState(String(testing?.donationHours ?? 48));
   const [vialsPerUnit, setVialsPerUnit] = useState(String(testing?.vialsPerUnit ?? 10));
   const [extraEnabled, setExtraEnabled] = useState(testing?.extraEnabled ?? false);
+  const [allowExternal, setAllowExternal] = useState(testing?.allowExternal ?? false);
   const [extraMinText, setExtraMinText] = useState(testing && testing.extraMin > 0 ? toMajor(testing.extraMin) : '');
   const [signupHours, setSignupHours] = useState(String(testing?.extraSignupHours ?? 24));
   const [payHours, setPayHours] = useState(String(testing?.extraPayHours ?? 48));
@@ -156,7 +157,9 @@ function TestingForm({
   const currency = testing?.currency ?? product?.currency ?? shop.currency;
   const fmt = (amount: number): string => formatPrice(amount, currency);
 
-  const contributionOk = MONEY_RE.test(contribution.trim()) && cents(contribution) > 0;
+  // 0: everyone takes part for free (the money comes from gifts and the extra round).
+  const contributionOk = MONEY_RE.test(contribution.trim()) && cents(contribution) >= 0;
+  const extraMinCents = extraMinText.trim() === '' || !MONEY_RE.test(extraMinText.trim()) ? 0 : cents(extraMinText);
   const perUnitOk = perUnit.trim() === '' || MONEY_RE.test(perUnit.trim());
   const perUnitCents = perUnit.trim() === '' || !perUnitOk ? 0 : cents(perUnit);
   const tierOk = (tier: TierDraft): boolean =>
@@ -224,7 +227,9 @@ function TestingForm({
               ? t('testing.badVialsPerUnit')
               : extraEnabled && (!hoursField(signupHours) || !hoursField(payHours))
                 ? t('testing.badExtraHours', { max: MAX_DONATION_HOURS })
-                : null;
+                : extraEnabled && cents(contribution) === 0 && extraMinCents === 0
+                  ? t('testing.needExtraMin')
+                  : null;
 
   const save = async (): Promise<void> => {
     setBusy(true);
@@ -238,9 +243,10 @@ function TestingForm({
         donationHours: Number(donationHours),
         vialsPerUnit: vialsNumber,
         extraEnabled,
-        extraMin: extraMinText.trim() === '' || !MONEY_RE.test(extraMinText.trim()) ? 0 : cents(extraMinText),
+        extraMin: extraMinCents,
         extraSignupHours: Number(signupHours) || 24,
         extraPayHours: Number(payHours) || 48,
+        allowExternal,
       };
       if (testing) {
         await api.adminUpdateTesting(testing.id, body);
@@ -320,6 +326,8 @@ function TestingForm({
           extra: null,
           extraReportSentAt: null,
           posterior,
+          allowExternal,
+          externalOpen: false,
           donationsUntil: null,
           donationsOpen: false,
           donationProductId: null,
@@ -667,6 +675,22 @@ function TestingForm({
             </div>
           </div>
         )}
+      </Section>
+
+      <Section header={t('testing.externalAdminTitle')} footer={t('testing.externalAdminFooter')}>
+        <Cell
+          Component="label"
+          multiline
+          after={
+            <Switch
+              checked={allowExternal}
+              disabled={!editable}
+              onChange={(e) => setAllowExternal(e.target.checked)}
+            />
+          }
+        >
+          {t('testing.externalEnable')}
+        </Cell>
       </Section>
 
       {testing?.extra && <ExtraStatus testing={testing} />}
