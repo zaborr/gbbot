@@ -245,6 +245,8 @@ export function toOrderDTO(row: OrderRow, items: OrderItemRow[]): Order {
     shipping: row.shipping,
     testing: row.testing,
     donatedVials: row.donatedVials,
+    donationDue: items.reduce((sum, item) => sum + item.donationUnpaid * item.unitPrice, 0),
+    resumeStatus: row.resumeStatus ?? null,
     shippingZoneName: row.shippingZoneName,
     encryptedAddress: row.encryptedAddress,
     addressKeyFingerprint: row.addressKeyFingerprint,

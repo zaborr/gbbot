@@ -13,6 +13,8 @@ const base: Order = {
   shipping: 590,
   testing: 0,
   donatedVials: [],
+  donationDue: 0,
+  resumeStatus: null,
   shippingZoneName: 'Spain',
   encryptedAddress: null,
   addressKeyFingerprint: null,

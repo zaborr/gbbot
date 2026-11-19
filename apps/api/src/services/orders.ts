@@ -483,7 +483,9 @@ export async function markOrderPaid(
     const [updated] = await tx
       .update(orders)
       .set({
-        status: amountPaid >= order.total ? 'paid' : 'pending',
+        // Sent already and only a donation was owed: it goes back to sent.
+        status: amountPaid >= order.total ? (order.resumeStatus ?? 'paid') : 'pending',
+        resumeStatus: amountPaid >= order.total ? null : order.resumeStatus,
         amountPaid,
         amountSubmitted: 0,
         paymentExchange: null,
@@ -499,6 +501,7 @@ export async function markOrderPaid(
     if (amountPaid >= order.total) {
       await tx.update(orderItems).set({ donationUnpaid: 0 }).where(eq(orderItems.orderId, order.id));
     }
+
 
     if (!order.stockApplied) await takeStock(tx, items);
 

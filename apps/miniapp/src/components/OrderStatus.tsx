@@ -20,6 +20,13 @@ type Kind = 'warn' | 'info' | 'ok' | '';
 /** What the order is waiting for, as a coloured label: orange = your turn. */
 function chipOf(order: Order): { text: string; kind: Kind } {
   if (order.changeRequest) return { text: t('orders.changeRequested'), kind: 'info' };
+  // Paid (or sent) and only a donation is owed.
+  if (order.donationDue > 0 && order.amountPaid >= order.total - order.donationDue) {
+    return {
+      text: t('orders.donationPending', { status: statusText(order.resumeStatus ?? 'paid') }),
+      kind: 'warn',
+    };
+  }
   if (order.status === 'pending' && order.amountPaid > 0) {
     return { text: t('orders.differenceToPay'), kind: 'warn' };
   }
@@ -54,7 +61,9 @@ export function OrderTracker({ order }: { order: Order }): React.JSX.Element | n
     shipped: 4,
     fulfilled: 5,
   };
-  const done = doneCount[order.status];
+  // Waiting only for a donation: where it really is.
+  const shown = order.resumeStatus && order.resumeStatus !== 'cancelled' ? order.resumeStatus : order.status;
+  const done = doneCount[shown === 'cancelled' ? 'pending' : shown];
   const steps = [
     t('track.ordered'),
     t('track.paid'),

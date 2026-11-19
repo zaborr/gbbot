@@ -189,7 +189,7 @@ function TestingForm({
     setTiers(next);
   };
 
-  const hoursOk = COUNT_RE.test(donationHours.trim()) && Number(donationHours) >= 1 && Number(donationHours) <= MAX_DONATION_HOURS;
+  const hoursOk = COUNT_RE.test(donationHours.trim()) && Number(donationHours) <= MAX_DONATION_HOURS;
   const problem = !lab.trim()
     ? t('testing.needLab')
     : !contributionOk
@@ -653,10 +653,8 @@ function PotSection({ testing, steps }: { testing: Testing; steps: ReturnType<ty
           label={t('testing.potFees', { count: m.payers, amount: fmt(testing.contribution) })}
           value={fmt(m.fees)}
         />
-        {m.extras > 0 && <Line label={t('testing.potExtras')} value={fmt(m.extras)} />}
-        {(m.donations > 0 || testing.donationsUntil) && (
-          <Line label={t('testing.potDonations')} value={fmt(m.donations)} />
-        )}
+        {/* What was given on top of the part, in the cart or from the order: all one. */}
+        <Line label={t('testing.potDonations')} value={fmt(m.extras + m.donations)} />
         <Line
           label={t('testing.potHidden', { units: units(m.units), amount: fmt(m.perUnit) })}
           value={fmt(m.perUnitTotal)}

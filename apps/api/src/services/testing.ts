@@ -163,9 +163,16 @@ export const vialShare = (unitPrice: number, vialsPerUnit: number): number =>
 export const testingPot = (row: Pick<TestingRow, 'perUnit'>, totals: TestingTotals): number =>
   totals.fees + totals.extras + totals.donations + row.perUnit * totals.units;
 
-/** Buyers can give to it now: the GB closed, its time to give not over. */
-export const donationsOpen = (row: Pick<TestingRow, 'status' | 'donationsUntil' | 'donationsDone'>, now = new Date()): boolean =>
-  row.status === 'closed' && !row.donationsDone && row.donationsUntil !== null && row.donationsUntil > now;
+/**
+ * Those in it can give now: while it is open, and once the GB closes until its
+ * time to give is over.
+ */
+export const donationsOpen = (
+  row: Pick<TestingRow, 'status' | 'donationsUntil' | 'donationsDone'>,
+  now = new Date(),
+): boolean =>
+  row.status === 'open' ||
+  (row.status === 'closed' && !row.donationsDone && row.donationsUntil !== null && row.donationsUntil > now);
 
 /** Where each tier of a testing stands (fixed by the draw once it is done). */
 export function stepsOf(row: TestingRow, totals: TestingTotals, vialPrice: number): TierStep[] {
