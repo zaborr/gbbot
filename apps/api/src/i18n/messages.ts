@@ -201,6 +201,9 @@ const en = {
   'testing.extraDone': '🧪 {shop}: the extra round of {product} got {tiers}. You will get its results.',
   'testing.extraFailed': '🧪 {shop}: the extra round of {product} did not get any test after all (someone did not pay). What you paid for it is owed back to you.',
   'testing.extraUnpaid': '🧪 {shop}: in the extra round of {product} these did not pay their share: {who}. You can block them from the app.',
+  'testing.extraRound': '🧪 {shop}: someone did not pay the extra round of {product}, {gap} is missing. Do you go on? It depends on how many go on:\n{options}\nAnswer from your order within {hours} h. If you leave or do not answer, all you paid goes back.',
+  'testing.extraRoundOption': '• {count} go on: {amount} more each',
+  'testing.extraTopup': '🧪 {shop}: the extra round of {product} goes on. Your difference: {amount}. Pay it from your order within {hours} h, or all you paid goes back.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -394,6 +397,9 @@ const es: Record<BotMessageKey, string> = {
   'testing.extraDone': '🧪 {shop}: la fase extra de {product} ha conseguido {tiers}. Recibirás sus resultados.',
   'testing.extraFailed': '🧪 {shop}: al final la fase extra de {product} no ha conseguido ningún test (alguien no pagó). Se te devuelve lo que pagaste.',
   'testing.extraUnpaid': '🧪 {shop}: en la fase extra de {product} no pagaron su parte: {who}. Puedes bloquearlos desde la app.',
+  'testing.extraRound': '🧪 {shop}: alguien no ha pagado la fase extra de {product}, faltan {gap}. ¿Sigues o te bajas? Depende de cuántos sigan:\n{options}\nResponde desde tu pedido en {hours} h. Si te bajas o no respondes, se te devuelve todo lo pagado.',
+  'testing.extraRoundOption': '• Si siguen {count}: {amount} más cada uno',
+  'testing.extraTopup': '🧪 {shop}: la fase extra de {product} sigue. Tu diferencia: {amount}. Págala desde tu pedido en {hours} h; si no, se te devuelve todo lo pagado.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -585,6 +591,9 @@ const it: Record<BotMessageKey, string> = {
   'testing.extraDone': '🧪 {shop}: la fase extra di {product} ha ottenuto {tiers}. Riceverai i risultati.',
   'testing.extraFailed': '🧪 {shop}: alla fine la fase extra di {product} non ha ottenuto nessun test (qualcuno non ha pagato). Ti viene rimborsato quanto pagato.',
   'testing.extraUnpaid': '🧪 {shop}: nella fase extra di {product} non hanno pagato la loro parte: {who}. Puoi bloccarli dall\'app.',
+  'testing.extraRound': '🧪 {shop}: qualcuno non ha pagato la fase extra di {product}, mancano {gap}. Continui o ti ritiri? Dipende da quanti continuano:\n{options}\nRispondi dal tuo ordine entro {hours} h. Se ti ritiri o non rispondi, ti viene restituito tutto.',
+  'testing.extraRoundOption': '• Se continuano in {count}: {amount} in più a testa',
+  'testing.extraTopup': '🧪 {shop}: la fase extra di {product} continua. La tua differenza: {amount}. Pagala dal tuo ordine entro {hours} h, altrimenti ti viene restituito tutto.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -776,6 +785,9 @@ const pt: Record<BotMessageKey, string> = {
   'testing.extraDone': '🧪 {shop}: a fase extra de {product} conseguiu {tiers}. Vai receber os resultados.',
   'testing.extraFailed': '🧪 {shop}: afinal a fase extra de {product} não conseguiu nenhum teste (alguém não pagou). É-lhe devolvido o que pagou.',
   'testing.extraUnpaid': '🧪 {shop}: na fase extra de {product} não pagaram a sua parte: {who}. Pode bloqueá-los na app.',
+  'testing.extraRound': '🧪 {shop}: alguém não pagou a fase extra de {product}, faltam {gap}. Continua ou sai? Depende de quantos continuarem:\n{options}\nResponda a partir da sua encomenda em {hours} h. Se sair ou não responder, é-lhe devolvido tudo o que pagou.',
+  'testing.extraRoundOption': '• Se continuarem {count}: mais {amount} cada',
+  'testing.extraTopup': '🧪 {shop}: a fase extra de {product} continua. A sua diferença: {amount}. Pague-a a partir da sua encomenda em {hours} h; caso contrário, é-lhe devolvido tudo.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

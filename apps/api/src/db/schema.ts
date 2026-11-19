@@ -506,7 +506,11 @@ export const testingExtraMembers = pgTable(
     /** What they were asked to pay once shared out. */
     share: integer('share').notNull().default(0),
     /** signed → in (asked to pay) or out (cap below the share) → paid or failed. */
-    state: text('state').$type<'signed' | 'in' | 'out' | 'paid' | 'failed'>().notNull().default('signed'),
+    /** signed → in or out → paid or failed; second round: paid → stay or left → topup → paid (or left). */
+    state: text('state')
+      .$type<'signed' | 'in' | 'out' | 'paid' | 'failed' | 'stay' | 'left' | 'topup'>()
+      .notNull()
+      .default('signed'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [unique('testing_extra_members_testing_order_unique').on(table.testingId, table.orderId)],

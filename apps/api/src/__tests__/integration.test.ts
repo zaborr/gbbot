@@ -1684,6 +1684,144 @@ describeDb('API integration', () => {
     }
   });
 
+  it('asks the payers whether they go on when someone does not pay the extra round', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const [seed] = await db.select().from(products).where(eq(products.id, productId));
+    const [own] = await db
+      .insert(products)
+      .values({
+        shopId,
+        categoryId: seed!.categoryId,
+        slug: 'kukicha-round',
+        title: 'Kukicha',
+        description: '',
+        price: 150,
+        currency: 'USDC',
+        stock: 10,
+        isActive: true,
+      })
+      .returning();
+    const tested = own!.id;
+    const created = await request('/api/admin/testings', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({
+        productId: tested,
+        variantId: null,
+        lab: 'Lab',
+        contribution: 1000,
+        perUnit: 0,
+        feeMode: 'mandatory',
+        donationHours: 1,
+        extraEnabled: true,
+        extraMin: 0,
+        tiers: [
+          { id: 'mp', name: 'M&P', cost: 1000, vials: 0 },
+          { id: 'endo', name: 'Endo', cost: 6000, vials: 0 },
+        ],
+      }),
+    });
+    const testing = (await created.json()) as { id: string; donationProductId: string };
+    const testingId = testing.id;
+    const [row0] = await db.select().from(testings).where(eq(testings.id, testingId));
+    const people: Array<{ orderId: string; headers: Record<string, string> }> = [];
+    for (const [userId, name] of [
+      [555001003, 'Bea'],
+      [555001004, 'Dan'],
+      [555001005, 'Eva'],
+    ] as const) {
+      const headers = { Authorization: `Bearer ${await authToken(userId, name)}`, 'content-type': 'application/json' };
+      await db.delete(carts).where(eq(carts.userId, userId));
+      await request('/api/cart/items', { method: 'POST', headers, body: JSON.stringify({ productId: tested, quantity: 1 }) });
+      const placed = await request('/api/orders', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ contactUsername: `@${name.toLowerCase()}_test` }),
+      });
+      const { orderId } = (await placed.json()) as { orderId: string };
+      await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+      people.push({ orderId, headers });
+    }
+    const [a, b, c] = people as [(typeof people)[0], (typeof people)[0], (typeof people)[0]];
+    const signUp = (who: typeof a, cap: number): Promise<Response> =>
+      Promise.resolve(
+        request(`/api/orders/${who.orderId}/extra`, {
+          method: 'POST',
+          headers: who.headers,
+          body: JSON.stringify({ testingId, cap }),
+        }),
+      );
+    const t0 = Date.now();
+    await db.update(shops).set({ closedAt: new Date() }).where(eq(shops.id, shopId));
+    try {
+      await db.update(testings).set({ status: 'closed' }).where(eq(testings.id, testingId));
+      const shopRow = (await db.query.shops.findFirst({ where: eq(shops.id, shopId) }))!;
+      await openDonationWindows(db, testEnv, shopRow, new Date(t0));
+      await closeDonationWindows(db, testEnv, new Date(t0 + 2 * 3600_000));
+      // 40 missing for Endo, three in: 13.34, 13.33 and 13.33.
+      expect((await signUp(a, 3000)).status).toBe(200);
+      expect((await signUp(b, 2900)).status).toBe(200);
+      expect((await signUp(c, 2800)).status).toBe(200);
+      await advanceExtras(db, testEnv, new Date(t0 + 28 * 3600_000));
+      for (const who of [a, b]) {
+        await request(`/api/admin/orders/${who.orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+      }
+      // Cid does not pay: 13.33 is missing, and the two who paid are asked.
+      await advanceExtras(db, testEnv, new Date(t0 + 80 * 3600_000));
+      const [round] = await db.select().from(testings).where(eq(testings.id, testingId));
+      expect(round?.extra).toMatchObject({ stage: 'round', gap: 1333 });
+      const seen = ((await (await request(`/api/products/${tested}/testings`, { headers: a.headers })).json()) as Array<{
+        extra: { round: { gap: number; options: Array<{ count: number; amount: number }> } | null };
+      }>)[0];
+      expect(seen?.extra.round).toEqual({
+        gap: 1333,
+        options: [
+          { count: 2, amount: 667 },
+          { count: 1, amount: 1333 },
+        ],
+      });
+      const answer = (who: typeof a, stay: boolean): Promise<Response> =>
+        Promise.resolve(
+          request(`/api/orders/${who.orderId}/extra/round`, {
+            method: 'POST',
+            headers: who.headers,
+            body: JSON.stringify({ testingId, stay }),
+          }),
+        );
+      // Only those who paid are asked.
+      expect((await answer(c, true)).status).toBe(409);
+      expect((await answer(a, true)).status).toBe(200);
+      expect((await answer(b, true)).status).toBe(200);
+
+      // Both go on: 6.67 and 6.66 more, within their caps.
+      await advanceExtras(db, testEnv, new Date(t0 + 105 * 3600_000));
+      const topping = await db.select().from(testingExtraMembers).where(eq(testingExtraMembers.testingId, testingId));
+      expect(topping.filter((m) => m.state === 'topup').map((m) => m.share).sort()).toEqual([2000, 2000]);
+      const [owed] = await db.select().from(orders).where(eq(orders.id, b.orderId));
+      expect((owed?.total ?? 0) - (owed?.amountPaid ?? 0)).toBeGreaterThan(0);
+      for (const who of [a, b]) {
+        await request(`/api/admin/orders/${who.orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+      }
+      await advanceExtras(db, testEnv, new Date(t0 + 130 * 3600_000));
+      const [done] = await db.select().from(testings).where(eq(testings.id, testingId));
+      expect(done?.extra).toMatchObject({ stage: 'done', outcome: { tiers: ['endo'], collected: 4000, refunded: 0 } });
+    } finally {
+      await db.update(shops).set({ closedAt: null }).where(eq(shops.id, shopId));
+      const ids = people.map((p) => p.orderId);
+      await db.delete(orderItems).where(inArray(orderItems.orderId, ids));
+      await db.delete(orders).where(inArray(orders.id, ids));
+      await db.delete(testings).where(eq(testings.id, testingId));
+      await db
+        .delete(products)
+        .where(inArray(products.id, [tested, testing.donationProductId, ...(row0?.extraProductId ? [row0.extraProductId] : [])]));
+      await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
+    }
+  });
+
   it('closes a drawn testing: the donor gets the vial back, the fees stay', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,

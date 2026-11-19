@@ -636,6 +636,14 @@ export class ApiClient {
     return this.request<Order>(`/orders/${orderId}/extra/${testingId}`, { method: 'DELETE' });
   }
 
+  /** The second round of the extra one: going on (paying the difference) or leaving (all back). */
+  answerExtraRound(orderId: string, testingId: string, stay: boolean): Promise<Order> {
+    return this.request<Order>(`/orders/${orderId}/extra/round`, {
+      method: 'POST',
+      body: JSON.stringify({ testingId, stay }),
+    });
+  }
+
   adminRequestTestingReport(id: string, kind: 'base' | 'extra' = 'base'): Promise<{ ok: boolean }> {
     return this.request<{ ok: boolean }>(
       `/admin/testings/${id}/report-request${kind === 'extra' ? '?kind=extra' : ''}`,

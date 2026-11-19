@@ -1265,13 +1265,61 @@ function ExtraSection({ order, onChanged }: { order: Order; onChanged: () => voi
                   : t('extra.out')}
               </Cell>
             )}
+            {extra.stage === 'round' && mine && extra.round && (
+              <>
+                <Cell multiline>{t('extra.roundAsk', { gap: fmt(extra.round.gap) })}</Cell>
+                {extra.round.options.map((o) => (
+                  <Cell key={o.count} after={<span className="gb-testing-money">+{fmt(o.amount)}</span>}>
+                    {t('extra.roundOption', { count: o.count })}
+                  </Cell>
+                ))}
+                <div className="gb-donation-row">
+                  <Button
+                    size="m"
+                    stretched
+                    mode={mine.state === 'stay' ? 'filled' : 'bezeled'}
+                    loading={busy === `stay-${x.id}`}
+                    onClick={() => run(`stay-${x.id}`, () => api.answerExtraRound(order.id, x.id, true))}
+                  >
+                    {t('extra.stay')}
+                  </Button>
+                  <Button
+                    size="m"
+                    stretched
+                    mode={mine.state === 'left' ? 'filled' : 'bezeled'}
+                    loading={busy === `left-${x.id}`}
+                    onClick={() => run(`left-${x.id}`, () => api.answerExtraRound(order.id, x.id, false))}
+                  >
+                    {t('extra.goDown')}
+                  </Button>
+                </div>
+                <Cell multiline subtitle={t('extra.roundHint')}>
+                  {mine.state === 'stay'
+                    ? t('extra.roundStaying')
+                    : mine.state === 'left'
+                      ? t('extra.roundLeaving')
+                      : t('extra.roundPending')}
+                </Cell>
+              </>
+            )}
+            {extra.stage === 'topup' && mine && (
+              <Cell multiline>
+                {mine.state === 'topup'
+                  ? t('extra.topup')
+                  : mine.state === 'left'
+                    ? t('extra.left')
+                    : t('extra.topupWait')}
+              </Cell>
+            )}
             {extra.stage === 'done' && mine && (
               <Cell multiline>
                 {mine.state === 'paid' && (extra.outcome?.tiers.length ?? 0) > 0
                   ? t('extra.doneIn')
                   : mine.state === 'out'
                     ? t('extra.out')
-                    : t('extra.doneNone')}
+                    : mine.state === 'left'
+                      ? t('extra.left')
+                      : t('extra.doneNone')}
               </Cell>
             )}
           </div>
