@@ -97,6 +97,8 @@ export const order = z.object({
   items: z.array(orderItem),
   /** Only to take part in a testing from outside: nothing to send. */
   external: z.boolean(),
+  /** The testing an order from outside is for. */
+  externalTestingId: z.string().nullable(),
   /** Placed by a VIP: VIP prices apply to it, also when it is changed later. */
   isVip: z.boolean(),
   /** Total including `fee`. */

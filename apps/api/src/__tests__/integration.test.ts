@@ -1687,7 +1687,7 @@ describeDb('API integration', () => {
       made.push(orderId);
       const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
       // Free: in at once, nothing to pay nor send.
-      expect(order).toMatchObject({ external: true, status: 'paid', total: 0 });
+      expect(order).toMatchObject({ external: true, externalTestingId: testingId, status: 'paid', total: 0 });
       expect((await join(outside)).status).toBe(409);
       const after = ((await (await request(`/api/products/${tested}/testings`, { headers: outside })).json()) as Array<{
         joined: boolean;
