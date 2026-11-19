@@ -118,10 +118,10 @@ export async function reopenShop(db: Database, env: Env, shop: ShopRow): Promise
     .where(eq(shops.id, shop.id))
     .returning();
   if (!row) throw ApiError.notFound('Shop not found');
-  // Its testings open again (those not drawn yet).
+  // Its testings open again (those not drawn yet); one made after closing becomes a usual one.
   await db
     .update(testings)
-    .set({ status: 'open', updatedAt: new Date() })
+    .set({ status: 'open', posterior: false, updatedAt: new Date() })
     .where(and(eq(testings.shopId, shop.id), eq(testings.status, 'closed')));
   return row;
 }

@@ -12,6 +12,7 @@ import type { ShopRow } from './shop.js';
 import { botToken } from './activeBot.js';
 import { audience, testedLabel } from './testingDraw.js';
 import {
+  dropUnpaidTesting,
   donationsOpen,
   feeExempt,
   progressText,
@@ -379,9 +380,8 @@ async function remindDonations(db: Database, env: Env, now: Date): Promise<void>
  * what it tests hear they can join it from their order (and then give).
  */
 export async function announceNewTesting(db: Database, env: Env, shop: ShopRow, testingId: string): Promise<void> {
-  if (shop.closedAt) return;
   const row = await db.query.testings.findFirst({ where: eq(testings.id, testingId) });
-  if (!row) return;
+  if (!row || (shop.closedAt && !row.posterior)) return;
   const buyers = await db
     .selectDistinct({ id: orders.id })
     .from(orders)
@@ -406,11 +406,12 @@ export async function announceNewTesting(db: Database, env: Env, shop: ShopRow, 
   const steps = totals ? stepsOf(row, totals, (await vialPrices(db, [row])).get(row.id) ?? 0) : [];
   await notifyUsers(db, botToken(env), ids, (lang: Lang) =>
     [
-      tr(lang, 'testing.announced', {
+      tr(lang, row.posterior ? 'testing.announcedAfter' : 'testing.announced', {
         shop: shop.name,
         product: what,
         lab: row.lab,
         amount: formatMoney(row.contribution, row.currency),
+        hours: row.donationHours,
       }),
       progressText(lang, steps, true),
     ].join('\n\n'),
@@ -438,6 +439,8 @@ export async function closeDonationWindows(db: Database, env: Env, now = new Dat
       .returning();
     if (!claimed) continue;
     await dropUnpaidDonations(db, [claimed]);
+    // After closing: parts not paid in time drop out too.
+    if (claimed.posterior) await dropUnpaidTesting(db, claimed.shopId);
     const shop = await db.query.shops.findFirst({ where: (s, { eq: same }) => same(s.id, row.shopId) });
     if (!shop) continue;
     const what = await testedLabel(db, row);

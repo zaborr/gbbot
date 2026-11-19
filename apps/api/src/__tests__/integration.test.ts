@@ -17,6 +17,7 @@ import {
   productVariants,
   products,
   shops,
+  testingEntries,
   testings,
   bots,
   botSwitches,
@@ -1441,6 +1442,113 @@ describeDb('API integration', () => {
       await db.delete(orders).where(eq(orders.id, orderId));
       await db.delete(testings).where(eq(testings.id, testingId));
       await db.delete(products).where(inArray(products.id, [tested, testing.donationProductId]));
+      await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
+    }
+  });
+
+  it('runs a testing made after closing: buyers join with their part, even on sent orders', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const [seed] = await db.select().from(products).where(eq(products.id, productId));
+    const [own] = await db
+      .insert(products)
+      .values({
+        shopId,
+        categoryId: seed!.categoryId,
+        slug: 'hojicha-after',
+        title: 'Hojicha',
+        description: '',
+        price: 150,
+        currency: 'USDC',
+        stock: 10,
+        isActive: true,
+      })
+      .returning();
+    const tested = own!.id;
+    const buy = async (userId: number, name: string): Promise<{ orderId: string; headers: Record<string, string> }> => {
+      const headers = { Authorization: `Bearer ${await authToken(userId, name)}`, 'content-type': 'application/json' };
+      await db.delete(carts).where(eq(carts.userId, userId));
+      await request('/api/cart/items', { method: 'POST', headers, body: JSON.stringify({ productId: tested, quantity: 1 }) });
+      const placed = await request('/api/orders', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ contactUsername: `@${name.toLowerCase()}_test` }),
+      });
+      const { orderId } = (await placed.json()) as { orderId: string };
+      await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+      await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'shipped' }) });
+      return { orderId, headers };
+    };
+    const alice = await buy(CUSTOMER_ID, 'Alice');
+    const bob = await buy(555000999, 'Bob');
+    await db.update(shops).set({ closedAt: new Date() }).where(eq(shops.id, shopId));
+    let testingId = '';
+    let donationProductId: string | null = null;
+    try {
+      const created = await request('/api/admin/testings', {
+        method: 'POST',
+        headers: admin,
+        body: JSON.stringify({
+          productId: tested,
+          variantId: null,
+          lab: 'Lab',
+          contribution: 1000,
+          perUnit: 200,
+          feeMode: 'optional',
+          donationHours: 2,
+          tiers: [{ id: 'mp', name: 'M&P', cost: 5000, vials: 0 }],
+        }),
+      });
+      expect(created.status).toBe(201);
+      const testing = (await created.json()) as Record<string, unknown> & { id: string; donationProductId: string };
+      testingId = testing.id;
+      donationProductId = testing.donationProductId;
+      // Made after closing: open to join for its hours, and there is no optional part.
+      expect(testing).toMatchObject({ posterior: true, status: 'closed', donationsOpen: true, feeMode: 'mandatory' });
+
+      const join = (who: { orderId: string; headers: Record<string, string> }): Promise<Response> =>
+        Promise.resolve(
+          request(`/api/orders/${who.orderId}/testings`, {
+            method: 'POST',
+            headers: who.headers,
+            body: JSON.stringify({ testingId, volunteer: false }),
+          }),
+        );
+      // A sent order can join: it waits for the part, then goes back to sent.
+      expect((await join(alice)).status).toBe(200);
+      const [waiting] = await db.select().from(orders).where(eq(orders.id, alice.orderId));
+      expect(waiting).toMatchObject({ status: 'pending', resumeStatus: 'shipped' });
+      await request(`/api/admin/orders/${alice.orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+      const [joined] = await db.select().from(orders).where(eq(orders.id, alice.orderId));
+      expect(joined?.status).toBe('shipped');
+
+      // Bob joins and does not pay: kept while the time lasts, off when it is over.
+      expect((await join(bob)).status).toBe(200);
+      const shopRow = (await db.query.shops.findFirst({ where: eq(shops.id, shopId) }))!;
+      expect(shopRow.closedAt).not.toBeNull();
+      // What maintenance does on a closed GB: the time to join is not over, so Bob stays.
+      await dropUnpaidTesting(db, shopId);
+      expect((await db.select().from(testingEntries).where(eq(testingEntries.orderId, bob.orderId))).length).toBe(1);
+      await closeDonationWindows(db, testEnv, new Date(Date.now() + 3 * 3600_000));
+      expect((await db.select().from(testingEntries).where(eq(testingEntries.orderId, bob.orderId))).length).toBe(0);
+      const [bobAfter] = await db.select().from(orders).where(eq(orders.id, bob.orderId));
+      expect(bobAfter).toMatchObject({ status: 'shipped', testing: 0 });
+
+      const [listed] = ((await (await request('/api/admin/testings', { headers: admin })).json()) as Array<{
+        id: string;
+        money: { fees: number; perUnitTotal: number };
+      }>).filter((x) => x.id === testingId);
+      // Alice's part, and the hidden part of both units sold.
+      expect(listed?.money).toMatchObject({ fees: 1000, perUnitTotal: 400 });
+    } finally {
+      await db.update(shops).set({ closedAt: null }).where(eq(shops.id, shopId));
+      await db.delete(orderItems).where(inArray(orderItems.orderId, [alice.orderId, bob.orderId]));
+      await db.delete(orders).where(inArray(orders.id, [alice.orderId, bob.orderId]));
+      if (testingId) await db.delete(testings).where(eq(testings.id, testingId));
+      await db.delete(products).where(inArray(products.id, [tested, ...(donationProductId ? [donationProductId] : [])]));
       await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
     }
   });

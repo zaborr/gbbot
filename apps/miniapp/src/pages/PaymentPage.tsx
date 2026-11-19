@@ -157,7 +157,7 @@ export function PaymentPage(): React.JSX.Element {
         )}
       </Section>
 
-      {!closed && shop.data.testingEnabled && <OrderTestingOffers order={current} onAdded={reload} />}
+      {shop.data.testingEnabled && <OrderTestingOffers order={current} onAdded={reload} />}
 
       {shop.data.testingEnabled && <DonationSection order={current} onChanged={reload} />}
 
@@ -959,11 +959,14 @@ function OrderTestingOffers({ order, onAdded }: { order: Order; onAdded: () => v
   const [volunteer, setVolunteer] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Not while a payment is being checked (its amount would not match any more).
-  const open = order.status === 'paid' || (order.status === 'pending' && order.amountSubmitted === 0);
+  // Not while a payment is being checked (its amount would not match any more);
+  // sent orders only for a testing made after closing.
+  const sent = order.status === 'shipped' || order.status === 'fulfilled';
+  const state = order.status === 'paid' || (order.status === 'pending' && order.amountSubmitted === 0);
   const offers = (testings.data ?? []).filter(
     (x) =>
-      x.status === 'open' &&
+      (x.status === 'open' || (x.posterior && x.donationsOpen)) &&
+      (state || (sent && x.posterior)) &&
       !x.joined &&
       !x.exempt &&
       x.currency === order.currency &&
@@ -971,7 +974,7 @@ function OrderTestingOffers({ order, onAdded }: { order: Order; onAdded: () => v
         (item) => item.productId === x.productId && (x.variantId === null || item.variantId === x.variantId),
       ),
   );
-  if (!open || offers.length === 0) return null;
+  if (offers.length === 0) return null;
 
   const add = (testingId: string): void => {
     setBusy(testingId);
@@ -988,10 +991,19 @@ function OrderTestingOffers({ order, onAdded }: { order: Order; onAdded: () => v
       {offers.map((x) => (
         <Cell
           key={x.id}
-          subtitle={t('testing.offerSubtitle', { lab: x.lab, amount: formatPrice(x.contribution, x.currency) })}
+          subtitle={[
+            t('testing.offerSubtitle', { lab: x.lab, amount: formatPrice(x.contribution, x.currency) }),
+            x.posterior && x.donationsUntil
+              ? t('testing.joinUntil', { date: new Date(x.donationsUntil).toLocaleString() })
+              : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
           after={
             <Button size="s" mode="bezeled" loading={busy === x.id} onClick={() => add(x.id)}>
-              {t('testing.join')}
+              {x.posterior
+                ? t('testing.participate', { amount: formatPrice(x.contribution, x.currency) })
+                : t('testing.join')}
             </Button>
           }
           multiline

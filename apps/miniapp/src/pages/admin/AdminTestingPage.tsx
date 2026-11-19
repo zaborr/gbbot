@@ -113,7 +113,12 @@ function TestingForm({
   );
   const product = products.find((p) => p.id === productId) ?? null;
   const withVariants = (product?.variants.length ?? 0) > 0;
-  const tested = new Set(testings.map((x) => `${x.productId}|${x.variantId ?? ''}`));
+  // One at a time: a product can have another once its last is settled or cancelled.
+  const tested = new Set(
+    testings
+      .filter((x) => x.status !== 'settled' && x.status !== 'cancelled')
+      .map((x) => `${x.productId}|${x.variantId ?? ''}`),
+  );
   const isTested = (pid: string, vid: string | null): boolean => tested.has(`${pid}|${vid ?? ''}`);
 
   const money = testing?.money ?? null;
@@ -189,7 +194,13 @@ function TestingForm({
     setTiers(next);
   };
 
-  const hoursOk = COUNT_RE.test(donationHours.trim()) && Number(donationHours) <= MAX_DONATION_HOURS;
+  // Made once the GB is closed: people join with their part from their orders, for some hours.
+  const posterior = testing ? testing.posterior : shop.isClosed;
+  const hoursOk =
+    COUNT_RE.test(donationHours.trim()) &&
+    Number(donationHours) <= MAX_DONATION_HOURS &&
+    (!posterior || Number(donationHours) >= 1);
+  const modes = posterior ? FEE_MODES.filter((mode) => mode !== 'optional') : FEE_MODES;
   const problem = !lab.trim()
     ? t('testing.needLab')
     : !contributionOk
@@ -297,6 +308,13 @@ function TestingForm({
   return (
     <List>
       <PageTitle title={testing ? t('testing.edit') : t('testing.new')} />
+      {posterior && (
+        <Section>
+          <Cell multiline subtitle={t('testing.posteriorHint')}>
+            {t('testing.posteriorTitle')}
+          </Cell>
+        </Section>
+      )}
       <ErrorBanner message={actions.error} />
 
       <Section header={t('testing.what')}>
@@ -364,7 +382,7 @@ function TestingForm({
           onChange={(e) => setLab(e.target.value)}
         />
         <Input
-          header={t('testing.contributionField', { currency })}
+          header={posterior ? t('testing.partField', { currency }) : t('testing.contributionField', { currency })}
           type="text"
           inputMode="decimal"
           placeholder="5.00"
@@ -402,7 +420,7 @@ function TestingForm({
           </span>
         </Cell>
         <Input
-          header={t('testing.donationHoursField')}
+          header={posterior ? t('testing.posteriorHoursField') : t('testing.donationHoursField')}
           type="text"
           inputMode="numeric"
           placeholder="48"
@@ -412,13 +430,18 @@ function TestingForm({
           onChange={(e) => setDonationHours(e.target.value)}
         />
         <Cell multiline>
-          <span className="gb-hint">{t('testing.donationHoursHint')}</span>
+          <span className="gb-hint">
+            {posterior ? t('testing.posteriorHoursHint') : t('testing.donationHoursHint')}
+          </span>
         </Cell>
       </Section>
 
-      <Section header={t('testing.feeMode')} footer={t(`testing.feeMode.${feeMode}.hint`)}>
+      <Section
+        header={t('testing.feeMode')}
+        footer={posterior ? t(`testing.posteriorMode.${feeMode === 'mandatory_non_vip' ? 'vip' : 'all'}.hint`) : t(`testing.feeMode.${feeMode}.hint`)}
+      >
         <div className="gb-chips" style={{ padding: '12px 16px' }}>
-          {FEE_MODES.map((mode) => (
+          {modes.map((mode) => (
             <Button
               key={mode}
               size="s"
@@ -426,7 +449,7 @@ function TestingForm({
               disabled={!editable || locked}
               onClick={() => setFeeMode(mode)}
             >
-              {t(`testing.feeMode.${mode}`)}
+              {posterior ? t(`testing.posteriorMode.${mode === 'mandatory_non_vip' ? 'vip' : 'all'}`) : t(`testing.feeMode.${mode}`)}
             </Button>
           ))}
         </div>
