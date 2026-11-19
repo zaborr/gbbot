@@ -22,7 +22,16 @@ export function useAsync<T>(loader: () => Promise<T>, deps: readonly unknown[]):
   useEffect(() => {
     let cancelled = false;
     setState((prev) => ({ ...prev, loading: true, error: null }));
-    loader()
+    // A failed connection (going back while the app wakes up, a network blip)
+    // or the server restarting is tried again twice before showing an error.
+    const attempt = (left: number): Promise<T> =>
+      loader().catch(async (err: unknown) => {
+        const passing = !(err instanceof ApiClientError) || err.status >= 500;
+        if (!passing || left <= 0 || cancelled) throw err;
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        return attempt(left - 1);
+      });
+    attempt(2)
       .then((data) => {
         if (!cancelled) setState((prev) => ({ data, loading: false, error: null, version: prev.version + 1 }));
       })
