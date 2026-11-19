@@ -437,7 +437,7 @@ function TestingActions({
     return (
       <>
         <Cell multiline subtitle={inCart ? t('testing.joinInCart') : t('testing.joinOnAdd', { item: what })}>
-          {t('testing.feeIncluded', { amount })}
+          {testing.contribution > 0 ? t('testing.feeIncluded', { amount }) : t('testing.feeIncludedFree')}
         </Cell>
         {volunteerSwitch((value) => {
           if (!inCart) onChoice({ join: value, volunteer: value });
@@ -466,7 +466,7 @@ function TestingActions({
         subtitle={inCart ? (joined ? t('testing.joinInCart') : undefined) : t('testing.joinOnAdd', { item: what })}
         multiline
       >
-        {t('testing.joinSwitch', { amount })}
+        {testing.contribution > 0 ? t('testing.joinSwitch', { amount }) : t('testing.joinSwitchFree')}
       </Cell>
       {joined && volunteerSwitch(setVolunteer)}
       {error && <Cell multiline>{error}</Cell>}

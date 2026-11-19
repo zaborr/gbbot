@@ -205,8 +205,8 @@ const en = {
   'testing.extraRoundOption': '• {count} go on: {amount} more each',
   'testing.extraTopup': '🧪 {shop}: the extra round of {product} goes on. Your difference: {amount}. Pay it from your order within {hours} h, or all you paid goes back.',
   'platform.blocked': '🚫 {by} blocked {who} in every GB, from «{shop}». Reason: {reason}',
-  'testing.announcedFree': '🧪 {shop}: {product} now has a lab testing ({lab}). Joining is free: do it from your order to see the results; once in, you can also give and offer a vial.',
-  'testing.announcedAfterFree': '🧪 {shop}: {product}, which you bought, has a lab testing ({lab}). Joining is free: do it from your order within {hours} h to see the results; once in, you can also give and offer a vial.',
+  'testing.announcedFree': '🧪 {shop}: {product} now has a lab testing ({lab}). Signing up has no fee: the test is paid with gifts and, if that falls short, with an extra round where you set your cap. Sign up from your order; once in, you can also give and offer a vial.',
+  'testing.announcedAfterFree': '🧪 {shop}: {product}, which you bought, has a lab testing ({lab}). Signing up has no fee: the test is paid with gifts and, if that falls short, with an extra round where you set your cap. Sign up from your order within {hours} h.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -404,8 +404,8 @@ const es: Record<BotMessageKey, string> = {
   'testing.extraRoundOption': '• Si siguen {count}: {amount} más cada uno',
   'testing.extraTopup': '🧪 {shop}: la fase extra de {product} sigue. Tu diferencia: {amount}. Págala desde tu pedido en {hours} h; si no, se te devuelve todo lo pagado.',
   'platform.blocked': '🚫 {by} ha bloqueado a {who} en todos los GB, desde «{shop}». Motivo: {reason}',
-  'testing.announcedFree': '🧪 {shop}: {product} ya tiene testing de laboratorio ({lab}). Participar es gratis: únete desde tu pedido para ver los resultados; una vez dentro también puedes donar y ofrecer un vial.',
-  'testing.announcedAfterFree': '🧪 {shop}: {product}, que compraste, tiene testing de laboratorio ({lab}). Participar es gratis: únete desde tu pedido en las próximas {hours} h para ver los resultados; una vez dentro también puedes donar y ofrecer un vial.',
+  'testing.announcedFree': '🧪 {shop}: {product} ya tiene testing de laboratorio ({lab}). Apuntarse no tiene cuota: el test se paga con donaciones y, si falta, con una fase extra en la que tú decides tu máximo. Apúntate desde tu pedido; una vez dentro también puedes donar y ofrecer un vial.',
+  'testing.announcedAfterFree': '🧪 {shop}: {product}, que compraste, tiene testing de laboratorio ({lab}). Apuntarse no tiene cuota: el test se paga con donaciones y, si falta, con una fase extra en la que tú decides tu máximo. Apúntate desde tu pedido en las próximas {hours} h.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -601,8 +601,8 @@ const it: Record<BotMessageKey, string> = {
   'testing.extraRoundOption': '• Se continuano in {count}: {amount} in più a testa',
   'testing.extraTopup': '🧪 {shop}: la fase extra di {product} continua. La tua differenza: {amount}. Pagala dal tuo ordine entro {hours} h, altrimenti ti viene restituito tutto.',
   'platform.blocked': '🚫 {by} ha bloccato {who} in tutti i GB, da «{shop}». Motivo: {reason}',
-  'testing.announcedFree': '🧪 {shop}: {product} ora ha un testing di laboratorio ({lab}). Partecipare è gratis: unisciti dal tuo ordine per vedere i risultati; una volta dentro puoi anche donare e offrire una fiala.',
-  'testing.announcedAfterFree': '🧪 {shop}: {product}, che hai comprato, ha un testing di laboratorio ({lab}). Partecipare è gratis: unisciti dal tuo ordine entro {hours} h per vedere i risultati; una volta dentro puoi anche donare e offrire una fiala.',
+  'testing.announcedFree': '🧪 {shop}: {product} ora ha un testing di laboratorio ({lab}). Iscriversi non ha quota: il test si paga con le donazioni e, se non basta, con una fase extra in cui decidi tu il tuo tetto. Iscriviti dal tuo ordine; una volta dentro puoi anche donare e offrire una fiala.',
+  'testing.announcedAfterFree': '🧪 {shop}: {product}, che hai comprato, ha un testing di laboratorio ({lab}). Iscriversi non ha quota: il test si paga con le donazioni e, se non basta, con una fase extra in cui decidi tu il tuo tetto. Iscriviti dal tuo ordine entro {hours} h.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -798,8 +798,8 @@ const pt: Record<BotMessageKey, string> = {
   'testing.extraRoundOption': '• Se continuarem {count}: mais {amount} cada',
   'testing.extraTopup': '🧪 {shop}: a fase extra de {product} continua. A sua diferença: {amount}. Pague-a a partir da sua encomenda em {hours} h; caso contrário, é-lhe devolvido tudo.',
   'platform.blocked': '🚫 {by} bloqueou {who} em todos os GB, a partir de «{shop}». Motivo: {reason}',
-  'testing.announcedFree': '🧪 {shop}: {product} já tem testing de laboratório ({lab}). Participar é grátis: junte-se a partir da sua encomenda para ver os resultados; depois de entrar também pode doar e oferecer um frasco.',
-  'testing.announcedAfterFree': '🧪 {shop}: {product}, que comprou, tem testing de laboratório ({lab}). Participar é grátis: junte-se a partir da sua encomenda nas próximas {hours} h para ver os resultados; depois de entrar também pode doar e oferecer um frasco.',
+  'testing.announcedFree': '🧪 {shop}: {product} já tem testing de laboratório ({lab}). Inscrever-se não tem quota: o teste paga-se com doações e, se faltar, com uma fase extra em que decide o seu máximo. Inscreva-se a partir da sua encomenda; depois de entrar também pode doar e oferecer um frasco.',
+  'testing.announcedAfterFree': '🧪 {shop}: {product}, que comprou, tem testing de laboratório ({lab}). Inscrever-se não tem quota: o teste paga-se com doações e, se faltar, com uma fase extra em que decide o seu máximo. Inscreva-se a partir da sua encomenda nas próximas {hours} h.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };
