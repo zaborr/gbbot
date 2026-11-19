@@ -88,7 +88,7 @@ export async function listShops(db: Database, env: Env, userId: number): Promise
   );
   const withTesting = await shopTestingCounts(
     db,
-    rows.filter((row) => row.testingEnabled && !isClosedAt(row)).map((row) => row.id),
+    rows.filter((row) => row.testingEnabled).map((row) => row.id),
   );
   // Closed, but with a testing open to people from outside: they see it too.
   const outside = await shopsOpenToOutside(

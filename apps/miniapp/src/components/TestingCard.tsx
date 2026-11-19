@@ -40,6 +40,51 @@ function missingText(tier: TestingTierView): string {
     : t('testing.shareCovered', { percent: sharePercent(tier) });
 }
 
+type Step = 'join' | 'extra' | 'draw' | 'report';
+
+/** Where the testing is now (null once cancelled). */
+function stepOf(testing: Testing): Step | null {
+  if (testing.status === 'cancelled') return null;
+  if (testing.status === 'settled' || testing.reportSentAt) return 'report';
+  if (testing.status === 'open' || (testing.status === 'closed' && testing.donationsOpen && !testing.extra)) {
+    return 'join';
+  }
+  const stage = testing.extra?.stage;
+  if (stage && stage !== 'done') return 'extra';
+  return 'draw';
+}
+
+/** What comes, step by step, with the one it is at marked. */
+function TestingSteps({ testing }: { testing: Testing }): React.JSX.Element | null {
+  const now = stepOf(testing);
+  if (!now) return null;
+  const until = testing.donationsUntil ? new Date(testing.donationsUntil).toLocaleString() : null;
+  const steps: Array<{ id: Step; text: string }> = [
+    {
+      id: 'join',
+      text:
+        testing.status === 'open'
+          ? t('testing.stepJoinOpen')
+          : until
+            ? t('testing.stepJoinUntil', { date: until })
+            : t('testing.stepJoin'),
+    },
+    ...(testing.extraEnabled ? [{ id: 'extra' as const, text: t('testing.stepExtra') }] : []),
+    { id: 'draw', text: t('testing.stepDraw') },
+    { id: 'report', text: t('testing.stepReport') },
+  ];
+  const at = steps.findIndex((step) => step.id === now);
+  return (
+    <ol className="gb-testing-steps">
+      {steps.map((step, i) => (
+        <li key={step.id} className={i === at ? 'is-now' : i < at ? 'is-done' : undefined}>
+          {step.text}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 /**
  * The testing of a product (or of one of its variants), as customers see it:
  * the lab, the fee, the bar and each tier: reached, next, or later.
@@ -62,7 +107,16 @@ export function TestingCard({
     : t('testing.cardTitle');
 
   return (
-    <Section header={title} footer={preview ? t('testing.previewFooter') : t('testing.cardRules')}>
+    <Section
+      header={title}
+      footer={
+        preview
+          ? t('testing.previewFooter')
+          : testing.contribution === 0
+            ? t('testing.cardRulesFree')
+            : t('testing.cardRules')
+      }
+    >
       <div className="gb-testing-head">
         <div className="gb-chips">
           <span className="gb-chip gb-chip--info">{t('testing.lab', { lab: testing.lab })}</span>
@@ -88,6 +142,7 @@ export function TestingCard({
             {t('testing.cardDonations', { date: new Date(testing.donationsUntil).toLocaleString() })}
           </span>
         )}
+        <TestingSteps testing={testing} />
         {testing.status === 'settled' && <span className="gb-hint">{t('testing.cardSettled')}</span>}
         {testing.status === 'cancelled' && <span className="gb-hint">{t('testing.cardCancelled')}</span>}
         {testing.reportSentAt && (
