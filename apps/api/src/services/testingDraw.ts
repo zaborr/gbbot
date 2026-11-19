@@ -20,6 +20,7 @@ import type { ShopRow } from './shop.js';
 import { botToken } from './activeBot.js';
 import { donationsOpen, reachedTiers, vialShare } from './testing.js';
 import { closeDonationWindows, donationsBeingChecked } from './testingDonations.js';
+import { advanceExtras, extraGoing, extraPayers } from './testingExtra.js';
 
 /**
  * The draw of donors for a testing: the organiser launches it once the GB is
@@ -92,6 +93,7 @@ async function unpaidEntries(db: Database, testingId: string): Promise<number> {
 export async function drawBlocker(db: Database, shop: ShopRow, testing: TestingRow): Promise<string | null> {
   if (!shop.closedAt) return 'gb_open';
   if (testing.status !== 'closed') return 'not_closed';
+  if (extraGoing(testing)) return 'extra_open';
   if (donationsOpen(testing)) return 'donations_open';
   if ((await unpaidEntries(db, testing.id)) > 0) return 'unpaid';
   if (await donationsBeingChecked(db, testing)) return 'unpaid';
@@ -219,6 +221,9 @@ export async function launchDraw(
   if (blocker === 'gb_open') throw ApiError.conflict('draw_gb_open', 'Close the GB before the draw');
   if (blocker === 'not_closed') throw ApiError.conflict('draw_done', 'This testing was already drawn');
   if (blocker === 'unpaid') throw ApiError.conflict('draw_unpaid', 'Some contributions are not paid yet');
+  if (blocker === 'extra_open') {
+    throw ApiError.conflict('draw_extra_open', 'The extra round is still going: wait until it is over');
+  }
   if (blocker === 'donations_open') {
     throw ApiError.conflict('draw_donations_open', 'Buyers can still give: wait until that time is over');
   }
@@ -282,12 +287,27 @@ export async function finishDraw(
 
   const shop = await db.query.shops.findFirst({ where: eq(shops.id, testing.shopId) });
   if (!shop) return false;
-  const reached = await reachedTiers(db, testing);
   const ranked = rankCandidates(hash, draw.candidates);
   // One vial each, in ranking order; only when there are not enough people
   // does the ranking go round again (no one gives more vials than they have).
   const slots = await vialSlots(db, testing, ranked);
-  const { tiersDone, donors } = settleDraw(testing.tiers, reached, slots);
+  // The tests of the extra round get their vials from those who paid it.
+  const extraIds = testing.extra?.outcome?.tiers ?? [];
+  const reached = [...new Set([...(await reachedTiers(db, testing, { withoutExtra: true })), ...extraIds])];
+  const baseTiers = testing.tiers.filter(
+    (t) => !extraIds.includes(t.id) && !testing.tiers.some((u) => extraIds.includes(u.id) && u.replaces === t.id),
+  );
+  const base = settleDraw(baseTiers, reached, slots);
+  const payers = new Set(await extraPayers(db, testing.id));
+  const extra = settleDraw(
+    testing.tiers.filter((t) => extraIds.includes(t.id)),
+    reached,
+    slots.filter((c) => payers.has(c.orderId)),
+  );
+  const tiersDone = testing.tiers
+    .filter((t) => base.tiersDone.includes(t.id) || extra.tiersDone.includes(t.id))
+    .map((t) => t.id);
+  const donors = [...base.donors, ...extra.donors];
   const done: TestingDraw = {
     ...draw,
     hash,
@@ -354,6 +374,11 @@ export async function watchDraws(db: Database, env: Env): Promise<void> {
     await closeDonationWindows(db, env);
   } catch (error) {
     console.error('Closing the time to give failed:', error);
+  }
+  try {
+    await advanceExtras(db, env);
+  } catch (error) {
+    console.error('Extra rounds failed:', error);
   }
   const waiting = await db.select().from(testings).where(eq(testings.status, 'drawing'));
   for (const testing of waiting) {

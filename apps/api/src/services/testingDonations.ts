@@ -11,6 +11,7 @@ import { getOrder } from './orders.js';
 import type { ShopRow } from './shop.js';
 import { botToken } from './activeBot.js';
 import { audience, testedLabel } from './testingDraw.js';
+import { cancelExtra, startExtra } from './testingExtra.js';
 import {
   dropUnpaidTesting,
   donationsOpen,
@@ -30,7 +31,7 @@ import {
  */
 
 type TestingRow = typeof testings.$inferSelect;
-type Writer = Pick<Database, 'select' | 'selectDistinct' | 'insert' | 'update' | 'delete'>;
+export type Writer = Pick<Database, 'select' | 'selectDistinct' | 'insert' | 'update' | 'delete'>;
 
 /** Formats an amount the way the bot does. */
 const formatMoney = (amount: number, currency: string): string => `${(amount / 100).toFixed(2)} ${currency}`;
@@ -170,7 +171,7 @@ export async function removeDonation(
  * Takes donations to these products off an order: only what is not paid yet,
  * or all of it (what was paid is then owed back).
  */
-async function takeOff(
+export async function takeOff(
   tx: Writer,
   order: typeof orders.$inferSelect,
   productIds: readonly string[],
@@ -259,7 +260,7 @@ export async function donationsBeingChecked(db: Database, testing: TestingRow): 
 }
 
 /** Who bought what a testing tests and takes part (or is exempt): they hear they can give. */
-async function giversOf(db: Database, env: Env, shop: ShopRow, testing: TestingRow): Promise<number[]> {
+export async function giversOf(db: Database, env: Env, shop: ShopRow, testing: TestingRow): Promise<number[]> {
   const rows = await db
     .selectDistinct({ id: orders.id, isVip: orders.isVip, entry: testingEntries.amount })
     .from(orders)
@@ -441,6 +442,9 @@ export async function closeDonationWindows(db: Database, env: Env, now = new Dat
     await dropUnpaidDonations(db, [claimed]);
     // After closing: parts not paid in time drop out too.
     if (claimed.posterior) await dropUnpaidTesting(db, claimed.shopId);
+    // Tests still missing: the extra round starts (when it is on).
+    const fresh = await db.query.testings.findFirst({ where: eq(testings.id, claimed.id) });
+    if (fresh) await startExtra(db, env, fresh).catch((error: unknown) => console.error('Extra round failed to start:', error));
     const shop = await db.query.shops.findFirst({ where: (s, { eq: same }) => same(s.id, row.shopId) });
     if (!shop) continue;
     const what = await testedLabel(db, row);
@@ -463,9 +467,11 @@ export async function cancelDonationWindows(db: Database, shop: ShopRow): Promis
     .where(and(eq(testings.shopId, shop.id), inArray(testings.status, ['closed', 'drawing', 'drawn'])));
   if (rows.length === 0) return;
   await dropUnpaidDonations(db, rows);
+  // The extra round stops too (its shares come off; what was paid is owed back).
+  for (const row of rows) await db.transaction((tx) => cancelExtra(tx, row));
   await db
     .update(testings)
-    .set({ donationsUntil: null, donationsDone: false, updatedAt: new Date() })
+    .set({ donationsUntil: null, donationsDone: false, donationsReminded: false, updatedAt: new Date() })
     .where(
       inArray(
         testings.id,

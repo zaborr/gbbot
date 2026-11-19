@@ -81,6 +81,9 @@ export const createTestingRequest = z.object({
   donationHours: z.number().int().min(0).max(MAX_DONATION_HOURS).default(48),
   /** Vials in each unit (a kit): a donor gives one of them. */
   vialsPerUnit: z.number().int().min(1).max(100).default(10),
+  /** The extra round after the time to give, and the lowest cap to sign up (0: the fee). */
+  extraEnabled: z.boolean().default(false),
+  extraMin: z.number().int().min(0).max(100_000_000).default(0),
 });
 export type CreateTestingRequest = z.infer<typeof createTestingRequest>;
 
@@ -120,6 +123,8 @@ export interface TestingMoney {
   perUnitTotal: number;
   /** Given once the GB closed (orders paid). */
   donations: number;
+  /** Paid in the extra round (only for the tests it covers; what is not used goes back). */
+  extraPaid: number;
   pot: number;
   /** Units sold (orders paid), and on orders not paid yet. */
   units: number;
@@ -157,13 +162,19 @@ export const testing = z.object({
   exempt: z.boolean(),
   /** The draw of donors, once launched. */
   draw: z.custom<TestingDraw>().nullable(),
-  /** When the lab report was sent. */
+  /** When the lab report was sent (and the extra round's one). */
   reportSentAt: z.string().nullable(),
+  extraReportSentAt: z.string().nullable(),
   /** Hours to give once the GB closes, until when (set at closing), and whether one can give now. */
   donationHours: z.number().int(),
   vialsPerUnit: z.number().int(),
   /** Made once the GB was closed: the fee is paid to join (from an order), until the time to give ends. */
   posterior: z.boolean(),
+  extraEnabled: z.boolean(),
+  /** The lowest cap to sign up to it (0: the fee). */
+  extraMin: z.number().int(),
+  /** The extra round, once it started (with money: what is missing is shown to those in it). */
+  extra: z.custom<TestingExtraView>().nullable(),
   donationsUntil: z.string().nullable(),
   donationsOpen: z.boolean(),
   /** The hidden product whose order lines are what was given. */
@@ -350,4 +361,70 @@ export function settleDraw(
 export function textBar(share: number, width = 10): string {
   const full = Math.min(Math.max(Math.round(share * width), 0), width);
   return '▓'.repeat(full) + '░'.repeat(width - full);
+}
+
+/** Hours to sign up to the extra round, and to pay one's share. */
+export const EXTRA_SIGNUP_HOURS = 24;
+export const EXTRA_PAY_HOURS = 48;
+
+/** The extra round as stored. */
+export interface TestingExtraState {
+  stage: 'signup' | 'pay' | 'done';
+  /** When the stage ends. */
+  until: string;
+  /** Once shared out: the tests it is for, and the share of each one in. */
+  target: string[];
+  share: number;
+  /** The pot when it was shared out: the extra round covers tests from there (later gifts go to the GB). */
+  basePot?: number;
+  reminded?: boolean;
+  /** Once done: the tests it got, what was paid and what went back. */
+  outcome?: { tiers: string[]; collected: number; refunded: number };
+}
+
+/** The extra round as the customer (or organiser) sees it. */
+export interface TestingExtraView {
+  stage: TestingExtraState['stage'];
+  until: string;
+  /** The lowest cap to sign up. */
+  min: number;
+  /** The tests not covered, in order, with what each one adds to what is missing. */
+  missing: Array<{ id: string; name: string; amount: number }>;
+  signed: number;
+  /** The one asking, when signed up. */
+  mine: { cap: number; share: number; state: string; orderId: string } | null;
+  /** With those signed up now: the tests it would get and the share (null: none). */
+  estimate: { tiers: string[]; share: number | null; out: boolean };
+  outcome: TestingExtraState['outcome'] | null;
+}
+
+/** Signing up to the extra round from an order, with a cap. */
+export const extraSignupRequest = z.object({
+  testingId: z.uuid(),
+  cap: z.number().int().positive().max(100_000_000),
+});
+
+/**
+ * Shares out what the tests still missing cost among those signed up: as many
+ * tests as possible, in order, everyone in paying the same; whoever's cap is
+ * below that share is out. `needs` is what is missing up to each test
+ * (adding the ones before). Null when not even the first can be covered.
+ */
+export function shareOut<K>(
+  people: ReadonlyArray<{ key: K; cap: number }>,
+  needs: readonly number[],
+): { count: number; share: number; keys: K[] } | null {
+  for (let count = needs.length; count >= 1; count -= 1) {
+    const need = needs[count - 1] ?? 0;
+    if (need <= 0) return { count, share: 0, keys: [] };
+    let inside = [...people];
+    for (;;) {
+      if (inside.length === 0) break;
+      const share = Math.ceil(need / inside.length);
+      const next = inside.filter((p) => p.cap >= share);
+      if (next.length === inside.length) return { count, share, keys: inside.map((p) => p.key) };
+      inside = next;
+    }
+  }
+  return null;
 }

@@ -627,8 +627,20 @@ export class ApiClient {
   }
 
   /** The bot asks this organiser for the lab report (they reply with the file). */
-  adminRequestTestingReport(id: string): Promise<{ ok: boolean }> {
-    return this.request<{ ok: boolean }>(`/admin/testings/${id}/report-request`, { method: 'POST' });
+  /** Signs up to a testing's extra round from an order, with a cap (or changes it). */
+  signUpExtra(orderId: string, testingId: string, cap: number): Promise<Order> {
+    return this.request<Order>(`/orders/${orderId}/extra`, { method: 'POST', body: JSON.stringify({ testingId, cap }) });
+  }
+
+  leaveExtra(orderId: string, testingId: string): Promise<Order> {
+    return this.request<Order>(`/orders/${orderId}/extra/${testingId}`, { method: 'DELETE' });
+  }
+
+  adminRequestTestingReport(id: string, kind: 'base' | 'extra' = 'base'): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(
+      `/admin/testings/${id}/report-request${kind === 'extra' ? '?kind=extra' : ''}`,
+      { method: 'POST' },
+    );
   }
 
   adminGetTestingParticipants(id: string): Promise<TestingParticipant[]> {

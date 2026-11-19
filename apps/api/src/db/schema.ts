@@ -35,6 +35,7 @@ import type {
   CheckoutFields,
   TestingTier,
   TestingDraw,
+  TestingExtraState,
   WebRole,
 } from '@tma-shop/shared';
 
@@ -178,7 +179,7 @@ export const products = pgTable(
      * `donation`: made with a testing (at 1 a unit) for what its buyers give;
      * hidden everywhere products are listed, it only shows as order lines.
      */
-    kind: text('kind').$type<'sale' | 'donation'>().notNull().default('sale'),
+    kind: text('kind').$type<'sale' | 'donation' | 'extra'>().notNull().default('sale'),
     /** Minimum units per order, all variants together (1 = none). */
     minQuantity: integer('min_quantity').notNull().default(1),
     /** Option groups (Color, Size…); empty for a product without variants. */
@@ -421,6 +422,19 @@ export const testings = pgTable(
      * with their part (the fee) until its time to give ends.
      */
     posterior: boolean('posterior').notNull().default(false),
+    /**
+     * The extra round: once the time to give ends, those in it sign up (with a
+     * cap) to cover the tests still missing, at equal shares. Its money only
+     * pays those tests; what is not used goes back.
+     */
+    extraEnabled: boolean('extra_enabled').notNull().default(false),
+    /** Lowest cap to sign up (0: the fee). */
+    extraMin: integer('extra_min').notNull().default(0),
+    extra: jsonb('extra').$type<TestingExtraState>(),
+    /** Its hidden product: the order line of each share. */
+    extraProductId: uuid('extra_product_id').references(() => products.id, { onDelete: 'set null' }),
+    /** The report of the tests done in the extra round (sent to those who paid it). */
+    extraReport: jsonb('extra_report').$type<{ fileId: string; kind: 'document' | 'photo'; sentAt: string }>(),
     /** Leftovers below this per person are not sent back. */
     refundThreshold: integer('refund_threshold').notNull().default(200),
     tiers: jsonb('tiers').$type<TestingTier[]>().notNull(),
@@ -434,7 +448,7 @@ export const testings = pgTable(
     /** The lab report (a file in Telegram) and when it was sent to the participants. */
     report: jsonb('report').$type<{ fileId: string; kind: 'document' | 'photo'; sentAt: string }>(),
     /** The bot asked an organiser for the report: their reply carries it. */
-    reportRequest: jsonb('report_request').$type<{ chatId: number; messageId: number }>(),
+    reportRequest: jsonb('report_request').$type<{ chatId: number; messageId: number; kind?: 'base' | 'extra' }>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -470,6 +484,29 @@ export const testingEntries = pgTable(
     unique('testing_entries_testing_order_unique').on(table.testingId, table.orderId),
     index('testing_entries_order_idx').on(table.orderId),
   ],
+);
+
+/** Someone signed up to the extra round of a testing, on one of their orders. */
+export const testingExtraMembers = pgTable(
+  'testing_extra_members',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    testingId: uuid('testing_id')
+      .notNull()
+      .references(() => testings.id, { onDelete: 'cascade' }),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => orders.id, { onDelete: 'cascade' }),
+    userId: bigint('user_id', { mode: 'number' }).references(() => users.telegramId, { onDelete: 'set null' }),
+    /** The most they would pay (minor units). */
+    cap: integer('cap').notNull(),
+    /** What they were asked to pay once shared out. */
+    share: integer('share').notNull().default(0),
+    /** signed → in (asked to pay) or out (cap below the share) → paid or failed. */
+    state: text('state').$type<'signed' | 'in' | 'out' | 'paid' | 'failed'>().notNull().default('signed'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique('testing_extra_members_testing_order_unique').on(table.testingId, table.orderId)],
 );
 
 /** Testings ticked in a cart: they become entries when the order is placed. */

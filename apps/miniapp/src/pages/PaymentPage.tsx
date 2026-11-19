@@ -161,6 +161,8 @@ export function PaymentPage(): React.JSX.Element {
 
       {shop.data.testingEnabled && <DonationSection order={current} onChanged={reload} />}
 
+      {shop.data.testingEnabled && <ExtraSection order={current} onChanged={reload} />}
+
       {!done && <StatusSection order={current} autoCancelHours={shop.data.autoCancelHours} />}
 
       <OrderDetailsSection order={current} shop={shop.data} onAdded={reload} />
@@ -1127,6 +1129,150 @@ function DonationSection({ order, onChanged }: { order: Order; onChanged: () => 
                   {t('donation.remove')}
                 </Button>
               </div>
+            )}
+          </div>
+        );
+      })}
+      {error && <Cell multiline>{error}</Cell>}
+    </Section>
+  );
+}
+
+/**
+ * The extra round of the testings of what this order has: signing up with a
+ * cap while it is open, then the share to pay, then how it went.
+ */
+function ExtraSection({ order, onChanged }: { order: Order; onChanged: () => void }): React.JSX.Element | null {
+  const testings = useAsync(() => api.getTestings(), [order.id, order.total]);
+  const [caps, setCaps] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const list = (testings.data ?? []).filter(
+    (x) =>
+      x.extra &&
+      x.joined &&
+      !x.exempt &&
+      order.items.some(
+        (item) => item.productId === x.productId && (x.variantId === null || item.variantId === x.variantId),
+      ) &&
+      (x.extra.stage === 'signup' || x.extra.mine),
+  );
+  if (list.length === 0) return null;
+  const fmt = (amount: number): string => formatPrice(amount, order.currency);
+
+  const run = (id: string, action: () => Promise<unknown>): void => {
+    setBusy(id);
+    setError(null);
+    void action()
+      .then(onChanged)
+      .catch((err: unknown) => setError(err instanceof ApiClientError ? err.message : t('error.title')))
+      .finally(() => setBusy(null));
+  };
+
+  return (
+    <Section header={t('extra.title')} footer={t('extra.footer')}>
+      {list.map((x) => {
+        const extra = x.extra;
+        if (!extra) return null;
+        const mine = extra.mine && extra.mine.orderId === order.id ? extra.mine : null;
+        const name = x.variantLabel ? `${x.productTitle} · ${x.variantLabel}` : x.productTitle;
+        const text = caps[x.id] ?? (mine ? (mine.cap / 100).toFixed(2) : '');
+        const typed = /^\d+([.,]\d{1,2})?$/.test(text.trim()) ? Math.round(Number(text.trim().replace(',', '.')) * 100) : 0;
+        const quick = [extra.min, extra.min * 2, extra.min * 5];
+        return (
+          <div key={x.id} className="gb-donation">
+            <Cell
+              multiline
+              subtitle={
+                extra.stage === 'done'
+                  ? undefined
+                  : t('extra.until', { date: new Date(extra.until).toLocaleString() })
+              }
+            >
+              {name}
+            </Cell>
+            {extra.stage === 'signup' && (
+              <>
+                {extra.missing.map((m) => (
+                  <Cell key={m.id} after={<span className="gb-testing-money">{fmt(m.amount)}</span>}>
+                    {t('extra.missing', { tier: m.name })}
+                  </Cell>
+                ))}
+                <Cell multiline>
+                  {extra.estimate.share !== null
+                    ? t('extra.estimate', {
+                        count: extra.signed,
+                        tiers: extra.estimate.tiers.join(', '),
+                        amount: fmt(extra.estimate.share),
+                      })
+                    : t('extra.estimateNone', { count: extra.signed })}
+                </Cell>
+                {mine && extra.estimate.out && (
+                  <Cell multiline style={{ color: 'var(--tgui--destructive_text_color, #e53935)' }}>
+                    {t('extra.wouldBeOut', { amount: extra.estimate.share !== null ? fmt(extra.estimate.share) : '—' })}
+                  </Cell>
+                )}
+                <div className="gb-chips" style={{ padding: '4px 16px' }}>
+                  {quick.map((amount) => (
+                    <Button
+                      key={amount}
+                      size="s"
+                      mode={typed === amount ? 'filled' : 'bezeled'}
+                      onClick={() => setCaps((c) => ({ ...c, [x.id]: (amount / 100).toFixed(2) }))}
+                    >
+                      {fmt(amount)}
+                    </Button>
+                  ))}
+                </div>
+                <div className="gb-donation-row">
+                  <div style={{ flex: 1 }}>
+                    <Input
+                      header={t('extra.cap', { min: fmt(extra.min) })}
+                      type="text"
+                      inputMode="decimal"
+                      value={text}
+                      status={text.trim() === '' || typed >= extra.min ? 'default' : 'error'}
+                      onChange={(e) => setCaps((c) => ({ ...c, [x.id]: e.target.value }))}
+                    />
+                  </div>
+                  <Button
+                    size="m"
+                    disabled={typed < extra.min}
+                    loading={busy === x.id}
+                    onClick={() => run(x.id, () => api.signUpExtra(order.id, x.id, typed))}
+                  >
+                    {mine ? t('extra.change') : t('extra.signUp')}
+                  </Button>
+                </div>
+                {mine && (
+                  <div className="gb-donation-row">
+                    <Button
+                      size="s"
+                      mode="plain"
+                      loading={busy === `leave-${x.id}`}
+                      onClick={() => run(`leave-${x.id}`, () => api.leaveExtra(order.id, x.id))}
+                    >
+                      {t('extra.leave')}
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+            {extra.stage === 'pay' && mine && (
+              <Cell multiline>
+                {mine.state === 'in'
+                  ? t('extra.toPay', { amount: fmt(mine.share), tiers: extra.estimate.tiers.join(', ') })
+                  : t('extra.out')}
+              </Cell>
+            )}
+            {extra.stage === 'done' && mine && (
+              <Cell multiline>
+                {mine.state === 'paid' && (extra.outcome?.tiers.length ?? 0) > 0
+                  ? t('extra.doneIn')
+                  : mine.state === 'out'
+                    ? t('extra.out')
+                    : t('extra.doneNone')}
+              </Cell>
             )}
           </div>
         );

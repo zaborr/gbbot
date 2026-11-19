@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
+import { Button, Cell, List, Section, Switch } from '@telegram-apps/telegram-ui';
 import {
   MAX_DONATION_HOURS,
   MAX_TESTING_TIERS,
@@ -128,6 +128,8 @@ function TestingForm({
   const [feeMode, setFeeMode] = useState<TestingFeeMode>(testing?.feeMode ?? 'mandatory');
   const [donationHours, setDonationHours] = useState(String(testing?.donationHours ?? 48));
   const [vialsPerUnit, setVialsPerUnit] = useState(String(testing?.vialsPerUnit ?? 10));
+  const [extraEnabled, setExtraEnabled] = useState(testing?.extraEnabled ?? false);
+  const [extraMinText, setExtraMinText] = useState(testing && testing.extraMin > 0 ? toMajor(testing.extraMin) : '');
   const [tiers, setTiers] = useState<TierDraft[]>(
     money
       ? money.tiers.map((tier) => ({
@@ -226,6 +228,8 @@ function TestingForm({
         tiers: parsedTiers,
         donationHours: Number(donationHours),
         vialsPerUnit: vialsNumber,
+        extraEnabled,
+        extraMin: extraMinText.trim() === '' || !MONEY_RE.test(extraMinText.trim()) ? 0 : cents(extraMinText),
       };
       if (testing) {
         await api.adminUpdateTesting(testing.id, body);
@@ -298,6 +302,10 @@ function TestingForm({
           reportSentAt: null,
           donationHours: Number(donationHours) || 48,
           vialsPerUnit: vialsNumber,
+          extraEnabled,
+          extraMin: 0,
+          extra: null,
+          extraReportSentAt: null,
           posterior,
           donationsUntil: null,
           donationsOpen: false,
@@ -590,6 +598,36 @@ function TestingForm({
         )}
       </Section>
 
+      <Section header={t('testing.extraTitle')} footer={t('testing.extraFooter')}>
+        <Cell
+          Component="label"
+          multiline
+          after={
+            <Switch
+              checked={extraEnabled}
+              disabled={!editable || Boolean(testing?.extra)}
+              onChange={(e) => setExtraEnabled(e.target.checked)}
+            />
+          }
+        >
+          {t('testing.extraEnable')}
+        </Cell>
+        {extraEnabled && (
+          <Input
+            header={t('testing.extraMinField', { currency })}
+            type="text"
+            inputMode="decimal"
+            placeholder={contributionOk ? toMajor(cents(contribution)) : '5.00'}
+            status={extraMinText.trim() === '' || MONEY_RE.test(extraMinText.trim()) ? 'default' : 'error'}
+            value={extraMinText}
+            disabled={!editable || Boolean(testing?.extra)}
+            onChange={(e) => setExtraMinText(e.target.value)}
+          />
+        )}
+      </Section>
+
+      {testing?.extra && <ExtraStatus testing={testing} />}
+
       {parsedTiers.length > 0 && contributionOk && (
         <Simulator
           tiers={parsedTiers}
@@ -857,7 +895,9 @@ function DrawSection({ testing, onChange }: { testing: Testing; onChange: () => 
     const reason =
       blocker === 'gb_open'
         ? t('testing.drawGbOpen')
-        : blocker === 'donations_open'
+        : blocker === 'extra_open'
+          ? t('testing.drawExtraOpen')
+          : blocker === 'donations_open'
           ? t('testing.drawDonationsOpen', {
               date: testing.donationsUntil ? new Date(testing.donationsUntil).toLocaleString() : '—',
             })
@@ -1003,7 +1043,7 @@ function ReportSection({ testing }: { testing: Testing }): React.JSX.Element | n
         </Cell>
       )}
       {asked && <Cell multiline>{t('testing.reportAsked')}</Cell>}
-      <div style={{ padding: 16 }}>
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <Button
           stretched
           mode="bezeled"
@@ -1016,6 +1056,23 @@ function ReportSection({ testing }: { testing: Testing }): React.JSX.Element | n
         >
           {testing.reportSentAt ? t('testing.reportAgain') : t('testing.reportSend')}
         </Button>
+        {/* The tests the extra round paid: their own report, for those who paid it. */}
+        {(testing.extra?.outcome?.tiers.length ?? 0) > 0 && (
+          <Button
+            stretched
+            mode="bezeled"
+            onClick={() =>
+              void actions.run(async () => {
+                await api.adminRequestTestingReport(testing.id, 'extra');
+                setAsked(true);
+              })
+            }
+          >
+            {testing.extraReportSentAt
+              ? t('testing.extraReportAgain', { date: new Date(testing.extraReportSentAt).toLocaleString() })
+              : t('testing.extraReportSend')}
+          </Button>
+        )}
       </div>
     </Section>
   );
@@ -1038,6 +1095,56 @@ function CancelSection({ testing, onChange }: { testing: Testing; onChange: () =
           {actions.tapLabel('cancel', t('testing.cancel'))}
         </Button>
       </div>
+    </Section>
+  );
+}
+
+/** The extra round, for the organiser: where it is, what is missing and how it went. */
+function ExtraStatus({ testing }: { testing: Testing }): React.JSX.Element | null {
+  const extra = testing.extra;
+  if (!extra) return null;
+  const fmt = (amount: number): string => formatPrice(amount, testing.currency);
+  const until = new Date(extra.until).toLocaleString();
+  return (
+    <Section header={t('testing.extraStatusTitle')}>
+      <Cell multiline subtitle={extra.stage === 'done' ? undefined : t('testing.extraUntil', { date: until })}>
+        {t(`testing.extraStage.${extra.stage}`)}
+      </Cell>
+      {extra.stage === 'signup' &&
+        extra.missing.map((m) => (
+          <Cell key={m.id} after={<span className="gb-testing-money">{fmt(m.amount)}</span>}>
+            {m.name}
+          </Cell>
+        ))}
+      {extra.stage === 'signup' && (
+        <Cell multiline>
+          {t('testing.extraSigned', { count: extra.signed })}
+          {extra.estimate.share !== null
+            ? ` · ${t('testing.extraEstimate', { tiers: extra.estimate.tiers.join(', '), amount: fmt(extra.estimate.share) })}`
+            : ''}
+        </Cell>
+      )}
+      {extra.stage === 'pay' && (
+        <Cell multiline>
+          {t('testing.extraPaying', {
+            tiers: extra.estimate.tiers.join(', '),
+            amount: extra.estimate.share !== null ? fmt(extra.estimate.share) : '—',
+          })}
+        </Cell>
+      )}
+      {extra.outcome && (
+        <Cell multiline>
+          {t('testing.extraOutcome', {
+            tiers:
+              testing.tiers
+                .filter((tier) => extra.outcome?.tiers.includes(tier.id))
+                .map((tier) => tier.name)
+                .join(', ') || '—',
+            collected: fmt(extra.outcome.collected),
+            refunded: fmt(extra.outcome.refunded),
+          })}
+        </Cell>
+      )}
     </Section>
   );
 }
