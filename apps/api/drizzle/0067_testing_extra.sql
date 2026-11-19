@@ -1,5 +1,7 @@
 ALTER TABLE "testings" ADD COLUMN IF NOT EXISTS "extra_enabled" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "testings" ADD COLUMN IF NOT EXISTS "extra_min" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "testings" ADD COLUMN IF NOT EXISTS "extra_signup_hours" integer DEFAULT 24 NOT NULL;--> statement-breakpoint
+ALTER TABLE "testings" ADD COLUMN IF NOT EXISTS "extra_pay_hours" integer DEFAULT 48 NOT NULL;--> statement-breakpoint
 ALTER TABLE "testings" ADD COLUMN IF NOT EXISTS "extra" jsonb;--> statement-breakpoint
 ALTER TABLE "testings" ADD COLUMN IF NOT EXISTS "extra_product_id" uuid;--> statement-breakpoint
 ALTER TABLE "testings" ADD COLUMN IF NOT EXISTS "extra_report" jsonb;--> statement-breakpoint

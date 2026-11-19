@@ -1,7 +1,5 @@
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import {
-  EXTRA_PAY_HOURS,
-  EXTRA_SIGNUP_HOURS,
   shareOut,
   tierSteps,
   type Lang,
@@ -57,7 +55,7 @@ export async function startExtra(db: Database, env: Env, row: TestingRow, now = 
   if (missing.length === 0) return false;
   const state: TestingExtraState = {
     stage: 'signup',
-    until: new Date(now.getTime() + hours(EXTRA_SIGNUP_HOURS)).toISOString(),
+    until: new Date(now.getTime() + hours(row.extraSignupHours)).toISOString(),
     target: [],
     share: 0,
   };
@@ -78,7 +76,7 @@ export async function startExtra(db: Database, env: Env, row: TestingRow, now = 
     tr(lang, 'testing.extraOpen', {
       shop: shop.name,
       product: what,
-      hours: EXTRA_SIGNUP_HOURS,
+      hours: row.extraSignupHours,
       min: formatMoney(extraMin(row), row.currency),
       list,
     }),
@@ -283,7 +281,7 @@ async function shareOutExtra(db: Database, env: Env, shop: ShopRow, row: Testing
       .set({
         extra: {
           stage: 'pay',
-          until: new Date(now.getTime() + hours(EXTRA_PAY_HOURS)).toISOString(),
+          until: new Date(now.getTime() + hours(row.extraPayHours)).toISOString(),
           target,
           share: plan.share,
           basePot,
@@ -302,7 +300,7 @@ async function shareOutExtra(db: Database, env: Env, shop: ShopRow, row: Testing
         product: what,
         tiers: names,
         amount: formatMoney(amountOf.get(member.id) ?? plan.share, row.currency),
-        hours: EXTRA_PAY_HOURS,
+        hours: row.extraPayHours,
       }),
     );
   }
@@ -478,7 +476,7 @@ export async function advanceExtras(db: Database, env: Env, now = new Date()): P
         await shareOutExtra(db, env, shop, row, now);
       } else if (extra.stage === 'pay' && until <= now) {
         await settleExtra(db, env, shop, row);
-      } else if (extra.stage === 'pay' && !extra.reminded && until.getTime() - now.getTime() <= hours(EXTRA_PAY_HOURS / 2)) {
+      } else if (extra.stage === 'pay' && !extra.reminded && until.getTime() - now.getTime() <= hours(row.extraPayHours / 2)) {
         await remindExtra(db, env, shop, row);
       }
     } catch (error) {

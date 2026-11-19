@@ -430,6 +430,9 @@ export const testings = pgTable(
     extraEnabled: boolean('extra_enabled').notNull().default(false),
     /** Lowest cap to sign up (0: the fee). */
     extraMin: integer('extra_min').notNull().default(0),
+    /** Hours to sign up, and to pay one's share. */
+    extraSignupHours: integer('extra_signup_hours').notNull().default(24),
+    extraPayHours: integer('extra_pay_hours').notNull().default(48),
     extra: jsonb('extra').$type<TestingExtraState>(),
     /** Its hidden product: the order line of each share. */
     extraProductId: uuid('extra_product_id').references(() => products.id, { onDelete: 'set null' }),
