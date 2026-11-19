@@ -485,7 +485,14 @@ export async function shopTestingCounts(
     .select({ testing: testings })
     .from(testings)
     .innerJoin(shops, eq(testings.shopId, shops.id))
-    .where(and(inArray(testings.shopId, [...shopIds]), eq(testings.status, 'open'), eq(shops.testingEnabled, true)));
+    .where(
+      and(
+        inArray(testings.shopId, [...shopIds]),
+        eq(shops.testingEnabled, true),
+        // Open, or the GB closed and the time to join still lasts.
+        sql`(${testings.status} = 'open' or (${testings.status} = 'closed' and not ${testings.donationsDone} and ${testings.donationsUntil} > now()))`,
+      ),
+    );
   const totals = await testingTotals(
     db,
     rows.map((r) => r.testing.id),

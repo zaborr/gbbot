@@ -1,5 +1,9 @@
 import type { Testing, TestingTierView } from '@tma-shop/shared';
 
+/** Going on: open, or the GB closed and the time to join still lasts. */
+export const testingLive = (x: Testing): boolean =>
+  x.status === 'open' || (x.status === 'closed' && x.donationsOpen && x.extra === null);
+
 /** How close a testing is to its next tier: few units left, or most of it covered. */
 const HOT_UNITS = 3;
 const HOT_SHARE = 0.85;
@@ -34,7 +38,7 @@ export function testingState(testing: Testing): Omit<ProductTestingState, 'testi
  */
 export function productTestingState(productId: string, testings: readonly Testing[]): ProductTestingState | null {
   const states = testings
-    .filter((x) => x.productId === productId && x.status === 'open')
+    .filter((x) => x.productId === productId && testingLive(x))
     .map((testing): ProductTestingState => ({ testing, ...testingState(testing) }));
   if (states.length === 0) return null;
   return states.reduce((best, s) => (s.distance < best.distance ? s : best));

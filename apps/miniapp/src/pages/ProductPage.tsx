@@ -251,7 +251,8 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
         </TestingCard>
       ))}
 
-      {!outOfStock && (
+      {/* Closed: nothing to buy, so neither how many nor stock. */}
+      {!outOfStock && !shop.isClosed && (
         <Section header={t('product.quantity')}>
           <Cell
             subtitle={
@@ -311,6 +312,7 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
           </Cell>
         </div>
       )}
+      {!shop.isClosed && (
       <Section>
         <Cell
           after={
@@ -326,6 +328,7 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
           {t('product.availability')}
         </Cell>
       </Section>
+      )}
     </List>
   );
 }

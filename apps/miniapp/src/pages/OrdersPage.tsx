@@ -11,7 +11,7 @@ import { ErrorView } from '../components/ErrorView.js';
 import { useShopPath } from '../providers/ShopProvider.js';
 import { t, tn } from '../i18n/index.js';
 import { OrderStatusChip } from '../components/OrderStatus.js';
-import { ExternalTestings } from '../components/ExternalTestings.js';
+import { TestingsInProgress } from '../components/TestingsInProgress.js';
 
 /** Customers can delete orders with nothing paid or under verification. */
 const DELETABLE: OrderStatus[] = ['pending', 'cancelled'];
@@ -51,7 +51,11 @@ export function OrdersPage(): React.JSX.Element {
     return (
       <List>
         {/* Bought elsewhere: they can still join a testing open to people from outside. */}
-        <ExternalTestings orders={[]} onJoined={(id) => navigate(to(`/orders/${id}`))} />
+        <TestingsInProgress
+          orders={[]}
+          onOrder={(id) => navigate(to(`/orders/${id}`))}
+          onChanged={() => setReloadKey((k) => k + 1)}
+        />
         <Placeholder header={t('orders.empty')} description={t('orders.emptyHint')}>
           <span style={{ fontSize: 48 }}>📦</span>
         </Placeholder>
@@ -68,6 +72,11 @@ export function OrdersPage(): React.JSX.Element {
           </Cell>
         </div>
       )}
+      <TestingsInProgress
+        orders={orders}
+        onOrder={(id) => navigate(to(`/orders/${id}`))}
+        onChanged={() => setReloadKey((k) => k + 1)}
+      />
       <Section header={t('orders.title')}>
         {orders.map((order) => (
           <Cell
@@ -119,7 +128,6 @@ export function OrdersPage(): React.JSX.Element {
           </Cell>
         ))}
       </Section>
-      <ExternalTestings orders={orders} onJoined={(id) => navigate(to(`/orders/${id}`))} />
     </List>
   );
 }

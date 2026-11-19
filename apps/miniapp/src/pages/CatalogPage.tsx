@@ -11,7 +11,7 @@ import { useCart } from '../providers/CartProvider.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
 import { ProductCard } from '../components/ProductCard.js';
-import { productTestingState } from '../lib/testingState.js';
+import { productTestingState, testingLive } from '../lib/testingState.js';
 import { ProductImage } from '../components/ProductImage.js';
 import { useShop, useShopPath } from '../providers/ShopProvider.js';
 import { t } from '../i18n/index.js';
@@ -112,7 +112,7 @@ export function CatalogPage(): React.JSX.Element {
     seen.has(p.id) ? false : (seen.add(p.id), true),
   );
   // Only those with a testing: the closest to their next tier first.
-  const openTestings = (testings.data ?? []).filter((x) => x.status === 'open');
+  const openTestings = (testings.data ?? []).filter(testingLive);
   const items = onlyTesting
     ? [...loaded].sort(
         (a, b) =>
@@ -170,6 +170,14 @@ export function CatalogPage(): React.JSX.Element {
         )}
       </Section>
       <ClosingNotice shop={shop} />
+      {/* Closed, but a testing still takes people and gifts: from «My orders». */}
+      {shop.isClosed && openTestings.length > 0 && (
+        <Section>
+          <Cell multiline onClick={() => navigate(to('/orders'))} after="›">
+            {t('testing.liveBanner', { count: openTestings.length })}
+          </Cell>
+        </Section>
+      )}
       <UnpaidOrdersBanner orders={unpaid} />
       {/* The two places a customer comes back to, always in sight. */}
       <div className="gb-tiles">
