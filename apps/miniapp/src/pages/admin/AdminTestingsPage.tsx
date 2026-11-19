@@ -20,8 +20,20 @@ const STATUS: Record<Testing['status'], { key: MessageKey; chip: string }> = {
   cancelled: { key: 'testing.status.cancelled', chip: '' },
 };
 
-export function TestingStatusChip({ status }: { status: Testing['status'] }): React.JSX.Element {
-  const { key, chip } = STATUS[status];
+export function TestingStatusChip({
+  testing,
+}: {
+  testing: Pick<Testing, 'status' | 'donationsOpen' | 'donationsUntil'>;
+}): React.JSX.Element {
+  // The GB is closed, but people can still join and give until then.
+  if (testing.status === 'closed' && testing.donationsOpen && testing.donationsUntil) {
+    return (
+      <span className="gb-chip gb-chip--info">
+        {t('testing.status.windowOpen', { date: new Date(testing.donationsUntil).toLocaleString() })}
+      </span>
+    );
+  }
+  const { key, chip } = STATUS[testing.status];
   return <span className={`gb-chip ${chip}`}>{t(key)}</span>;
 }
 
@@ -57,7 +69,7 @@ function AdminTestings(): React.JSX.Element {
                 onClick={() => navigate(to(`/admin/testings/${testing.id}`))}
                 subtitle={
                   <span className="gb-chips" style={{ marginTop: 4 }}>
-                    <TestingStatusChip status={testing.status} />
+                    <TestingStatusChip testing={testing} />
                     <span className="gb-chip">
                       {t('testing.tiersOf', {
                         reached: testing.tiers.filter((tier) => tier.reached).length,

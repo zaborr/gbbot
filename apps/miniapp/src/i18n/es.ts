@@ -1385,6 +1385,7 @@ export const es: Record<MessageKey, string> = {
   'testing.status.drawn': '🎲 Sorteado',
   'testing.status.open': 'Abierto',
   'testing.status.settled': '✅ Liquidado',
+  'testing.status.windowOpen': '🔓 Abierto para unirse hasta {date}',
   'testing.substitute': 'Sustituir',
   'testing.switch': 'Testing de productos',
   'testing.switchFooter': 'Los compradores de un producto pueden pagar entre todos un análisis de laboratorio (pureza, endotoxinas…). Desactivado, el GB funciona exactamente igual que siempre. Solo se puede desactivar cuando sus testings han terminado.',

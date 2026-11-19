@@ -1383,6 +1383,7 @@ export const en = {
   'testing.status.drawn': '🎲 Drawn',
   'testing.status.open': 'Open',
   'testing.status.settled': '✅ Settled',
+  'testing.status.windowOpen': '🔓 Open to join until {date}',
   'testing.substitute': 'Replace',
   'testing.switch': 'Product testing',
   'testing.switchFooter': 'Buyers of a product can pay together for a lab test of it (purity, endotoxins…). Turned off, the GB works exactly as always. It can only be turned off once its testings are finished.',
