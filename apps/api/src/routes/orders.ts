@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import {
   addDonationRequest,
+  extraRoundRequest,
   extraSignupRequest,
   addOrderDetailsRequest,
   cartTestingRequest,
@@ -45,7 +46,7 @@ import { ApiError } from '../lib/errors.js';
 import { assertOpen } from '../services/closing.js';
 import { joinTestingWithOrder } from '../services/testing.js';
 import { addDonation, removeDonation } from '../services/testingDonations.js';
-import { leaveExtra, signUpExtra } from '../services/testingExtra.js';
+import { leaveExtra, answerRound, signUpExtra } from '../services/testingExtra.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -239,6 +240,12 @@ export function orderRoutes(): Hono<AppBindings> {
       return c.json(await leaveExtra(c.get('db'), c.get('shop'), c.get('claims').sub, id, testingId));
     },
   );
+
+  // The second round of the extra one: going on (paying the difference) or leaving (all back).
+  app.post('/:id/extra/round', zValidator('param', idParam), zValidator('json', extraRoundRequest), async (c) => {
+    const { testingId, stay } = c.req.valid('json');
+    return c.json(await answerRound(c.get('db'), c.get('shop'), c.get('claims').sub, c.req.valid('param').id, testingId, stay));
+  });
 
   // Joining a product testing with an order already placed (the contribution is added to it).
   app.post('/:id/testings', zValidator('param', idParam), zValidator('json', cartTestingRequest), async (c) => {

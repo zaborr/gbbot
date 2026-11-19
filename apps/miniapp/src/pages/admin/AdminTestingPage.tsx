@@ -1175,6 +1175,11 @@ function ExtraStatus({ testing }: { testing: Testing }): React.JSX.Element | nul
           })}
         </Cell>
       )}
+      {(extra.stage === 'round' || extra.stage === 'topup') && extra.round && (
+        <Cell after={<span className="gb-testing-money">{fmt(extra.round.gap)}</span>}>
+          {t('testing.extraGap')}
+        </Cell>
+      )}
       {extra.outcome && (
         <Cell multiline>
           {t('testing.extraOutcome', {

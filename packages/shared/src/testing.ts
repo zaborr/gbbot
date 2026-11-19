@@ -370,7 +370,10 @@ export function textBar(share: number, width = 10): string {
 
 /** The extra round as stored. */
 export interface TestingExtraState {
-  stage: 'signup' | 'pay' | 'done';
+  /** signup → pay → (someone did not pay: round, where the rest say if they go on → topup) → done. */
+  stage: 'signup' | 'pay' | 'round' | 'topup' | 'done';
+  /** In the second round: what is missing after someone did not pay. */
+  gap?: number;
   /** When the stage ends. */
   until: string;
   /** Once shared out: the tests it is for, and the share of each one in. */
@@ -397,7 +400,12 @@ export interface TestingExtraView {
   /** With those signed up now: the tests it would get and the share (null: none). */
   estimate: { tiers: string[]; share: number | null; out: boolean };
   outcome: TestingExtraState['outcome'] | null;
+  /** Second round: what is missing, and what each would pay more depending on how many go on. */
+  round: { gap: number; options: Array<{ count: number; amount: number }> } | null;
 }
+
+/** Going on (paying the difference) or leaving, in the second round of the extra round. */
+export const extraRoundRequest = z.object({ testingId: z.uuid(), stay: z.boolean() });
 
 /** Signing up to the extra round from an order, with a cap. */
 export const extraSignupRequest = z.object({
