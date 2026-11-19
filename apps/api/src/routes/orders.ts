@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import {
   addDonationRequest,
+  extraSignupRequest,
   addOrderDetailsRequest,
   cartTestingRequest,
   createOrderRequest,
@@ -44,6 +45,7 @@ import { ApiError } from '../lib/errors.js';
 import { assertOpen } from '../services/closing.js';
 import { joinTestingWithOrder } from '../services/testing.js';
 import { addDonation, removeDonation } from '../services/testingDonations.js';
+import { leaveExtra, signUpExtra } from '../services/testingExtra.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -221,6 +223,20 @@ export function orderRoutes(): Hono<AppBindings> {
     async (c) => {
       const { id, testingId } = c.req.valid('param');
       return c.json(await removeDonation(c.get('db'), c.get('shop'), c.get('claims').sub, id, testingId));
+    },
+  );
+
+  // The extra round of a testing: signing up with a cap, or leaving, while sign-up is open.
+  app.post('/:id/extra', zValidator('param', idParam), zValidator('json', extraSignupRequest), async (c) => {
+    const { testingId, cap } = c.req.valid('json');
+    return c.json(await signUpExtra(c.get('db'), c.get('shop'), c.get('claims').sub, c.req.valid('param').id, testingId, cap));
+  });
+  app.delete(
+    '/:id/extra/:testingId',
+    zValidator('param', z.object({ id: z.uuid(), testingId: z.uuid() })),
+    async (c) => {
+      const { id, testingId } = c.req.valid('param');
+      return c.json(await leaveExtra(c.get('db'), c.get('shop'), c.get('claims').sub, id, testingId));
     },
   );
 

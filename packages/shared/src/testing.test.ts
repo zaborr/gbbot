@@ -121,3 +121,16 @@ describe('text bar', () => {
     expect(textBar(1.4)).toBe('▓▓▓▓▓▓▓▓▓▓');
   });
 });
+
+describe('extra round', () => {
+  it('covers as many tests as it can, everyone in paying the same', async () => {
+    const { shareOut } = await import('./testing.js');
+    const caps = [10, 10, 50, 50, 50].map((cap, i) => ({ key: i, cap }));
+    // Metals 40, then sterility 100 more: 140 in all.
+    // Both: the two with 10 are out, the other three pay 47 each.
+    expect(shareOut(caps, [40, 140])).toEqual({ count: 2, share: 47, keys: [2, 3, 4] });
+    expect(shareOut(caps, [40])).toEqual({ count: 1, share: 8, keys: [0, 1, 2, 3, 4] });
+    // Not even the first one.
+    expect(shareOut([{ key: 'a', cap: 10 }], [40])).toBeNull();
+  });
+});

@@ -1,3 +1,4 @@
+import { extraViews } from './testingExtra.js';
 import { and, asc, eq, inArray, isNull, ne, notInArray, sql } from 'drizzle-orm';
 import { DONATION_UNIT, textBar, tierSteps, unitValue, type Lang, type TierStep } from '@tma-shop/shared';
 import type {
@@ -59,6 +60,8 @@ export interface TestingTotals {
   entries: number;
   /** Given once the GB closed, on orders paid. */
   donations: number;
+  /** Paid in the extra round (only for the tests it covers). */
+  extraPaid: number;
   units: number;
   pendingUnits: number;
   orders: number;
@@ -113,6 +116,16 @@ export async function testingTotals(
     // Each gift counts once paid (an order can owe a newer one).
     .where(and(inArray(testings.id, [...testingIds]), ne(orders.status, 'cancelled')))
     .groupBy(testings.id);
+  const extraLines = await db
+    .select({
+      testingId: testings.id,
+      paid: sql<number>`coalesce(sum((${orderItems.quantity} - ${orderItems.donationUnpaid}) * ${orderItems.unitPrice}), 0)::bigint`,
+    })
+    .from(testings)
+    .innerJoin(orderItems, eq(orderItems.productId, testings.extraProductId))
+    .innerJoin(orders, eq(orderItems.orderId, orders.id))
+    .where(and(inArray(testings.id, [...testingIds]), ne(orders.status, 'cancelled')))
+    .groupBy(testings.id);
   for (const id of testingIds) {
     const m = money.find((r) => r.testingId === id);
     const u = units.find((r) => r.testingId === id);
@@ -123,6 +136,7 @@ export async function testingTotals(
       payers: Number(m?.payers ?? 0),
       entries: Number(m?.entries ?? 0),
       donations: Number(given.find((r) => r.testingId === id)?.donations ?? 0),
+      extraPaid: Number(extraLines.find((r) => r.testingId === id)?.paid ?? 0),
       units: Number(u?.units ?? 0),
       pendingUnits: Number(u?.pendingUnits ?? 0),
       orders: Number(u?.orders ?? 0),
@@ -168,18 +182,26 @@ export const testingPot = (row: Pick<TestingRow, 'perUnit'>, totals: TestingTota
  * time to give is over.
  */
 export const donationsOpen = (
-  row: Pick<TestingRow, 'status' | 'donationsUntil' | 'donationsDone'>,
+  row: Pick<TestingRow, 'status' | 'donationsUntil' | 'donationsDone'> & { extra?: TestingRow['extra'] },
   now = new Date(),
 ): boolean =>
   row.status === 'open' ||
-  (row.status === 'closed' && !row.donationsDone && row.donationsUntil !== null && row.donationsUntil > now);
+  (row.status === 'closed' && !row.donationsDone && row.donationsUntil !== null && row.donationsUntil > now) ||
+  // Giving lowers what the extra round has to cover.
+  (row.status === 'closed' && row.extra !== null && row.extra !== undefined && row.extra.stage !== 'done');
 
 /** Where each tier of a testing stands (fixed by the draw once it is done). */
-export function stepsOf(row: TestingRow, totals: TestingTotals, vialPrice: number): TierStep[] {
+export function stepsOf(
+  row: TestingRow,
+  totals: TestingTotals,
+  vialPrice: number,
+  options: { withoutExtra?: boolean } = {},
+): TierStep[] {
   const drawn = row.status === 'drawn' || row.status === 'settled';
   return tierSteps({
     tiers: row.tiers,
-    pot: testingPot(row, totals),
+    // The extra round's money goes on top: it only reaches tests beyond the pot's.
+    pot: testingPot(row, totals) + (options.withoutExtra ? 0 : totals.extraPaid),
     vialPrice,
     unitValue: unitValue({
       perUnit: row.perUnit,
@@ -206,11 +228,15 @@ export function progressText(lang: Lang, steps: readonly TierStep[], withUnits: 
 }
 
 /** The tiers a testing's pot covers now, for one testing (loads what it needs). */
-export async function reachedTiers(db: Executor, row: TestingRow): Promise<string[]> {
+export async function reachedTiers(
+  db: Executor,
+  row: TestingRow,
+  options: { withoutExtra?: boolean } = {},
+): Promise<string[]> {
   const totals = (await testingTotals(db, [row.id])).get(row.id);
   const price = (await vialPrices(db, [row])).get(row.id) ?? 0;
   if (!totals) return [];
-  return stepsOf({ ...row, status: 'open' }, totals, price)
+  return stepsOf({ ...row, status: 'open' }, totals, price, options)
     .filter((s) => s.reached)
     .map((s) => s.tier.id);
 }
@@ -245,6 +271,7 @@ const EMPTY_TOTALS: TestingTotals = {
   payers: 0,
   entries: 0,
   donations: 0,
+  extraPaid: 0,
   units: 0,
   pendingUnits: 0,
   orders: 0,
@@ -299,10 +326,14 @@ function toTestingDTO(
     vialsPerUnit: row.vialsPerUnit,
     posterior: row.posterior,
     reportSentAt: row.report?.sentAt ?? null,
+    extraReportSentAt: row.extraReport?.sentAt ?? null,
     donationHours: row.donationHours,
     donationsUntil: row.donationsUntil?.toISOString() ?? null,
     donationsOpen: donationsOpen(row),
     donationProductId: row.donationProductId,
+    extraEnabled: row.extraEnabled,
+    extraMin: row.extraMin,
+    extra: null,
     money: admin
       ? {
           perUnit: row.perUnit,
@@ -321,6 +352,7 @@ function toTestingDTO(
           extras: t.extras,
           perUnitTotal: row.perUnit * t.units,
           donations: t.donations,
+          extraPaid: t.extraPaid,
           pot,
           units: t.units,
           pendingUnits: t.pendingUnits,
@@ -372,8 +404,9 @@ async function withLabels(
   ]);
   const titles = new Map(productRows.map((p) => [p.id, p.title]));
   const labels = new Map(variantRows.map((v) => [v.id, variantLabel(v.optionValues)]));
-  return rows.map((row) =>
-    toTestingDTO(
+  const extras = await extraViews(db, rows, options.userId);
+  return rows.map((row) => ({
+    ...toTestingDTO(
       row,
       titles.get(row.productId) ?? '',
       row.variantId ? (labels.get(row.variantId) ?? null) : null,
@@ -383,7 +416,8 @@ async function withLabels(
       options.isVip ?? false,
       options.admin,
     ),
-  );
+    extra: extras.get(row.id) ?? null,
+  }));
 }
 
 export async function listTestings(db: Database, shopId: string): Promise<Testing[]> {
@@ -658,6 +692,19 @@ export async function createTesting(
         kind: 'donation',
       })
       .returning({ id: products.id });
+    const [extraProduct] = await tx
+      .insert(products)
+      .values({
+        shopId: shop.id,
+        slug: `extra-${product.slug}-${Math.random().toString(36).slice(2, 8)}`,
+        title: `Fase extra · ${what} (testing)`,
+        titleEn: `Extra round · ${whatEn} (testing)`,
+        price: 1,
+        currency: product.currency,
+        isActive: false,
+        kind: 'extra',
+      })
+      .returning({ id: products.id });
     const [created] = await tx
       .insert(testings)
       .values({
@@ -672,6 +719,9 @@ export async function createTesting(
         tiers: input.tiers,
         donationHours: input.donationHours,
         vialsPerUnit: input.vialsPerUnit,
+        extraEnabled: input.extraEnabled,
+        extraMin: input.extraMin,
+        extraProductId: extraProduct?.id ?? null,
         donationProductId: donation?.id ?? null,
         // The GB is closed: a testing afterwards. Joining (with the fee) and
         // giving are open from now until its time to give ends.
@@ -709,6 +759,13 @@ export async function updateTesting(
   ) {
     throw ApiError.conflict('testing_fee_locked', 'People already paid this fee: it cannot change');
   }
+  // People signed up to the extra round seeing these sums: they stay.
+  if (
+    current.extra &&
+    (JSON.stringify(input.tiers) !== JSON.stringify(current.tiers) || input.perUnit !== current.perUnit)
+  ) {
+    throw ApiError.conflict('testing_extra_locked', 'The extra round started: the tests and sums cannot change');
+  }
   const [row] = await db
     .update(testings)
     .set({
@@ -719,6 +776,8 @@ export async function updateTesting(
       tiers: input.tiers,
       donationHours: input.donationHours,
       vialsPerUnit: input.vialsPerUnit,
+      // Once the extra round started, it stays as it was.
+      ...(current.extra ? {} : { extraEnabled: input.extraEnabled, extraMin: input.extraMin }),
       updatedAt: new Date(),
     })
     .where(eq(testings.id, current.id))
@@ -800,6 +859,7 @@ export async function deleteTesting(db: Database, shopId: string, id: string): P
         .limit(1);
       if (!line) await tx.delete(products).where(eq(products.id, current.donationProductId));
     }
+    if (current.extraProductId) await tx.delete(products).where(eq(products.id, current.extraProductId));
   });
 }
 

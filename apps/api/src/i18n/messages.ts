@@ -193,6 +193,16 @@ const en = {
   'testing.donationsReminder': '🧪 {shop}: {hours} h left to give to the testing of {product}. Give from your order in the app.',
   'testing.announced': '🧪 {shop}: {product} now has a lab testing ({lab}). Pay your part ({amount}) from your order to see the results; once in, you can also give and offer a vial.',
   'testing.announcedAfter': '🧪 {shop}: {product}, which you bought, now has a lab testing ({lab}). Join from your order by paying your part ({amount}) within {hours} h to see the results; once in, you can also give and offer a vial.',
+  'testing.extraOpen': '🧪 {shop}: extra round of the testing of {product}. Tests still missing:
+{list}
+Sign up from your order within {hours} h with the most you would pay (at least {min}). It is shared out at equal parts and you never pay more than your cap; if it does not reach a test, nothing is charged. ⚠️ Whoever signs up and does not pay may be blocked from future GBs.',
+  'testing.extraNone': '🧪 {shop}: the extra round of {product} did not reach any test. Nothing is charged.',
+  'testing.extraPay': '🧪 {shop}: the extra round of {product} covers {tiers}. Your share: {amount}. Pay it from your order within {hours} h.',
+  'testing.extraOut': '🧪 {shop}: the extra round of {product} came to {amount} each, above your cap: you are out and pay nothing.',
+  'testing.extraRemind': '🧪 {shop}: remember to pay your share of the extra round of {product} ({amount}) from your order.',
+  'testing.extraDone': '🧪 {shop}: the extra round of {product} got {tiers}. You will get its results.',
+  'testing.extraFailed': '🧪 {shop}: the extra round of {product} did not get any test after all (someone did not pay). What you paid for it is owed back to you.',
+  'testing.extraUnpaid': '🧪 {shop}: in the extra round of {product} these did not pay their share: {who}. You can block them from the app.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -378,6 +388,16 @@ const es: Record<BotMessageKey, string> = {
   'testing.donationsReminder': '🧪 {shop}: quedan {hours} h para donar al testing de {product}. Dona desde tu pedido en la app.',
   'testing.announced': '🧪 {shop}: {product} ya tiene testing de laboratorio ({lab}). Paga tu parte ({amount}) desde tu pedido para ver los resultados; una vez dentro también puedes donar y ofrecer un vial.',
   'testing.announcedAfter': '🧪 {shop}: {product}, que compraste, ya tiene testing de laboratorio ({lab}). Participa desde tu pedido pagando tu parte ({amount}) en las próximas {hours} h para ver los resultados; una vez dentro también puedes donar y ofrecer un vial.',
+  'testing.extraOpen': '🧪 {shop}: fase extra del testing de {product}. Tests que faltan:
+{list}
+Apúntate desde tu pedido en {hours} h con lo máximo que pagarías (al menos {min}). Se reparte a partes iguales y nunca pagas más que tu tope; si no llega a ningún test, no se cobra nada. ⚠️ Quien se apunte y no pague puede quedar bloqueado para futuras GB.',
+  'testing.extraNone': '🧪 {shop}: la fase extra de {product} no ha llegado a ningún test. No se cobra nada.',
+  'testing.extraPay': '🧪 {shop}: la fase extra de {product} cubre {tiers}. Tu parte: {amount}. Págala desde tu pedido en {hours} h.',
+  'testing.extraOut': '🧪 {shop}: la fase extra de {product} ha salido a {amount} por cabeza, por encima de tu tope: te quedas fuera y no pagas nada.',
+  'testing.extraRemind': '🧪 {shop}: recuerda pagar tu parte de la fase extra de {product} ({amount}) desde tu pedido.',
+  'testing.extraDone': '🧪 {shop}: la fase extra de {product} ha conseguido {tiers}. Recibirás sus resultados.',
+  'testing.extraFailed': '🧪 {shop}: al final la fase extra de {product} no ha conseguido ningún test (alguien no pagó). Se te devuelve lo que pagaste.',
+  'testing.extraUnpaid': '🧪 {shop}: en la fase extra de {product} no pagaron su parte: {who}. Puedes bloquearlos desde la app.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -561,6 +581,16 @@ const it: Record<BotMessageKey, string> = {
   'testing.donationsReminder': '🧪 {shop}: restano {hours} h per donare al testing di {product}. Dona dal tuo ordine nell\'app.',
   'testing.announced': '🧪 {shop}: {product} ora ha un testing di laboratorio ({lab}). Paga la tua parte ({amount}) dal tuo ordine per vedere i risultati; una volta dentro puoi anche donare e offrire una fiala.',
   'testing.announcedAfter': '🧪 {shop}: {product}, che hai comprato, ora ha un testing di laboratorio ({lab}). Partecipa dal tuo ordine pagando la tua parte ({amount}) entro {hours} h per vedere i risultati; una volta dentro puoi anche donare e offrire una fiala.',
+  'testing.extraOpen': '🧪 {shop}: fase extra del testing di {product}. Test che mancano:
+{list}
+Iscriviti dal tuo ordine entro {hours} h con il massimo che pagheresti (almeno {min}). Si divide in parti uguali e non paghi mai più del tuo tetto; se non arriva a nessun test, non si addebita nulla. ⚠️ Chi si iscrive e non paga può essere bloccato per i prossimi GB.',
+  'testing.extraNone': '🧪 {shop}: la fase extra di {product} non è arrivata a nessun test. Non si addebita nulla.',
+  'testing.extraPay': '🧪 {shop}: la fase extra di {product} copre {tiers}. La tua parte: {amount}. Pagala dal tuo ordine entro {hours} h.',
+  'testing.extraOut': '🧪 {shop}: la fase extra di {product} è venuta {amount} a testa, sopra il tuo tetto: resti fuori e non paghi nulla.',
+  'testing.extraRemind': '🧪 {shop}: ricorda di pagare la tua parte della fase extra di {product} ({amount}) dal tuo ordine.',
+  'testing.extraDone': '🧪 {shop}: la fase extra di {product} ha ottenuto {tiers}. Riceverai i risultati.',
+  'testing.extraFailed': '🧪 {shop}: alla fine la fase extra di {product} non ha ottenuto nessun test (qualcuno non ha pagato). Ti viene rimborsato quanto pagato.',
+  'testing.extraUnpaid': '🧪 {shop}: nella fase extra di {product} non hanno pagato la loro parte: {who}. Puoi bloccarli dall\'app.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -744,6 +774,16 @@ const pt: Record<BotMessageKey, string> = {
   'testing.donationsReminder': '🧪 {shop}: faltam {hours} h para doar para o testing de {product}. Doe a partir da sua encomenda na app.',
   'testing.announced': '🧪 {shop}: {product} já tem testing de laboratório ({lab}). Pague a sua parte ({amount}) a partir da sua encomenda para ver os resultados; depois de entrar também pode doar e oferecer um frasco.',
   'testing.announcedAfter': '🧪 {shop}: {product}, que comprou, já tem testing de laboratório ({lab}). Participe a partir da sua encomenda pagando a sua parte ({amount}) nas próximas {hours} h para ver os resultados; depois de entrar também pode doar e oferecer um frasco.',
+  'testing.extraOpen': '🧪 {shop}: fase extra do testing de {product}. Testes que faltam:
+{list}
+Inscreva-se a partir da sua encomenda em {hours} h com o máximo que pagaria (pelo menos {min}). Divide-se em partes iguais e nunca paga mais do que o seu teto; se não chegar a nenhum teste, nada é cobrado. ⚠️ Quem se inscrever e não pagar pode ficar bloqueado para futuros GB.',
+  'testing.extraNone': '🧪 {shop}: a fase extra de {product} não chegou a nenhum teste. Nada é cobrado.',
+  'testing.extraPay': '🧪 {shop}: a fase extra de {product} cobre {tiers}. A sua parte: {amount}. Pague-a a partir da sua encomenda em {hours} h.',
+  'testing.extraOut': '🧪 {shop}: a fase extra de {product} saiu a {amount} por pessoa, acima do seu teto: fica de fora e não paga nada.',
+  'testing.extraRemind': '🧪 {shop}: lembre-se de pagar a sua parte da fase extra de {product} ({amount}) a partir da sua encomenda.',
+  'testing.extraDone': '🧪 {shop}: a fase extra de {product} conseguiu {tiers}. Vai receber os resultados.',
+  'testing.extraFailed': '🧪 {shop}: afinal a fase extra de {product} não conseguiu nenhum teste (alguém não pagou). É-lhe devolvido o que pagou.',
+  'testing.extraUnpaid': '🧪 {shop}: na fase extra de {product} não pagaram a sua parte: {who}. Pode bloqueá-los na app.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

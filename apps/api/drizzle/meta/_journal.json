@@ -470,6 +470,13 @@
       "when": 1795723200000,
       "tag": "0066_testing_posterior",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1795809600000,
+      "tag": "0067_testing_extra",
+      "breakpoints": true
     }
   ]
 }

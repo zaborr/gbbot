@@ -12,6 +12,7 @@ import { audience, testedLabel, vialLabel } from './testingDraw.js';
 import { botToken } from './activeBot.js';
 import { reachedTiers } from './testing.js';
 import { refundDonations } from './testingDonations.js';
+import { cancelExtra, extraPayers } from './testingExtra.js';
 
 /**
  * The end of a testing: closing it (donors get their vial's price back),
@@ -150,8 +151,9 @@ export async function cancelTesting(db: Database, env: Env, shop: ShopRow, id: s
         .set({ donatedVials: sql`${orders.donatedVials} - ${what}::text` })
         .where(inArray(orders.id, donorOrders));
     }
-    // What was given goes back too.
+    // What was given goes back too, and so does the extra round.
     await refundDonations(tx, testing);
+    await cancelExtra(tx, testing);
     return tx
       .update(testings)
       .set({ status: 'cancelled', updatedAt: new Date() })
@@ -173,8 +175,14 @@ export async function cancelTesting(db: Database, env: Env, shop: ShopRow, id: s
  * Who gets the report: those who paid the fee, the donors, and VIPs exempt
  * from the fee who bought what is tested (they see every result).
  */
-async function reportAudience(db: Database, env: Env, shop: ShopRow, testing: TestingRow): Promise<number[]> {
-  const rows = await liveEntries(db, testing.id);
+async function reportAudience(
+  db: Database,
+  env: Env,
+  shop: ShopRow,
+  testing: TestingRow,
+  options: { onlyVips?: boolean } = {},
+): Promise<number[]> {
+  const rows = options.onlyVips ? [] : await liveEntries(db, testing.id);
   const donorOrders = (testing.draw?.candidates ?? [])
     .filter((c) => testing.draw?.donors.includes(c.ref))
     .map((c) => c.orderId);
@@ -197,7 +205,29 @@ async function reportAudience(db: Database, env: Env, shop: ShopRow, testing: Te
             ),
           )
       : [];
+  if (options.onlyVips) {
+    return audience(
+      db,
+      env,
+      shop,
+      vips.map((v) => v.id),
+    );
+  }
   return audience(db, env, shop, [...new Set([...paid, ...donorOrders, ...vips.map((v) => v.id)])]);
+}
+
+/**
+ * Who gets the extra round's report: those who paid it and VIPs exempt from
+ * the fee; everyone in when one of its tests upgrades a test of theirs.
+ */
+async function extraReportAudience(db: Database, env: Env, shop: ShopRow, testing: TestingRow): Promise<number[]> {
+  const extraIds = testing.extra?.outcome?.tiers ?? [];
+  const upgradesBase = testing.tiers.some((t) => extraIds.includes(t.id) && t.replaces && !extraIds.includes(t.replaces));
+  if (upgradesBase) return reportAudience(db, env, shop, testing);
+  const payers = await extraPayers(db, testing.id);
+  const vips = await reportAudience(db, env, shop, testing, { onlyVips: true });
+  const own = await audience(db, env, shop, payers);
+  return [...new Set([...own, ...vips])];
 }
 
 /** The bot asks this organiser (in their chat with it) to reply with the report. */
@@ -209,8 +239,12 @@ export async function requestReport(
   organiserId: number,
   lang: Lang,
   telegram = new TelegramApi(botToken(env)),
+  kind: 'base' | 'extra' = 'base',
 ): Promise<void> {
   const testing = await findTesting(db, shop.id, id);
+  if (kind === 'extra' && (testing.extra?.outcome?.tiers.length ?? 0) === 0) {
+    throw ApiError.conflict('report_no_extra', 'The extra round did not get any test');
+  }
   if (testing.status !== 'drawn' && testing.status !== 'settled') {
     throw ApiError.conflict('report_not_ready', 'Send the report once the donors are drawn');
   }
@@ -223,7 +257,7 @@ export async function requestReport(
   if (typeof sent.message_id !== 'number') throw new Error('No message id');
   await db
     .update(testings)
-    .set({ reportRequest: { chatId: organiserId, messageId: sent.message_id }, updatedAt: new Date() })
+    .set({ reportRequest: { chatId: organiserId, messageId: sent.message_id, kind }, updatedAt: new Date() })
     .where(eq(testings.id, testing.id));
 }
 
@@ -263,7 +297,8 @@ export async function handleReportReply(
   if (!shop) return false;
 
   const what = await testedLabel(db, testing);
-  const ids = await reportAudience(db, env, shop, testing);
+  const extra = testing.reportRequest?.kind === 'extra';
+  const ids = extra ? await extraReportAudience(db, env, shop, testing) : await reportAudience(db, env, shop, testing);
   const langs = await languagesOf(db, ids);
   let delivered = 0;
   for (const id of ids) {
@@ -279,9 +314,10 @@ export async function handleReportReply(
       console.error('Report not delivered:', error);
     }
   }
+  const sentReport = { ...file, sentAt: new Date().toISOString() };
   await db
     .update(testings)
-    .set({ report: { ...file, sentAt: new Date().toISOString() }, reportRequest: null, updatedAt: new Date() })
+    .set({ ...(extra ? { extraReport: sentReport } : { report: sentReport }), reportRequest: null, updatedAt: new Date() })
     .where(eq(testings.id, testing.id));
   await telegram.sendMessage(chatId, tr(lang, 'testing.reportSent', { count: delivered }));
   return true;

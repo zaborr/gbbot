@@ -70,7 +70,9 @@ export function testingAdminRoutes(): Hono<AppBindings> {
   app.post('/:id/report-request', zValidator('param', idParam), async (c) => {
     const sub = c.get('claims').sub;
     const lang = (await languagesOf(c.get('db'), [sub])).get(sub) ?? langFrom(undefined);
-    await requestReport(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('param').id, sub, lang);
+    // ?kind=extra: the report of the tests the extra round paid (for those who paid it).
+    const kind = c.req.query('kind') === 'extra' ? 'extra' : 'base';
+    await requestReport(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('param').id, sub, lang, undefined, kind);
     return c.json({ ok: true });
   });
   app.get('/:id/participants', zValidator('param', idParam), async (c) =>
