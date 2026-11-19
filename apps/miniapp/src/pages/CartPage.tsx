@@ -428,7 +428,10 @@ export function CartPage(): React.JSX.Element {
           {offers.map((x) => (
             <Cell
               key={x.id}
-              subtitle={t('testing.offerSubtitle', { lab: x.lab, amount: formatPrice(x.contribution, x.currency) })}
+              subtitle={t('testing.offerSubtitle', {
+                lab: x.lab,
+                amount: x.contribution > 0 ? formatPrice(x.contribution, x.currency) : t('testing.free'),
+              })}
               after={
                 <Button
                   size="s"

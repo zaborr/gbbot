@@ -69,7 +69,9 @@ export function TestingCard({
           <span className="gb-chip">
             {testing.exempt
               ? t('testing.feeExemptChip')
-              : t(`testing.feeChip.${testing.feeMode}`, { amount: money(testing.contribution) })}
+              : testing.contribution === 0
+                ? t('testing.feeChipFree')
+                : t(`testing.feeChip.${testing.feeMode}`, { amount: money(testing.contribution) })}
           </span>
           {preview && <span className="gb-chip gb-chip--soft">{t('testing.preview')}</span>}
         </div>

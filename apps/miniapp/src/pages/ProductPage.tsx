@@ -371,7 +371,8 @@ function TestingActions({
       (testing.variantId === null || line.variant?.id === testing.variantId),
   );
   const ticked = (cart?.testings ?? []).find((x) => x.testingId === testing.id);
-  const amount = formatPrice(testing.contribution, testing.currency);
+  // No fee: taking part is free.
+  const amount = testing.contribution > 0 ? formatPrice(testing.contribution, testing.currency) : t('testing.free');
   const what = testing.variantLabel ?? productTitle(product);
 
   if (testing.joined) return <Cell multiline>{t('testing.joinedAlready')}</Cell>;

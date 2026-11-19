@@ -383,7 +383,14 @@ async function remindDonations(db: Database, env: Env, now: Date): Promise<void>
  * A testing has just been created in an open GB: those who already bought
  * what it tests hear they can join it from their order (and then give).
  */
-export async function announceNewTesting(db: Database, env: Env, shop: ShopRow, testingId: string): Promise<void> {
+export async function announceNewTesting(
+  db: Database,
+  env: Env,
+  shop: ShopRow,
+  testingId: string,
+  /** Reopened: for these hours, and only to those not in yet. */
+  reopened?: { hours: number },
+): Promise<void> {
   const row = await db.query.testings.findFirst({ where: eq(testings.id, testingId) });
   if (!row || (shop.closedAt && !row.posterior)) return;
   const buyers = await db
@@ -398,25 +405,47 @@ export async function announceNewTesting(db: Database, env: Env, shop: ShopRow, 
         row.variantId ? eq(orderItems.variantId, row.variantId) : undefined,
       ),
     );
-  if (buyers.length === 0) return;
+  const inAlready = reopened
+    ? new Set(
+        (
+          await db
+            .select({ orderId: testingEntries.orderId })
+            .from(testingEntries)
+            .where(eq(testingEntries.testingId, row.id))
+        ).map((e) => e.orderId),
+      )
+    : new Set<string>();
+  const left = buyers.filter((b) => !inAlready.has(b.id));
+  if (left.length === 0) return;
   const ids = await audience(
     db,
     env,
     shop,
-    buyers.map((b) => b.id),
+    left.map((b) => b.id),
   );
   const what = await testedLabel(db, row);
   const totals = (await testingTotals(db, [row.id])).get(row.id);
   const steps = totals ? stepsOf(row, totals, (await vialPrices(db, [row])).get(row.id) ?? 0) : [];
   await notifyUsers(db, botToken(env), ids, (lang: Lang) =>
     [
-      tr(lang, row.posterior ? 'testing.announcedAfter' : 'testing.announced', {
-        shop: shop.name,
-        product: what,
-        lab: row.lab,
-        amount: formatMoney(row.contribution, row.currency),
-        hours: row.donationHours,
-      }),
+      tr(
+        lang,
+        // With no fee: joining is free.
+        row.posterior
+          ? row.contribution > 0
+            ? 'testing.announcedAfter'
+            : 'testing.announcedAfterFree'
+          : row.contribution > 0
+            ? 'testing.announced'
+            : 'testing.announcedFree',
+        {
+          shop: shop.name,
+          product: what,
+          lab: row.lab,
+          amount: formatMoney(row.contribution, row.currency),
+          hours: reopened?.hours ?? row.donationHours,
+        },
+      ),
       progressText(lang, steps, true),
     ].join('\n\n'),
   );
@@ -551,7 +580,7 @@ export async function reopenTesting(
     })
     .where(eq(testings.id, row.id));
   // Those who bought it hear it is open again (in the background).
-  void announceNewTesting(db, env, shop, row.id).catch((error: unknown) =>
+  void announceNewTesting(db, env, shop, row.id, { hours }).catch((error: unknown) =>
     console.error('Testing announcement failed:', error),
   );
 }
