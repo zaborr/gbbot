@@ -349,6 +349,8 @@ export async function finishDraw(
     draw.candidates.map((c) => c.orderId),
   );
   const donorIds = new Set(await audience(db, env, shop, donorOrders));
+  // From outside: no package to take it from, they send it.
+  const outsideIds = new Set(await audience(db, env, shop, await externalOf(db, donorOrders)));
   const link = `https://mempool.space/block/${hash}`;
   await notifyUsers(
     db,
@@ -364,9 +366,20 @@ export async function finishDraw(
         link,
       }),
   );
-  await notifyUsers(db, botToken(env), [...donorIds], (lang) =>
-    tr(lang, 'testing.drawDonor', { shop: shop.name, product: what, height: draw.height, link }),
-  );
+  for (const outside of [false, true]) {
+    await notifyUsers(
+      db,
+      botToken(env),
+      [...donorIds].filter((id) => outsideIds.has(id) === outside),
+      (lang) =>
+        tr(lang, outside ? 'testing.drawDonorExternal' : 'testing.drawDonor', {
+          shop: shop.name,
+          product: what,
+          height: draw.height,
+          link,
+        }),
+    );
+  }
   return true;
 }
 
@@ -449,8 +462,14 @@ export async function substituteDonor(
   if (inn) {
     const ids = await audience(db, env, shop, [inn.orderId]);
     const link = `https://mempool.space/block/${draw.hash}`;
+    const outside = (await externalOf(db, [inn.orderId])).length > 0;
     await notifyUsers(db, botToken(env), ids, (lang) =>
-      tr(lang, 'testing.drawDonor', { shop: shop.name, product: what, height: draw.height, link }),
+      tr(lang, outside ? 'testing.drawDonorExternal' : 'testing.drawDonor', {
+        shop: shop.name,
+        product: what,
+        height: draw.height,
+        link,
+      }),
     );
   }
   return row;
@@ -502,4 +521,14 @@ export async function cancelDrawsOnReopen(db: Database, env: Env, shop: ShopRow)
       tr(lang, 'testing.drawCancelled', { shop: shop.name, product: what }),
     );
   }
+}
+
+/** Of these orders, those from outside (they send their vial themselves). */
+async function externalOf(db: Database, orderIds: readonly string[]): Promise<string[]> {
+  if (orderIds.length === 0) return [];
+  const rows = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(and(inArray(orders.id, [...orderIds]), eq(orders.external, true)));
+  return rows.map((r) => r.id);
 }

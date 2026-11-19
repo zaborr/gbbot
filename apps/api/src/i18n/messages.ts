@@ -155,7 +155,7 @@ const en = {
   'testing.tierReached': '🎉 {shop}: the testing of {product} now covers {tiers}. Thanks for taking part!',
   'testing.drawAnnounced': '🎲 {shop}: draw of donors for the testing of {product}. It is decided by Bitcoin block {height}, the next one to be mined (about 10 minutes). Candidates (🙋 volunteers go first): {candidates}.',
   'testing.drawResult': '🎲 {shop}: result of the draw for the testing of {product} (block {height}). Donors: {donors}. Tests done: {tiers}. Check it: {link} — each place is sha256(block hash + order number).',
-  'testing.drawDonor': '🎁 {shop}: you donate one vial of {product} to the testing (draw with block {height}: {link}). It is taken from your package before shipping, and the testing is free for you.',
+  'testing.drawDonor': '🎁 {shop}: you donate one vial of {product} to the testing (draw with block {height}: {link}). It is taken from your package before shipping, and you get the vial\'s price back.',
   'testing.drawCancelled': '⚠️ {shop}: the draw for the testing of {product} has been cancelled because the GB was opened again. It will be drawn again, with a new block, when it closes.',
   'testing.settledRefund': '💸 {shop}: the testing of {product} is settled. You get {amount} back: the organiser will send it to you (you will see it on your order).',
   'testing.settledNoRefund': '✅ {shop}: the testing of {product} is settled. Nothing is left to send back (or it is below the refund threshold). The results will reach you through the bot.',
@@ -207,6 +207,7 @@ const en = {
   'platform.blocked': '🚫 {by} blocked {who} in every GB, from «{shop}». Reason: {reason}',
   'testing.announcedFree': '🧪 {shop}: {product} now has a lab testing ({lab}). Signing up has no fee: the test is paid with gifts and, if that falls short, with an extra round where you set your cap. Sign up from your order; once in, you can also give and offer a vial.',
   'testing.announcedAfterFree': '🧪 {shop}: {product}, which you bought, has a lab testing ({lab}). Signing up has no fee: the test is paid with gifts and, if that falls short, with an extra round where you set your cap. Sign up from your order within {hours} h.',
+  'testing.drawDonorExternal': '🎁 {shop}: you donate one vial of {product} to the testing (draw with block {height}: {link}). You send it yourself: the organiser will tell you where. You get the vial\'s price back.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -354,7 +355,7 @@ const es: Record<BotMessageKey, string> = {
   'testing.tierReached': '🎉 {shop}: el testing de {product} ya cubre {tiers}. ¡Gracias por participar!',
   'testing.drawAnnounced': '🎲 {shop}: sorteo de donantes del testing de {product}. Lo decide el bloque de Bitcoin {height}, el próximo que se mine (unos 10 minutos). Candidatos (🙋 los voluntarios van primero): {candidates}.',
   'testing.drawResult': '🎲 {shop}: resultado del sorteo del testing de {product} (bloque {height}). Donan: {donors}. Análisis que se hacen: {tiers}. Compruébalo: {link} — cada puesto es sha256(hash del bloque + número de pedido).',
-  'testing.drawDonor': '🎁 {shop}: donas un vial de {product} para el testing (sorteo con el bloque {height}: {link}). Se retira de tu paquete antes del envío y el testing te sale gratis.',
+  'testing.drawDonor': '🎁 {shop}: donas un vial de {product} para el testing (sorteo con el bloque {height}: {link}). Se retira de tu paquete antes del envío y se te devuelve el precio del vial.',
   'testing.drawCancelled': '⚠️ {shop}: el sorteo del testing de {product} se ha anulado porque se ha reabierto el GB. Se volverá a sortear, con un bloque nuevo, cuando cierre.',
   'testing.settledRefund': '💸 {shop}: el testing de {product} está liquidado. Te corresponden {amount}: el organizador te los devolverá (lo verás en tu pedido).',
   'testing.settledNoRefund': '✅ {shop}: el testing de {product} está liquidado. No sobra nada que devolver (o queda por debajo del umbral). Los resultados te llegarán por el bot.',
@@ -406,6 +407,7 @@ const es: Record<BotMessageKey, string> = {
   'platform.blocked': '🚫 {by} ha bloqueado a {who} en todos los GB, desde «{shop}». Motivo: {reason}',
   'testing.announcedFree': '🧪 {shop}: {product} ya tiene testing de laboratorio ({lab}). Apuntarse no tiene cuota: el test se paga con donaciones y, si falta, con una fase extra en la que tú decides tu máximo. Apúntate desde tu pedido; una vez dentro también puedes donar y ofrecer un vial.',
   'testing.announcedAfterFree': '🧪 {shop}: {product}, que compraste, tiene testing de laboratorio ({lab}). Apuntarse no tiene cuota: el test se paga con donaciones y, si falta, con una fase extra en la que tú decides tu máximo. Apúntate desde tu pedido en las próximas {hours} h.',
+  'testing.drawDonorExternal': '🎁 {shop}: donas un vial de {product} para el testing (sorteo con el bloque {height}: {link}). Lo envías tú: el organizador te dirá a dónde. Se te devuelve el precio del vial.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -551,7 +553,7 @@ const it: Record<BotMessageKey, string> = {
   'testing.tierReached': '🎉 {shop}: il testing di {product} ora copre {tiers}. Grazie per partecipare!',
   'testing.drawAnnounced': '🎲 {shop}: sorteggio dei donatori del testing di {product}. Lo decide il blocco Bitcoin {height}, il prossimo che verrà minato (circa 10 minuti). Candidati (🙋 i volontari vanno prima): {candidates}.',
   'testing.drawResult': '🎲 {shop}: risultato del sorteggio del testing di {product} (blocco {height}). Donano: {donors}. Analisi che si fanno: {tiers}. Verificalo: {link} — ogni posto è sha256(hash del blocco + numero d\'ordine).',
-  'testing.drawDonor': '🎁 {shop}: doni una fiala di {product} per il testing (sorteggio con il blocco {height}: {link}). Si toglie dal tuo pacco prima della spedizione e il testing per te è gratis.',
+  'testing.drawDonor': '🎁 {shop}: doni una fiala di {product} per il testing (sorteggio con il blocco {height}: {link}). Si toglie dal tuo pacco prima della spedizione e ti viene restituito il prezzo della fiala.',
   'testing.drawCancelled': '⚠️ {shop}: il sorteggio del testing di {product} è stato annullato perché il GB è stato riaperto. Si rifarà, con un nuovo blocco, quando chiuderà.',
   'testing.settledRefund': '💸 {shop}: il testing di {product} è liquidato. Ti spettano {amount}: l\'organizzatore te li restituirà (lo vedrai nel tuo ordine).',
   'testing.settledNoRefund': '✅ {shop}: il testing di {product} è liquidato. Non avanza nulla da restituire (o è sotto la soglia). I risultati ti arriveranno tramite il bot.',
@@ -603,6 +605,7 @@ const it: Record<BotMessageKey, string> = {
   'platform.blocked': '🚫 {by} ha bloccato {who} in tutti i GB, da «{shop}». Motivo: {reason}',
   'testing.announcedFree': '🧪 {shop}: {product} ora ha un testing di laboratorio ({lab}). Iscriversi non ha quota: il test si paga con le donazioni e, se non basta, con una fase extra in cui decidi tu il tuo tetto. Iscriviti dal tuo ordine; una volta dentro puoi anche donare e offrire una fiala.',
   'testing.announcedAfterFree': '🧪 {shop}: {product}, che hai comprato, ha un testing di laboratorio ({lab}). Iscriversi non ha quota: il test si paga con le donazioni e, se non basta, con una fase extra in cui decidi tu il tuo tetto. Iscriviti dal tuo ordine entro {hours} h.',
+  'testing.drawDonorExternal': '🎁 {shop}: doni una fiala di {product} per il testing (sorteggio con il blocco {height}: {link}). La invii tu: l\'organizzatore ti dirà dove. Ti viene restituito il prezzo della fiala.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -748,7 +751,7 @@ const pt: Record<BotMessageKey, string> = {
   'testing.tierReached': '🎉 {shop}: o testing de {product} já cobre {tiers}. Obrigado por participar!',
   'testing.drawAnnounced': '🎲 {shop}: sorteio de doadores do testing de {product}. Decide-o o bloco de Bitcoin {height}, o próximo a ser minerado (cerca de 10 minutos). Candidatos (🙋 os voluntários vão primeiro): {candidates}.',
   'testing.drawResult': '🎲 {shop}: resultado do sorteio do testing de {product} (bloco {height}). Doam: {donors}. Análises que se fazem: {tiers}. Verifique: {link} — cada lugar é sha256(hash do bloco + número do pedido).',
-  'testing.drawDonor': '🎁 {shop}: doa um frasco de {product} para o testing (sorteio com o bloco {height}: {link}). É retirado do seu pacote antes do envio e o testing fica-lhe grátis.',
+  'testing.drawDonor': '🎁 {shop}: doa um frasco de {product} para o testing (sorteio com o bloco {height}: {link}). É retirado do seu pacote antes do envio e é-lhe devolvido o preço do frasco.',
   'testing.drawCancelled': '⚠️ {shop}: o sorteio do testing de {product} foi anulado porque o GB foi reaberto. Voltará a ser sorteado, com um bloco novo, quando fechar.',
   'testing.settledRefund': '💸 {shop}: o testing de {product} está liquidado. Correspondem-lhe {amount}: o organizador devolve-lhos (verá no seu pedido).',
   'testing.settledNoRefund': '✅ {shop}: o testing de {product} está liquidado. Não sobra nada para devolver (ou fica abaixo do limite). Os resultados chegam-lhe pelo bot.',
@@ -800,6 +803,7 @@ const pt: Record<BotMessageKey, string> = {
   'platform.blocked': '🚫 {by} bloqueou {who} em todos os GB, a partir de «{shop}». Motivo: {reason}',
   'testing.announcedFree': '🧪 {shop}: {product} já tem testing de laboratório ({lab}). Inscrever-se não tem quota: o teste paga-se com doações e, se faltar, com uma fase extra em que decide o seu máximo. Inscreva-se a partir da sua encomenda; depois de entrar também pode doar e oferecer um frasco.',
   'testing.announcedAfterFree': '🧪 {shop}: {product}, que comprou, tem testing de laboratório ({lab}). Inscrever-se não tem quota: o teste paga-se com doações e, se faltar, com uma fase extra em que decide o seu máximo. Inscreva-se a partir da sua encomenda nas próximas {hours} h.',
+  'testing.drawDonorExternal': '🎁 {shop}: doa um frasco de {product} para o testing (sorteio com o bloco {height}: {link}). Envia-o você: o organizador dir-lhe-á para onde. É-lhe devolvido o preço do frasco.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };
