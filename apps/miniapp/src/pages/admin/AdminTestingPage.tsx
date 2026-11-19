@@ -298,6 +298,7 @@ function TestingForm({
           reportSentAt: null,
           donationHours: Number(donationHours) || 48,
           vialsPerUnit: vialsNumber,
+          posterior,
           donationsUntil: null,
           donationsOpen: false,
           donationProductId: null,
