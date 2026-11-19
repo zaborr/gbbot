@@ -85,7 +85,8 @@ export function PaymentPage(): React.JSX.Element {
   const direct = editableDirectly(current);
   // A closed GB takes no changes, and only the difference left on paid orders.
   const closed = shop.data.isClosed;
-  const canPay = !closed || current.amountPaid > 0;
+  // From outside: only the testing, which takes people after closing.
+  const canPay = !closed || current.amountPaid > 0 || current.external;
   // Pay in the order's token (USDC/EURC), or in the other one at the GB's rate.
   const rates = shop.data.exchangeRates;
   const methods = shop.data.paymentMethods

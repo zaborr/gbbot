@@ -129,7 +129,8 @@ export function orderRoutes(): Hono<AppBindings> {
       // the payment of an order with nothing paid (it is removed on closing).
       if (isClosedAt(c.get('shop'))) {
         const current = await getOrder(db, c.get('shopId'), c.req.valid('param').id, sub);
-        if (current && current.amountPaid === 0) assertOpen(c.get('shop'));
+        // From outside: only the testing, which takes people after closing.
+        if (current && current.amountPaid === 0 && !current.external) assertOpen(c.get('shop'));
       }
 
       const order = await submitCryptoPayment(
@@ -169,7 +170,7 @@ export function orderRoutes(): Hono<AppBindings> {
 
       if (isClosedAt(shop)) {
         const current = await getOrder(db, shop.id, c.req.valid('param').id, sub);
-        if (current && current.amountPaid === 0) assertOpen(shop);
+        if (current && current.amountPaid === 0 && !current.external) assertOpen(shop);
       }
 
       const order = await submitCryptoPayment(
