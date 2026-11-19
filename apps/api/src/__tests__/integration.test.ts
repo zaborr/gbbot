@@ -1319,7 +1319,7 @@ describeDb('API integration', () => {
     }
   });
 
-  it('lets buyers give for a while once the GB closes; unpaid gifts come off', async () => {
+  it('lets those in a testing give at any time, also on sent orders; unpaid gifts come off', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
       'content-type': 'application/json',
@@ -1388,8 +1388,22 @@ describeDb('API integration', () => {
         money: { donations: number; pot: number };
       }>).find((x) => x.id === testingId)!.money;
 
-    // Not while the GB is open.
-    expect((await give(2000)).status).toBe(409);
+    const pay = (): Promise<Response> =>
+      Promise.resolve(
+        request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) }),
+      );
+    // While the GB is open, too.
+    expect((await give(1000)).status).toBe(200);
+    await pay();
+    expect(await pot()).toMatchObject({ donations: 1000, pot: 2000 });
+    // Sent already: it waits for the donation, then goes back to sent.
+    await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'shipped' }) });
+    const onSent = (await (await give(500)).json()) as { status: string; resumeStatus: string | null; donationDue: number };
+    expect(onSent).toMatchObject({ status: 'pending', resumeStatus: 'shipped', donationDue: 500 });
+    await pay();
+    const [sent] = await db.select().from(orders).where(eq(orders.id, orderId));
+    expect(sent).toMatchObject({ status: 'shipped', resumeStatus: null });
+    expect(await pot()).toMatchObject({ donations: 1500 });
     await db.update(shops).set({ closedAt: new Date() }).where(eq(shops.id, shopId));
     try {
       await db.update(testings).set({ status: 'closed' }).where(eq(testings.id, testingId));
@@ -1404,20 +1418,20 @@ describeDb('API integration', () => {
       const more = await give(500);
       const order = (await more.json()) as { status: string; amountDue: number; items: Array<{ productId: string; quantity: number }> };
       expect(order).toMatchObject({ status: 'pending', amountDue: 2500 });
-      expect(order.items.find((i) => i.productId === testing.donationProductId)?.quantity).toBe(25);
+      expect(order.items.find((i) => i.productId === testing.donationProductId)?.quantity).toBe(40);
       // Not paid yet: not in the pot.
-      expect(await pot()).toMatchObject({ donations: 0, pot: 1000 });
+      expect(await pot()).toMatchObject({ donations: 1500, pot: 2500 });
 
-      await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
-      expect(await pot()).toMatchObject({ donations: 2500, pot: 3500 });
+      await pay();
+      expect(await pot()).toMatchObject({ donations: 4000, pot: 5000 });
 
-      // Given again and not paid when the time is up: it comes off, the order is paid again.
+      // Given again and not paid when the time is up: it comes off, the order is sent again.
       expect((await give(700)).status).toBe(200);
       await closeDonationWindows(db, testEnv, new Date(Date.now() + 2 * 3600_000));
       const [row] = await db.select().from(orders).where(eq(orders.id, orderId));
-      expect(row?.status).toBe('paid');
+      expect(row?.status).toBe('shipped');
       expect((row?.total ?? 0) - (row?.amountPaid ?? 0)).toBe(0);
-      expect(await pot()).toMatchObject({ donations: 2500 });
+      expect(await pot()).toMatchObject({ donations: 4000 });
       const after = await request(`/api/admin/testings/${testingId}/draw`, { headers: admin });
       expect(await after.json()).toEqual({ blocker: null });
       expect((await give(100)).status).toBe(409);

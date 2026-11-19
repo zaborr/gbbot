@@ -78,7 +78,7 @@ export const createTestingRequest = z.object({
   feeMode: testingFeeMode,
   tiers,
   /** Hours buyers can give once the GB closes. */
-  donationHours: z.number().int().min(1).max(MAX_DONATION_HOURS).default(48),
+  donationHours: z.number().int().min(0).max(MAX_DONATION_HOURS).default(48),
   /** Vials in each unit (a kit): a donor gives one of them. */
   vialsPerUnit: z.number().int().min(1).max(100).default(10),
 });

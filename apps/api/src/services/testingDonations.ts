@@ -12,7 +12,6 @@ import type { ShopRow } from './shop.js';
 import { botToken } from './activeBot.js';
 import { audience, testedLabel } from './testingDraw.js';
 import {
-  donationOfOrder,
   donationsOpen,
   feeExempt,
   progressText,
@@ -22,10 +21,11 @@ import {
 } from './testing.js';
 
 /**
- * Giving to a testing once the GB is closed: for a while (hours set per
- * testing) its buyers can add a line of its donation product (1 a unit) to
- * their order and pay it the usual way. What is not paid when the time is up
- * is taken off again; what was paid stays in the pot.
+ * Giving to a testing: those in it (they paid their part, or are exempt VIPs)
+ * add a line of its donation product (1 a unit) to their order, whatever its
+ * state, and pay it the usual way. Open while the testing is; once the GB
+ * closes, for some hours more. What is not paid when the time is up comes off
+ * again; what was paid stays in the pot.
  */
 
 type TestingRow = typeof testings.$inferSelect;
@@ -79,17 +79,10 @@ export async function addDonation(
     if (testing.currency !== order.currency) {
       throw ApiError.conflict('mixed_currency', `This order is in ${order.currency}`);
     }
-    // Everything else on it paid, and no payment being checked.
-    const [given] = await tx
-      .select({ amount: donationOfOrder })
-      .from(orders)
-      .where(eq(orders.id, order.id));
-    const donated = Number(given?.amount ?? 0);
+    // Any state but cancelled, as long as no payment is being checked.
     const payable =
-      (order.status === 'paid' || order.status === 'pending') &&
-      order.amountSubmitted === 0 &&
-      order.amountPaid >= order.total - donated;
-    if (!payable) throw ApiError.conflict('donation_order_state', 'Pay your order first, then you can give');
+      ['pending', 'paid', 'shipped', 'fulfilled'].includes(order.status) && order.amountSubmitted === 0;
+    if (!payable) throw ApiError.conflict('donation_order_state', 'Wait until your payment is checked, then you can give');
     if (!(await mayGive(tx, testing, order))) {
       throw ApiError.conflict('donation_not_buyer', 'Only those who bought it and pay its testing can give');
     }
@@ -126,9 +119,16 @@ export async function addDonation(
         donationUnpaid: units,
       });
     }
+    // It waits for that payment; sent already, it remembers to go back to sent.
+    const sent = order.status === 'shipped' || order.status === 'fulfilled';
     await tx
       .update(orders)
-      .set({ total: order.total + amount, status: 'pending', updatedAt: new Date() })
+      .set({
+        total: order.total + amount,
+        status: 'pending',
+        resumeStatus: sent ? order.status : order.resumeStatus,
+        updatedAt: new Date(),
+      })
       .where(eq(orders.id, order.id));
   });
   const order = await getOrder(db, shop.id, orderId, userId);
@@ -155,7 +155,7 @@ export async function removeDonation(
       where: and(eq(testings.shopId, shop.id), eq(testings.id, testingId)),
     });
     if (!testing?.donationProductId) throw ApiError.notFound('Testing not found');
-    if (order.status !== 'pending' || order.amountSubmitted > 0) {
+    if (order.amountSubmitted > 0) {
       throw ApiError.conflict('donation_paid', 'This donation is paid or its payment is being checked');
     }
     await takeOff(tx, order, [testing.donationProductId], true);
@@ -200,8 +200,9 @@ async function takeOff(
     .update(orders)
     .set({
       total,
-      // Nothing left to pay: back to paid (a donation paid and taken off is owed back).
-      status: order.status === 'pending' && order.amountPaid >= total ? 'paid' : order.status,
+      // Nothing left to pay: back to paid, or sent (a donation paid and taken off is owed back).
+      status: order.status === 'pending' && order.amountPaid >= total ? (order.resumeStatus ?? 'paid') : order.status,
+      resumeStatus: order.status === 'pending' && order.amountPaid >= total ? null : order.resumeStatus,
       updatedAt: new Date(),
     })
     .where(eq(orders.id, order.id));
@@ -304,6 +305,7 @@ export async function openDonationWindows(db: Database, env: Env, shop: ShopRow,
   const prices = await vialPrices(db, rows);
   for (const row of rows) {
     const until = new Date(now.getTime() + row.donationHours * 3600_000);
+    // No time after closing: nothing to announce, it ends with the GB.
     const [opened] = await db
       .update(testings)
       .set({ donationsUntil: until, updatedAt: new Date() })
@@ -313,8 +315,8 @@ export async function openDonationWindows(db: Database, env: Env, shop: ShopRow,
     const t = totals.get(row.id);
     const steps = t ? stepsOf(opened, t, prices.get(row.id) ?? 0) : [];
     const next = steps.find((s) => !s.reached);
-    // Nothing left to reach: no point asking for more.
-    if (!next) continue;
+    // Nothing left to reach (or no time to give): no point asking for more.
+    if (!next || row.donationHours === 0) continue;
     const what = await testedLabel(db, row);
     const ids = await giversOf(db, env, shop, row);
     await notifyUsers(db, botToken(env), ids, (lang: Lang) =>
@@ -333,8 +335,91 @@ export async function openDonationWindows(db: Database, env: Env, shop: ShopRow,
   }
 }
 
+/** A day before the time to give ends: those in it hear how far the next test is. */
+async function remindDonations(db: Database, env: Env, now: Date): Promise<void> {
+  const soon = new Date(now.getTime() + 24 * 3600_000);
+  const rows = await db
+    .select()
+    .from(testings)
+    .where(
+      and(
+        eq(testings.status, 'closed'),
+        eq(testings.donationsDone, false),
+        eq(testings.donationsReminded, false),
+        lte(testings.donationsUntil, soon),
+        gt(testings.donationHours, 24),
+      ),
+    );
+  for (const row of rows) {
+    const [claimed] = await db
+      .update(testings)
+      .set({ donationsReminded: true })
+      .where(and(eq(testings.id, row.id), eq(testings.donationsReminded, false)))
+      .returning();
+    if (!claimed || !claimed.donationsUntil || claimed.donationsUntil <= now) continue;
+    const shop = await db.query.shops.findFirst({ where: (s, { eq: same }) => same(s.id, row.shopId) });
+    const totals = (await testingTotals(db, [row.id])).get(row.id);
+    if (!shop || !totals) continue;
+    const steps = stepsOf(claimed, totals, (await vialPrices(db, [claimed])).get(row.id) ?? 0);
+    if (!steps.some((s) => !s.reached)) continue;
+    const what = await testedLabel(db, row);
+    const hours = Math.max(Math.round((claimed.donationsUntil.getTime() - now.getTime()) / 3600_000), 1);
+    const ids = await giversOf(db, env, shop, row);
+    await notifyUsers(db, botToken(env), ids, (lang: Lang) =>
+      [
+        tr(lang, 'testing.donationsReminder', { shop: shop.name, product: what, hours }),
+        progressText(lang, steps, true),
+      ].join('\n\n'),
+    );
+  }
+}
+
+/**
+ * A testing has just been created in an open GB: those who already bought
+ * what it tests hear they can join it from their order (and then give).
+ */
+export async function announceNewTesting(db: Database, env: Env, shop: ShopRow, testingId: string): Promise<void> {
+  if (shop.closedAt) return;
+  const row = await db.query.testings.findFirst({ where: eq(testings.id, testingId) });
+  if (!row) return;
+  const buyers = await db
+    .selectDistinct({ id: orders.id })
+    .from(orders)
+    .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+    .where(
+      and(
+        eq(orders.shopId, shop.id),
+        ne(orders.status, 'cancelled'),
+        eq(orderItems.productId, row.productId),
+        row.variantId ? eq(orderItems.variantId, row.variantId) : undefined,
+      ),
+    );
+  if (buyers.length === 0) return;
+  const ids = await audience(
+    db,
+    env,
+    shop,
+    buyers.map((b) => b.id),
+  );
+  const what = await testedLabel(db, row);
+  const totals = (await testingTotals(db, [row.id])).get(row.id);
+  const steps = totals ? stepsOf(row, totals, (await vialPrices(db, [row])).get(row.id) ?? 0) : [];
+  await notifyUsers(db, botToken(env), ids, (lang: Lang) =>
+    [
+      tr(lang, 'testing.announced', {
+        shop: shop.name,
+        product: what,
+        lab: row.lab,
+        amount: formatMoney(row.contribution, row.currency),
+      }),
+      progressText(lang, steps, true),
+    ].join('\n\n'),
+  );
+}
+
 /** Every minute: the time to give that is over closes, and unpaid donations come off. */
 export async function closeDonationWindows(db: Database, env: Env, now = new Date()): Promise<void> {
+  await remindDonations(db, env, now).catch((error: unknown) => console.error('Donation reminder failed:', error));
   // Over already: a payment rejected since leaves its donation unpaid; it comes off too.
   const over = await db
     .select()

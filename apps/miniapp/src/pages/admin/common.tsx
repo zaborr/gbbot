@@ -27,6 +27,9 @@ export function adminStatusText(status: OrderStatus): string {
 /** Status shown to the admin, including change requests and pending refunds. */
 export function statusLabel(order: Order): string {
   if (order.changeRequest) return t('adminStatus.changeRequested');
+  if (order.donationDue > 0 && order.amountPaid >= order.total - order.donationDue) {
+    return t('adminStatus.donationPending', { status: adminStatusText(order.resumeStatus ?? 'paid') });
+  }
   if (order.status === 'pending' && order.amountPaid > 0) return t('adminStatus.differenceUnpaid');
   if (order.amountDue < 0) return t('adminStatus.refundOwed');
   return adminStatusText(order.status);

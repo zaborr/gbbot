@@ -159,7 +159,7 @@ export function PaymentPage(): React.JSX.Element {
 
       {!closed && shop.data.testingEnabled && <OrderTestingOffers order={current} onAdded={reload} />}
 
-      {closed && shop.data.testingEnabled && <DonationSection order={current} onChanged={reload} />}
+      {shop.data.testingEnabled && <DonationSection order={current} onChanged={reload} />}
 
       {!done && <StatusSection order={current} autoCancelHours={shop.data.autoCancelHours} />}
 
@@ -1032,7 +1032,7 @@ function DonationSection({ order, onChanged }: { order: Order; onChanged: () => 
   );
   if (open.length === 0) return null;
   // A payment being checked: nothing can be added until it is done.
-  const canGive = order.amountSubmitted === 0 && (order.status === 'paid' || order.status === 'pending');
+  const canGive = order.amountSubmitted === 0 && order.status !== 'cancelled' && order.status !== 'awaiting_payment';
 
   const run = (id: string, action: () => Promise<unknown>): void => {
     setBusy(id);
@@ -1104,7 +1104,7 @@ function DonationSection({ order, onChanged }: { order: Order; onChanged: () => 
                 </Button>
               </div>
             )}
-            {line && order.status === 'pending' && order.amountSubmitted === 0 && (
+            {order.donationDue > 0 && order.amountSubmitted === 0 && (
               <div className="gb-donation-row">
                 <Button
                   size="s"

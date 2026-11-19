@@ -24,6 +24,7 @@ import type {
   BotSwitchReason,
   CreatorAccountStatus,
   OrderChangeRequest,
+  OrderStatus,
   PaymentLogEntry,
   PriceTier,
   ProductOption,
@@ -284,6 +285,11 @@ export const orders = pgTable('orders', {
   testing: integer('testing').notNull().default(0),
   /** Drawn to donate one vial of each of these (product · variant): taken from the package. */
   donatedVials: jsonb('donated_vials').$type<string[]>().notNull().default([]),
+  /**
+   * Shipped (or delivered) and waiting only for a donation to be paid: where
+   * it goes back once paid (or once the donation comes off).
+   */
+  resumeStatus: text('resume_status').$type<OrderStatus>(),
   shippingZoneName: text('shipping_zone_name'),
   /** Address encrypted on the customer's device; the server cannot read it. */
   encryptedAddress: text('encrypted_address'),
@@ -408,6 +414,8 @@ export const testings = pgTable(
     donationsUntil: timestamp('donations_until', { withTimezone: true }),
     /** The time to give is over: what was not paid was taken off the orders. */
     donationsDone: boolean('donations_done').notNull().default(false),
+    /** The reminder a day before the time to give ends was sent. */
+    donationsReminded: boolean('donations_reminded').notNull().default(false),
     /** Leftovers below this per person are not sent back. */
     refundThreshold: integer('refund_threshold').notNull().default(200),
     tiers: jsonb('tiers').$type<TestingTier[]>().notNull(),

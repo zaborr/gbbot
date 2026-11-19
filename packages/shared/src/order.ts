@@ -104,6 +104,10 @@ export const order = z.object({
   testing: moneyAmount,
   /** Drawn to donate one vial of each of these (product · variant) to a testing. */
   donatedVials: z.array(z.string()),
+  /** Given to testings and not paid yet (the only thing the order owes, when it was paid or sent). */
+  donationDue: z.number().int(),
+  /** Sent (or delivered) and waiting only for that: where it goes back once paid. */
+  resumeStatus: orderStatus.nullable(),
   /** Name of the shipping zone chosen at checkout. */
   shippingZoneName: z.string().nullable(),
   /**
