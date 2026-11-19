@@ -1,8 +1,8 @@
-import { announceNewTesting } from '../services/testingDonations.js';
+import { announceNewTesting, reopenTesting } from '../services/testingDonations.js';
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { createTestingRequest, langFrom, updateTestingRequest } from '@tma-shop/shared';
+import { createTestingRequest, langFrom, MAX_DONATION_HOURS, updateTestingRequest } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { drawBlocker, launchDraw, substituteDonor } from '../services/testingDraw.js';
 import { cancelTesting, requestReport, settleTesting } from '../services/testingSettle.js';
@@ -63,6 +63,16 @@ export function testingAdminRoutes(): Hono<AppBindings> {
     await settleTesting(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('param').id);
     return c.json({ ok: true });
   });
+  // The time to join and give opens again (closed, or settled with nothing reached).
+  app.post(
+    '/:id/reopen',
+    zValidator('param', idParam),
+    zValidator('json', z.object({ hours: z.number().int().min(1).max(MAX_DONATION_HOURS) })),
+    async (c) => {
+      await reopenTesting(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('param').id, c.req.valid('json').hours);
+      return c.json({ ok: true });
+    },
+  );
   app.post('/:id/cancel', zValidator('param', idParam), async (c) => {
     await cancelTesting(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('param').id);
     return c.json({ ok: true });
