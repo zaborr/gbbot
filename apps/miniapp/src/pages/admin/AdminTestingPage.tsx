@@ -352,7 +352,7 @@ function TestingForm({
           subtitle={
             testing ? (
               <span className="gb-chips" style={{ marginTop: 4 }}>
-                <TestingStatusChip status={testing.status} />
+                <TestingStatusChip testing={testing} />
               </span>
             ) : (
               currency
