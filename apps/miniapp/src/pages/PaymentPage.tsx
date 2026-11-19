@@ -141,7 +141,7 @@ export function PaymentPage(): React.JSX.Element {
         )}
         {current.donatedVials.map((v) => (
           <Cell key={v} multiline>
-            {t('testing.donorLine', { item: v })}
+            {t(current.external ? 'testing.donorLineExternal' : 'testing.donorLine', { item: v })}
           </Cell>
         ))}
         <Cell after={formatPrice(current.total, current.currency)}>{t('cart.total')}</Cell>

@@ -21,7 +21,8 @@ const FILTERS: Record<FilterKey, { label: MessageKey; match: (order: Order) => b
   all: { label: 'catalog.all', match: () => true },
   attention: { label: 'adminHome.toReview', match: needsAttention },
   unpaid: { label: 'filter.unpaid', match: (o) => o.status === 'pending' },
-  paid: { label: 'filter.toShip', match: (o) => o.status === 'paid' },
+  // From outside: nothing to send.
+  paid: { label: 'filter.toShip', match: (o) => o.status === 'paid' && !o.external },
   shipped: { label: 'orderStatus.shipped', match: (o) => o.status === 'shipped' },
   fulfilled: { label: 'orderStatus.fulfilled', match: (o) => o.status === 'fulfilled' },
   cancelled: { label: 'orderStatus.cancelled', match: (o) => o.status === 'cancelled' },
