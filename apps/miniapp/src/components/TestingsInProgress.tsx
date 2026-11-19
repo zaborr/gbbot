@@ -98,13 +98,13 @@ export function TestingsInProgress({
     switch (action.kind) {
       case 'in':
         return (
-          <Button size="s" mode="plain" onClick={() => onOrder(action.orderId)}>
+          <Button size="s" mode="bezeled" onClick={() => onOrder(action.orderId)}>
             {extraLive(x) ? t('testing.liveExtra') : t('testing.liveIn')}
           </Button>
         );
       case 'see':
         return (
-          <Button size="s" mode="plain" onClick={() => onOrder(action.orderId)}>
+          <Button size="s" mode="bezeled" onClick={() => onOrder(action.orderId)}>
             {t('testing.liveSee')}
           </Button>
         );
