@@ -5,15 +5,23 @@ import { z } from 'zod';
  *  - `orders`: anyone with an order that is not cancelled;
  *  - `paid`: orders with something paid (paid, shipped, delivered);
  *  - `unpaid`: orders still waiting for a payment;
- *  - `cart`: people with products in their cart.
+ *  - `cart`: people with products in their cart;
+ *  - `testing`: those taking part in one testing (people from outside too);
+ *  - `donors`: one testing's vial donors (its volunteers, before the draw).
+ * `paid` leaves out orders from outside: they only took part in a testing.
  */
-export const broadcastAudience = z.enum(['orders', 'paid', 'unpaid', 'cart']);
+export const broadcastAudience = z.enum(['orders', 'paid', 'unpaid', 'cart', 'testing', 'donors']);
 export type BroadcastAudience = z.infer<typeof broadcastAudience>;
 
 export const BROADCAST_MAX_LENGTH = 3500;
 
+/** The audiences about one testing. */
+export const TESTING_AUDIENCES: readonly BroadcastAudience[] = ['testing', 'donors'];
+
 export const sendBroadcastRequest = z.object({
   audience: broadcastAudience,
+  /** For `testing` and `donors`: which testing. */
+  testingId: z.uuid().nullable().default(null),
   text: z.string().trim().min(1).max(BROADCAST_MAX_LENGTH),
 });
 export type SendBroadcastRequest = z.infer<typeof sendBroadcastRequest>;
@@ -22,6 +30,8 @@ export type SendBroadcastRequest = z.infer<typeof sendBroadcastRequest>;
 export const broadcastView = z.object({
   id: z.string(),
   audience: broadcastAudience,
+  /** For a testing's audiences: what it tests. */
+  testing: z.string().nullable(),
   text: z.string(),
   /** "@ana" or the sender's name. */
   sender: z.string(),

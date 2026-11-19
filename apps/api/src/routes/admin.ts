@@ -289,19 +289,21 @@ export function adminRoutes(): Hono<AppBindings> {
   // Messages to the GB's buyers through the bot: how many would get it, send, history.
   app.get(
     '/broadcasts/count',
-    zValidator('query', z.object({ audience: broadcastAudience })),
-    async (c) =>
-      c.json({
-        count: (
-          await audienceIds(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('query').audience)
-        ).length,
-      }),
+    zValidator('query', z.object({ audience: broadcastAudience, testingId: z.uuid().optional() })),
+    async (c) => {
+      const { audience, testingId } = c.req.valid('query');
+      return c.json({
+        count: (await audienceIds(c.get('db'), c.get('env'), c.get('shop'), audience, testingId ?? null)).length,
+      });
+    },
   );
   app.get('/broadcasts', async (c) => c.json(await listBroadcasts(c.get('db'), c.get('shopId'))));
   app.post('/broadcasts', zValidator('json', sendBroadcastRequest), async (c) => {
-    const { audience, text } = c.req.valid('json');
+    const { audience, text, testingId } = c.req.valid('json');
     return c.json(
-      await startBroadcast(c.get('db'), c.get('env'), c.get('shop'), c.get('claims').sub, audience, text),
+      await startBroadcast(c.get('db'), c.get('env'), c.get('shop'), c.get('claims').sub, audience, text, {
+        testingId,
+      }),
       201,
     );
   });

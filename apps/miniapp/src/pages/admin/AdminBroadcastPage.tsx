@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
-import { BROADCAST_MAX_LENGTH, broadcastAudience, type BroadcastAudience } from '@tma-shop/shared';
+import {
+  BROADCAST_MAX_LENGTH,
+  broadcastAudience,
+  TESTING_AUDIENCES,
+  type BroadcastAudience,
+} from '@tma-shop/shared';
 import { Textarea } from '../../components/Field.js';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
@@ -25,12 +30,25 @@ const audienceLabel = (audience: BroadcastAudience): string =>
 function Broadcast(): React.JSX.Element {
   const { shop } = useShop();
   const [audience, setAudience] = useState<BroadcastAudience>('orders');
+  // For a testing's audiences: which one (those not cancelled).
+  const testings = useAsync(
+    () => (shop.testingEnabled ? api.adminGetTestings() : Promise.resolve([])),
+    [shop.testingEnabled],
+  );
+  const live = (testings.data ?? []).filter((x) => x.status !== 'cancelled');
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const aboutTesting = TESTING_AUDIENCES.includes(audience);
+  const chosen = aboutTesting ? (testingId ?? live[0]?.id ?? null) : null;
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const actions = useAdminActions(() => setReloadKey((k) => k + 1));
-  const count = useAsync(() => api.adminBroadcastCount(audience), [audience, reloadKey]);
+  const count = useAsync(
+    () =>
+      aboutTesting && !chosen ? Promise.resolve({ count: 0 }) : api.adminBroadcastCount(audience, chosen),
+    [audience, chosen, reloadKey],
+  );
   const history = useAsync(() => api.adminListBroadcasts(), [reloadKey]);
   const sending = (history.data ?? []).some((b) => b.status === 'sending');
   // Follow a send in progress.
@@ -42,7 +60,7 @@ function Broadcast(): React.JSX.Element {
   const send = async (): Promise<void> => {
     setBusy(true);
     await actions.twoTap('send', async () => {
-      await api.adminSendBroadcast(audience, message);
+      await api.adminSendBroadcast(audience, message, chosen);
       setText('');
       setSent(true);
     });
@@ -56,7 +74,9 @@ function Broadcast(): React.JSX.Element {
 
       <Section header={t('broadcast.to')} footer={t('broadcast.toFooter')}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '12px 16px' }}>
-          {broadcastAudience.options.map((option) => (
+          {broadcastAudience.options
+            .filter((option) => shop.testingEnabled || !TESTING_AUDIENCES.includes(option))
+            .map((option) => (
             <Button
               key={option}
               size="s"
@@ -68,8 +88,28 @@ function Broadcast(): React.JSX.Element {
             >
               {audienceLabel(option)}
             </Button>
-          ))}
+            ))}
         </div>
+        {aboutTesting &&
+          (live.length === 0 ? (
+            <Cell multiline>{t('broadcast.noTesting')}</Cell>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '0 16px 12px' }}>
+              {live.map((x) => (
+                <Button
+                  key={x.id}
+                  size="s"
+                  mode={chosen === x.id ? 'filled' : 'bezeled'}
+                  onClick={() => {
+                    setTestingId(x.id);
+                    setSent(false);
+                  }}
+                >
+                  {x.variantLabel ? `${x.productTitle} · ${x.variantLabel}` : x.productTitle}
+                </Button>
+              ))}
+            </div>
+          ))}
         <Cell after={count.loading ? '…' : String(recipients)}>{t('broadcast.people')}</Cell>
       </Section>
 
@@ -117,7 +157,7 @@ function Broadcast(): React.JSX.Element {
                   hour: '2-digit',
                   minute: '2-digit',
                 }),
-                audienceLabel(b.audience),
+                b.testing ? `${audienceLabel(b.audience)} (${b.testing})` : audienceLabel(b.audience),
                 b.sender,
               ].join(' · ')}
               description={

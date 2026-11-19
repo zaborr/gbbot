@@ -115,7 +115,18 @@ function AdminOrder(): React.JSX.Element {
         >
           {t('adminOrder.customer')}
         </Cell>
-        <Cell after={o.userId === null ? '—' : String(o.userId)}>{t('adminOrder.telegramId')}</Cell>
+        <Cell
+          after={
+            o.userId === null ? (
+              '—'
+            ) : (
+              // Without a @username, the id still opens a chat in Telegram.
+              <a href={`tg://user?id=${o.userId}`}>{String(o.userId)}</a>
+            )
+          }
+        >
+          {t('adminOrder.telegramId')}
+        </Cell>
         {o.anonymizedAt && (
           <Cell multiline subtitle={t('adminOrder.since', { date: formatDate(o.anonymizedAt) })}>
             {t('adminOrder.anonymized')}
