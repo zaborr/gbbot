@@ -154,6 +154,19 @@ export async function cancelTesting(db: Database, env: Env, shop: ShopRow, id: s
     // What was given goes back too, and so does the extra round.
     await refundDonations(tx, testing);
     await cancelExtra(tx, testing);
+    // Orders from outside were only for this testing: with nothing paid they go;
+    // with something paid they stay until it is given back.
+    await tx
+      .update(orders)
+      .set({ status: 'cancelled', closedAt: new Date(), updatedAt: new Date() })
+      .where(
+        and(
+          eq(orders.externalTestingId, testing.id),
+          ne(orders.status, 'cancelled'),
+          eq(orders.amountPaid, 0),
+          eq(orders.amountSubmitted, 0),
+        ),
+      );
     return tx
       .update(testings)
       .set({ status: 'cancelled', updatedAt: new Date() })

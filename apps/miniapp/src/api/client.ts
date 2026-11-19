@@ -786,8 +786,10 @@ export class ApiClient {
   }
 
   /** How many buyers a message to `audience` would reach. */
-  adminBroadcastCount(audience: BroadcastAudience): Promise<{ count: number }> {
-    return this.request(`/admin/broadcasts/count?audience=${audience}`);
+  adminBroadcastCount(audience: BroadcastAudience, testingId: string | null = null): Promise<{ count: number }> {
+    return this.request(
+      `/admin/broadcasts/count?audience=${audience}${testingId ? `&testingId=${testingId}` : ''}`,
+    );
   }
 
   adminListBroadcasts(): Promise<BroadcastView[]> {
@@ -795,10 +797,10 @@ export class ApiClient {
   }
 
   /** Sends a message to the GB's buyers through the bot (in the background). */
-  adminSendBroadcast(audience: BroadcastAudience, text: string): Promise<BroadcastView> {
+  adminSendBroadcast(audience: BroadcastAudience, text: string, testingId: string | null = null): Promise<BroadcastView> {
     return this.request<BroadcastView>('/admin/broadcasts', {
       method: 'POST',
-      body: JSON.stringify({ audience, text }),
+      body: JSON.stringify({ audience, text, testingId }),
     });
   }
 

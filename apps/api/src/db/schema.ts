@@ -573,8 +573,10 @@ export const broadcasts = pgTable(
       .notNull()
       .references(() => shops.id, { onDelete: 'cascade' }),
     senderId: bigint('sender_id', { mode: 'number' }).notNull(),
-    /** Who it went to: `orders`, `paid`, `unpaid` or `cart`. */
+    /** Who it went to: `orders`, `paid`, `unpaid`, `cart`, `testing` or `donors`. */
     audience: text('audience').notNull(),
+    /** For `testing` and `donors`: which testing. */
+    testingId: uuid('testing_id'),
     text: text('text').notNull(),
     recipients: integer('recipients').notNull().default(0),
     sent: integer('sent').notNull().default(0),

@@ -1,8 +1,10 @@
-import { and, desc, eq, gt, isNotNull, lt, ne, sql } from 'drizzle-orm';
-import type { BroadcastAudience, BroadcastView } from '@tma-shop/shared';
+import { and, desc, eq, gt, inArray, isNotNull, lt, ne, sql } from 'drizzle-orm';
+import { TESTING_AUDIENCES, type BroadcastAudience, type BroadcastView } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
-import { broadcasts, cartItems, carts, orders } from '../db/schema.js';
+import { broadcasts, cartItems, carts, orders, testingEntries, testings } from '../db/schema.js';
+import { ApiError } from '../lib/errors.js';
+import { testedLabel } from './testingDraw.js';
 import { tr } from '../i18n/messages.js';
 import { TelegramApi, type InlineKeyboard } from '../telegram/api.js';
 import { miniAppUrl } from './bot.js';
@@ -26,8 +28,12 @@ export async function audienceIds(
   env: Env,
   shop: ShopRow,
   audience: BroadcastAudience,
+  testingId: string | null = null,
 ): Promise<number[]> {
   const shopId = shop.id;
+  if (TESTING_AUDIENCES.includes(audience)) {
+    return withoutBlocked(db, env, shop, await testingAudience(db, shopId, audience, testingId));
+  }
   // The blacklisted never hear from the GB.
   if (audience === 'cart') {
     const rows = await db
@@ -39,7 +45,11 @@ export async function audienceIds(
   }
   const filters = [eq(orders.shopId, shopId), isNotNull(orders.userId), ne(orders.status, 'cancelled')];
   if (audience === 'paid') {
-    filters.push(sql`(${orders.status} IN ('paid', 'shipped', 'fulfilled') OR ${orders.amountPaid} > 0)`);
+    // Orders from outside only took part in a testing: they have their own audience.
+    filters.push(
+      sql`(${orders.status} IN ('paid', 'shipped', 'fulfilled') OR ${orders.amountPaid} > 0)`,
+      eq(orders.external, false),
+    );
   } else if (audience === 'unpaid') {
     filters.push(eq(orders.status, 'pending'), gt(sql`${orders.total} - ${orders.amountPaid}`, 0));
   }
@@ -47,10 +57,51 @@ export async function audienceIds(
   return withoutBlocked(db, env, shop, rows.flatMap((r) => (r.id === null ? [] : [r.id])));
 }
 
+/**
+ * Those in one testing (from outside too), or its vial donors: the drawn
+ * ones once drawn, the volunteers before.
+ */
+async function testingAudience(
+  db: Database,
+  shopId: string,
+  audience: BroadcastAudience,
+  testingId: string | null,
+): Promise<number[]> {
+  if (!testingId) throw ApiError.badRequest('testing_needed', 'Choose the testing');
+  const testing = await db.query.testings.findFirst({
+    where: and(eq(testings.shopId, shopId), eq(testings.id, testingId)),
+  });
+  if (!testing) throw ApiError.notFound('Testing not found');
+  const drawn = testing.draw?.hash ? testing.draw : null;
+  const donorOrders =
+    audience === 'donors' && drawn
+      ? drawn.candidates.filter((c) => drawn.donors.includes(c.ref)).map((c) => c.orderId)
+      : null;
+  if (donorOrders && donorOrders.length === 0) return [];
+  const rows = await db
+    .selectDistinct({ id: orders.userId })
+    .from(testingEntries)
+    .innerJoin(orders, eq(testingEntries.orderId, orders.id))
+    .where(
+      and(
+        eq(testingEntries.testingId, testing.id),
+        ne(orders.status, 'cancelled'),
+        isNotNull(orders.userId),
+        audience === 'donors' && !donorOrders ? eq(testingEntries.volunteer, true) : undefined,
+        donorOrders ? inArray(orders.id, donorOrders) : undefined,
+      ),
+    );
+  return rows.flatMap((r) => (r.id === null ? [] : [r.id]));
+}
+
 async function toView(db: Database, row: BroadcastRow): Promise<BroadcastView> {
+  const testing = row.testingId
+    ? await db.query.testings.findFirst({ where: eq(testings.id, row.testingId) })
+    : undefined;
   return {
     id: row.id,
     audience: row.audience as BroadcastAudience,
+    testing: testing ? await testedLabel(db, testing) : null,
     text: row.text,
     sender: await describeUser(db, row.senderId),
     recipients: row.recipients,
@@ -145,12 +196,13 @@ export async function startBroadcast(
   senderId: number,
   audience: BroadcastAudience,
   text: string,
-  options: { telegram?: TelegramApi; gapMs?: number; wait?: boolean } = {},
+  options: { telegram?: TelegramApi; gapMs?: number; wait?: boolean; testingId?: string | null } = {},
 ): Promise<BroadcastView> {
-  const ids = await audienceIds(db, env, shop, audience);
+  const testingId = TESTING_AUDIENCES.includes(audience) ? (options.testingId ?? null) : null;
+  const ids = await audienceIds(db, env, shop, audience, testingId);
   const [row] = await db
     .insert(broadcasts)
-    .values({ shopId: shop.id, senderId, audience, text, recipients: ids.length })
+    .values({ shopId: shop.id, senderId, audience, testingId, text, recipients: ids.length })
     .returning();
   if (!row) throw new Error('Failed to save the broadcast');
   const run = deliver(

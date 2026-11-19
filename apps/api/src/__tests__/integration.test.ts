@@ -1694,6 +1694,13 @@ describeDb('API integration', () => {
         participants: number;
       }>)[0];
       expect(after).toMatchObject({ joined: true, participants: 1 });
+      // Messages: those of the testing (from outside too) and its volunteers.
+      const count = async (query: string): Promise<number> =>
+        ((await (await request(`/api/admin/broadcasts/count?${query}`, { headers: admin })).json()) as { count: number })
+          .count;
+      expect(await count(`audience=testing&testingId=${testingId}`)).toBe(1);
+      expect(await count(`audience=donors&testingId=${testingId}`)).toBe(1);
+      expect((await request('/api/admin/broadcasts/count?audience=testing', { headers: admin })).status).toBe(400);
       // In like anyone: they can give from that order.
       const gift = await request(`/api/orders/${orderId}/donations`, {
         method: 'POST',
