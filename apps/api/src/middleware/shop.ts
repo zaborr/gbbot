@@ -9,6 +9,7 @@ import { isGuestOf, isVipOf } from '../services/vip.js';
 import { isBlocked } from '../services/blacklist.js';
 import { canOwnShop } from '../services/team.js';
 import { disclaimerPending } from '../services/disclaimer.js';
+import { shopsOpenToOutside } from '../services/testing.js';
 import { and, eq } from 'drizzle-orm';
 import { isClosedAt } from '@tma-shop/shared';
 import { orders } from '../db/schema.js';
@@ -58,7 +59,9 @@ export const withShop = createMiddleware<AppBindings>(async (c, next) => {
         where: and(eq(orders.shopId, shop.id), eq(orders.userId, userId)),
         columns: { id: true },
       })) !== undefined;
-    if (!ordered) throw ApiError.notFound('Shop not found');
+    // Or who can still join one of its testings from outside.
+    const outside = !ordered && shop.testingEnabled && (await shopsOpenToOutside(c.get('db'), [shop.id])).has(shop.id);
+    if (!ordered && !outside) throw ApiError.notFound('Shop not found');
   }
 
   c.set('shop', shop);

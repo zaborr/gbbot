@@ -1254,3 +1254,19 @@ export async function dropUnpaidExternal(db: Database, testingId: string): Promi
     );
   return rows.length;
 }
+
+/** Of these GBs, those with a testing people from outside can join now (they reach it even closed). */
+export async function shopsOpenToOutside(db: Executor, shopIds: readonly string[]): Promise<Set<string>> {
+  if (shopIds.length === 0) return new Set();
+  const rows = await db
+    .selectDistinct({ shopId: testings.shopId })
+    .from(testings)
+    .where(
+      and(
+        inArray(testings.shopId, [...shopIds]),
+        eq(testings.allowExternal, true),
+        sql`(${testings.status} = 'open' or (${testings.status} = 'closed' and not ${testings.donationsDone} and ${testings.donationsUntil} > now()))`,
+      ),
+    );
+  return new Set(rows.map((r) => r.shopId));
+}
