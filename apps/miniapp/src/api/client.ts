@@ -298,10 +298,15 @@ export class ApiClient {
     });
   }
 
-  adminBlacklistAdd(who: string, removeData: boolean): Promise<BlacklistView> {
+  adminBlacklistAdd(
+    who: string,
+    removeData: boolean,
+    reason: string,
+    scope: 'shop' | 'platform',
+  ): Promise<BlacklistView> {
     return this.request<BlacklistView>('/admin/blacklist', {
       method: 'POST',
-      body: JSON.stringify({ who, removeData }),
+      body: JSON.stringify({ who, removeData, reason, scope }),
     });
   }
 
@@ -323,10 +328,10 @@ export class ApiClient {
     });
   }
 
-  platformBlacklistAdd(who: string, removeData: boolean): Promise<BlacklistView> {
+  platformBlacklistAdd(who: string, removeData: boolean, reason: string): Promise<BlacklistView> {
     return this.request<BlacklistView>('/platform/blacklist', {
       method: 'POST',
-      body: JSON.stringify({ who, removeData }),
+      body: JSON.stringify({ who, removeData, reason }),
     });
   }
 

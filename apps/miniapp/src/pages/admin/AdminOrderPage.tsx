@@ -72,6 +72,29 @@ function AdminOrder(): React.JSX.Element {
         }
       >
         {o.customerBlocked && <Cell multiline>{t('blacklist.orderNote')}</Cell>}
+        {o.extraUnpaid?.map((product) => (
+          <Cell key={product} multiline>
+            ⚠️ {t('blacklist.extraUnpaid', { product })}
+          </Cell>
+        ))}
+        {o.extraUnpaid && !o.customerBlocked && o.userId !== null && shop.data?.canOwn && (
+          <div style={{ padding: '4px 16px 12px' }}>
+            <Button
+              size="s"
+              mode="bezeled"
+              onClick={() =>
+                navigate(
+                  `${to('/admin/blacklist')}?${new URLSearchParams({
+                    who: String(o.userId),
+                    reason: (o.extraUnpaid ?? []).map((product) => t('blacklist.extraUnpaid', { product })).join(' '),
+                  }).toString()}`,
+                )
+              }
+            >
+              {t('blacklist.blockFromOrder')}
+            </Button>
+          </div>
+        )}
         <Cell after={statusLabel(o)}>{t('adminOrder.status')}</Cell>
         <Cell after={formatDate(o.createdAt)}>{t('adminOrder.created')}</Cell>
         {o.updatedAt !== o.createdAt && (

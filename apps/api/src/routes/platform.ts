@@ -140,8 +140,10 @@ export function platformRoutes(): Hono<AppBindings> {
     c.json(await checkBlacklist(c.get('db'), c.req.valid('json').who, null)),
   );
   app.post('/blacklist', zValidator('json', addToBlacklistRequest), async (c) => {
-    const { who, removeData } = c.req.valid('json');
-    return c.json(await addToPlatformBlacklist(c.get('db'), c.get('env'), who, removeData));
+    const { who, removeData, reason } = c.req.valid('json');
+    return c.json(
+      await addToPlatformBlacklist(c.get('db'), c.get('env'), c.get('claims').sub, who, removeData, reason),
+    );
   });
   app.post('/blacklist/remove', zValidator('json', blacklistWho), async (c) =>
     c.json(await removeFromPlatformBlacklist(c.get('db'), c.req.valid('json').who)),

@@ -759,3 +759,15 @@ export async function extraPayers(db: Database, testingId: string): Promise<stri
     .where(and(eq(testingExtraMembers.testingId, testingId), eq(testingExtraMembers.state, 'paid')));
   return rows.map((r) => r.orderId);
 }
+
+/** What was tested in the extra rounds whose share this order did not pay (for the team). */
+export async function unpaidExtras(db: Database, orderId: string): Promise<string[]> {
+  const rows = await db
+    .select({ testing: testings })
+    .from(testingExtraMembers)
+    .innerJoin(testings, eq(testingExtraMembers.testingId, testings.id))
+    .where(and(eq(testingExtraMembers.orderId, orderId), eq(testingExtraMembers.state, 'failed')));
+  const labels: string[] = [];
+  for (const { testing } of rows) labels.push(await testedLabel(db, testing));
+  return labels;
+}

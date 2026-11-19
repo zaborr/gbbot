@@ -44,6 +44,7 @@ import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth, requireOwner } from '../auth/middleware.js';
 import { testingAdminRoutes } from './testing.js';
 import { announceTestingTiers, listTestings, setTestingEnabled } from '../services/testing.js';
+import { unpaidExtras } from '../services/testingExtra.js';
 import {
   createCategory,
   createProduct,
@@ -672,7 +673,8 @@ export function adminRoutes(): Hono<AppBindings> {
     const order = await getOrder(c.get('db'), c.get('shopId'), c.req.valid('param').id);
     if (!order) throw ApiError.notFound('Order not found');
     const [marked] = await markBlocked(c, [order]);
-    return c.json(marked ?? order);
+    const extraUnpaid = await unpaidExtras(c.get('db'), order.id);
+    return c.json({ ...(marked ?? order), ...(extraUnpaid.length > 0 ? { extraUnpaid } : {}) });
   });
 
   // Blacklist of the GB (administrators): for those in it the GB does not exist.
@@ -683,8 +685,9 @@ export function adminRoutes(): Hono<AppBindings> {
     c.json(await checkBlacklist(c.get('db'), c.req.valid('json').who, c.get('shopId'))),
   );
   app.post('/blacklist', requireOwner, zValidator('json', addToBlacklistRequest), async (c) => {
-    const { who, removeData } = c.req.valid('json');
-    return c.json(await addToShopBlacklist(c.get('db'), c.get('env'), c.get('shop'), who, removeData));
+    return c.json(
+      await addToShopBlacklist(c.get('db'), c.get('env'), c.get('shop'), c.get('claims').sub, c.req.valid('json')),
+    );
   });
   app.post('/blacklist/remove', requireOwner, zValidator('json', blacklistWho), async (c) =>
     c.json(await removeFromShopBlacklist(c.get('db'), c.get('shop'), c.req.valid('json').who)),

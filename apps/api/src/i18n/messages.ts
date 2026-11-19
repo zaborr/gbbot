@@ -204,6 +204,7 @@ const en = {
   'testing.extraRound': '🧪 {shop}: someone did not pay the extra round of {product}, {gap} is missing. Do you go on? It depends on how many go on:\n{options}\nAnswer from your order within {hours} h. If you leave or do not answer, all you paid goes back.',
   'testing.extraRoundOption': '• {count} go on: {amount} more each',
   'testing.extraTopup': '🧪 {shop}: the extra round of {product} goes on. Your difference: {amount}. Pay it from your order within {hours} h, or all you paid goes back.',
+  'platform.blocked': '🚫 {by} blocked {who} in every GB, from «{shop}». Reason: {reason}',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -400,6 +401,7 @@ const es: Record<BotMessageKey, string> = {
   'testing.extraRound': '🧪 {shop}: alguien no ha pagado la fase extra de {product}, faltan {gap}. ¿Sigues o te bajas? Depende de cuántos sigan:\n{options}\nResponde desde tu pedido en {hours} h. Si te bajas o no respondes, se te devuelve todo lo pagado.',
   'testing.extraRoundOption': '• Si siguen {count}: {amount} más cada uno',
   'testing.extraTopup': '🧪 {shop}: la fase extra de {product} sigue. Tu diferencia: {amount}. Págala desde tu pedido en {hours} h; si no, se te devuelve todo lo pagado.',
+  'platform.blocked': '🚫 {by} ha bloqueado a {who} en todos los GB, desde «{shop}». Motivo: {reason}',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -594,6 +596,7 @@ const it: Record<BotMessageKey, string> = {
   'testing.extraRound': '🧪 {shop}: qualcuno non ha pagato la fase extra di {product}, mancano {gap}. Continui o ti ritiri? Dipende da quanti continuano:\n{options}\nRispondi dal tuo ordine entro {hours} h. Se ti ritiri o non rispondi, ti viene restituito tutto.',
   'testing.extraRoundOption': '• Se continuano in {count}: {amount} in più a testa',
   'testing.extraTopup': '🧪 {shop}: la fase extra di {product} continua. La tua differenza: {amount}. Pagala dal tuo ordine entro {hours} h, altrimenti ti viene restituito tutto.',
+  'platform.blocked': '🚫 {by} ha bloccato {who} in tutti i GB, da «{shop}». Motivo: {reason}',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -788,6 +791,7 @@ const pt: Record<BotMessageKey, string> = {
   'testing.extraRound': '🧪 {shop}: alguém não pagou a fase extra de {product}, faltam {gap}. Continua ou sai? Depende de quantos continuarem:\n{options}\nResponda a partir da sua encomenda em {hours} h. Se sair ou não responder, é-lhe devolvido tudo o que pagou.',
   'testing.extraRoundOption': '• Se continuarem {count}: mais {amount} cada',
   'testing.extraTopup': '🧪 {shop}: a fase extra de {product} continua. A sua diferença: {amount}. Pague-a a partir da sua encomenda em {hours} h; caso contrário, é-lhe devolvido tudo.',
+  'platform.blocked': '🚫 {by} bloqueou {who} em todos os GB, a partir de «{shop}». Motivo: {reason}',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };
