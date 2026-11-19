@@ -18,7 +18,7 @@ import { withoutBlocked } from './blacklist.js';
 import { notifyUsers } from './notifications.js';
 import type { ShopRow } from './shop.js';
 import { botToken } from './activeBot.js';
-import { donationsOpen, reachedTiers, vialShare } from './testing.js';
+import { donationsOpen, reachedTiers, takesPart, vialPrices, vialShare } from './testing.js';
 import { closeDonationWindows, donationsBeingChecked } from './testingDonations.js';
 import { advanceExtras, extraGoing, extraPayers } from './testingExtra.js';
 
@@ -162,17 +162,19 @@ async function loadCandidates(db: Database, env: Env, shop: ShopRow, testing: Te
   const priceOf = (orderId: string): number =>
     items.find((i) => i.orderId === orderId && (testing.variantId === null || i.variantId === testing.variantId))
       ?.unitPrice ?? 0;
+  // From outside: what a vial costs here now.
+  const priceHere = (await vialPrices(db, [testing])).get(testing.id) ?? 0;
 
   const people = new Map<number, DrawCandidate>();
   for (const { entry, order } of entries) {
     if (order.userId === null || order.amountPaid < order.total || people.has(order.userId)) continue;
-    // Exempt (fee 0): only as a volunteer.
-    if (entry.amount <= 0 && !entry.volunteer) continue;
+    // Exempt VIPs, and those from outside (no package to take it from): only as volunteers.
+    if ((!takesPart(testing, order.isVip, entry.amount) || order.external) && !entry.volunteer) continue;
     people.set(order.userId, {
       orderId: order.id,
       ref: shortRef(order.id),
       volunteer: entry.volunteer,
-      vialPrice: vialShare(priceOf(order.id), testing.vialsPerUnit),
+      vialPrice: order.external ? priceHere : vialShare(priceOf(order.id), testing.vialsPerUnit),
     });
   }
   const allowed = new Set(await withoutBlocked(db, env, shop, [...people.keys()]));

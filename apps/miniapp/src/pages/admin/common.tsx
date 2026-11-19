@@ -85,6 +85,7 @@ export function toInput(product: Product, isActive: boolean): ProductInput {
 
 /** One line per order: "2× Sencha, 1× Gaiwan". */
 export function itemsSummary(order: Order): string {
+  if (order.external && order.items.length === 0) return t('orders.externalTesting');
   return order.items.map((item) => `${item.quantity}× ${itemName(item)}`).join(', ');
 }
 

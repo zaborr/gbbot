@@ -71,8 +71,8 @@ export const createTestingRequest = z.object({
   /** Required when the product has variants: the one tested. */
   variantId: z.uuid().nullable(),
   lab: z.string().trim().min(1).max(80),
-  /** The testing fee, paid once per buyer (minor units). */
-  contribution: z.number().int().positive().max(100_000_000),
+  /** The testing fee, paid once per buyer (minor units); 0: everyone takes part for free. */
+  contribution: z.number().int().min(0).max(100_000_000),
   /** Hidden: what the organiser puts in the pot for each unit sold (minor units). */
   perUnit: z.number().int().min(0).max(100_000_000),
   feeMode: testingFeeMode,
@@ -86,6 +86,8 @@ export const createTestingRequest = z.object({
   extraMin: z.number().int().min(0).max(100_000_000).default(0),
   extraSignupHours: z.number().int().min(1).max(MAX_DONATION_HOURS).default(24),
   extraPayHours: z.number().int().min(1).max(MAX_DONATION_HOURS).default(48),
+  /** People who bought elsewhere can join from the GB, paying the same fee. */
+  allowExternal: z.boolean().default(false),
 });
 export type CreateTestingRequest = z.infer<typeof createTestingRequest>;
 
@@ -172,6 +174,10 @@ export const testing = z.object({
   vialsPerUnit: z.number().int(),
   /** Made once the GB was closed: the fee is paid to join (from an order), until the time to give ends. */
   posterior: z.boolean(),
+  /** Those who did not buy it here can join (an order of only the fee). */
+  allowExternal: z.boolean(),
+  /** Those from outside can join now. */
+  externalOpen: z.boolean(),
   extraEnabled: z.boolean(),
   /** The lowest cap to sign up to it (0: the fee), and its hours to sign up and to pay. */
   extraMin: z.number().int(),
@@ -405,6 +411,12 @@ export interface TestingExtraView {
 }
 
 /** Going on (paying the difference) or leaving, in the second round of the extra round. */
+/** Joining from outside: no order of the product here. */
+export const joinExternalRequest = z.object({
+  volunteer: z.boolean().default(false),
+  contactUsername: z.string().trim().max(64).nullable().default(null),
+});
+
 export const extraRoundRequest = z.object({ testingId: z.uuid(), stay: z.boolean() });
 
 /** Signing up to the extra round from an order, with a cap. */

@@ -80,11 +80,13 @@ export async function testingTotals(
       testingId: testingEntries.testingId,
       amount: sql<number>`coalesce(sum(case when ${paid} then ${testingEntries.amount} else 0 end), 0)::bigint`,
       extras: sql<number>`coalesce(sum(case when ${paid} then ${testingEntries.extra} else 0 end), 0)::bigint`,
-      payers: sql<number>`count(*) filter (where ${paid} and ${testingEntries.amount} > 0)::int`,
+      // Who takes part: paid the fee, or the fee is 0 (VIPs exempt only offer a vial).
+      payers: sql<number>`count(*) filter (where ${paid} and (${testingEntries.amount} > 0 or (${testings.contribution} = 0 and not (${orders.isVip} and ${testings.feeMode} = 'mandatory_non_vip'))))::int`,
       entries: sql<number>`count(*)::int`,
     })
     .from(testingEntries)
     .innerJoin(orders, eq(testingEntries.orderId, orders.id))
+    .innerJoin(testings, eq(testingEntries.testingId, testings.id))
     .where(and(inArray(testingEntries.testingId, [...testingIds]), ne(orders.status, 'cancelled')))
     .groupBy(testingEntries.testingId);
   const units = await db
@@ -245,6 +247,16 @@ export async function reachedTiers(
 export const feeExempt = (testing: Pick<TestingRow, 'feeMode'>, isVip: boolean): boolean =>
   isVip && testing.feeMode === 'mandatory_non_vip';
 
+/**
+ * Takes part (not only offering a vial as an exempt VIP): paid the fee on the
+ * entry, or the fee is 0 and everyone takes part for free.
+ */
+export const takesPart = (
+  testing: Pick<TestingRow, 'feeMode' | 'contribution'>,
+  isVip: boolean,
+  amount: number,
+): boolean => !feeExempt(testing, isVip) && (amount > 0 || testing.contribution === 0);
+
 /** The testings this person already takes part in (on an order not cancelled). */
 async function joinedBy(db: Executor, userId: number | undefined, testingIds: readonly string[]): Promise<Set<string>> {
   if (userId === undefined || testingIds.length === 0) return new Set();
@@ -325,6 +337,8 @@ function toTestingDTO(
       : null,
     vialsPerUnit: row.vialsPerUnit,
     posterior: row.posterior,
+    allowExternal: row.allowExternal,
+    externalOpen: externalOpen(row),
     reportSentAt: row.report?.sentAt ?? null,
     extraReportSentAt: row.extraReport?.sentAt ?? null,
     donationHours: row.donationHours,
@@ -648,6 +662,7 @@ export async function createTesting(
     where: and(eq(products.shopId, shop.id), eq(products.id, input.productId)),
   });
   if (!product) throw ApiError.notFound('Product not found');
+  needExtraMin(input);
   const posterior = shop.closedAt !== null;
   if (posterior && input.donationHours < 1) {
     throw ApiError.badRequest('posterior_hours', 'A testing after closing needs some hours to join');
@@ -725,6 +740,7 @@ export async function createTesting(
         extraMin: input.extraMin,
         extraSignupHours: input.extraSignupHours,
         extraPayHours: input.extraPayHours,
+        allowExternal: input.allowExternal,
         extraProductId: extraProduct?.id ?? null,
         donationProductId: donation?.id ?? null,
         // The GB is closed: a testing afterwards. Joining (with the fee) and
@@ -745,6 +761,13 @@ export async function createTesting(
   return oneTesting(db, row);
 }
 
+/** With no fee the extra round's lowest cap cannot be the fee: it is set by hand. */
+function needExtraMin(input: Pick<UpdateTestingRequest, 'extraEnabled' | 'extraMin' | 'contribution'>): void {
+  if (input.extraEnabled && input.contribution === 0 && input.extraMin <= 0) {
+    throw ApiError.badRequest('extra_min_needed', 'Without a fee, set the lowest cap of the extra round');
+  }
+}
+
 export async function updateTesting(
   db: Database,
   shopId: string,
@@ -752,6 +775,7 @@ export async function updateTesting(
   input: UpdateTestingRequest,
 ): Promise<Testing> {
   const current = await findTesting(db, shopId, id);
+  needExtraMin(input);
   // The tiers and the hidden part are the organiser's own sums: they can change
   // until the draw. The fee is what people were charged: it stays once they take part.
   if (current.status !== 'open' && current.status !== 'closed') {
@@ -780,6 +804,7 @@ export async function updateTesting(
       tiers: input.tiers,
       donationHours: input.donationHours,
       vialsPerUnit: input.vialsPerUnit,
+      allowExternal: input.allowExternal,
       // Once the extra round started, it stays as it was.
       ...(current.extra
         ? {}
@@ -1120,4 +1145,112 @@ export async function joinTestingWithOrder(
       })
       .where(eq(orders.id, order.id));
   });
+}
+
+/**
+ * Those from outside can join: while it is open, and once the GB closes while
+ * the time to give lasts (a testing made after closing, or one from before).
+ */
+export const externalOpen = (
+  row: Pick<TestingRow, 'allowExternal' | 'status' | 'donationsDone' | 'donationsUntil'>,
+  now = new Date(),
+): boolean =>
+  row.allowExternal &&
+  (row.status === 'open' ||
+    (row.status === 'closed' && !row.donationsDone && row.donationsUntil !== null && row.donationsUntil > now));
+
+/**
+ * Joins a testing from outside (bought elsewhere): an order of only the fee,
+ * with nothing to send. Once paid (at once when the fee is 0) they are in like
+ * anyone: giving, the extra round, the report; drawn only when offering a vial
+ * (there is no package of theirs to take it from).
+ */
+export async function joinTestingExternal(
+  db: Database,
+  shop: ShopRow,
+  userId: number,
+  testingId: string,
+  input: { volunteer: boolean; contactUsername: string | null },
+): Promise<string> {
+  if (!shop.testingEnabled) {
+    throw ApiError.conflict('testing_off', 'Turn on product testing in the GB settings first');
+  }
+  return db.transaction(async (tx) => {
+    const testing = await tx.query.testings.findFirst({
+      where: and(eq(testings.shopId, shop.id), eq(testings.id, testingId)),
+    });
+    if (!testing) throw ApiError.notFound('Testing not found');
+    if (!testing.allowExternal) throw ApiError.conflict('testing_no_external', 'This testing is only for buyers');
+    if (!externalOpen(testing)) throw ApiError.conflict('testing_not_open', 'This testing is closed');
+    if ((await joinedBy(tx, userId, [testing.id])).size > 0) {
+      throw ApiError.conflict('testing_joined', 'You already take part in this testing');
+    }
+    // Bought it here: they join from that order.
+    const [bought] = await tx
+      .select({ id: orders.id })
+      .from(orders)
+      .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+      .where(
+        and(
+          eq(orders.shopId, shop.id),
+          eq(orders.userId, userId),
+          ne(orders.status, 'cancelled'),
+          eq(orderItems.productId, testing.productId),
+          testing.variantId ? eq(orderItems.variantId, testing.variantId) : undefined,
+        ),
+      )
+      .limit(1);
+    if (bought) throw ApiError.conflict('testing_use_order', 'You bought it here: join from your order');
+    const fee = testing.contribution;
+    const [order] = await tx
+      .insert(orders)
+      .values({
+        shopId: shop.id,
+        userId,
+        external: true,
+        status: fee > 0 ? 'pending' : 'paid',
+        total: fee,
+        testing: fee,
+        currency: testing.currency,
+        contactUsername: input.contactUsername,
+      })
+      .returning({ id: orders.id });
+    if (!order) throw new Error('Failed to create the order');
+    await tx.insert(testingEntries).values({
+      testingId: testing.id,
+      orderId: order.id,
+      userId,
+      amount: fee,
+      volunteer: input.volunteer,
+    });
+    return order.id;
+  });
+}
+
+/** The time to join is over: orders from outside still not paid are cancelled. */
+export async function dropUnpaidExternal(db: Database, testingId: string): Promise<number> {
+  const rows = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .innerJoin(testingEntries, eq(testingEntries.orderId, orders.id))
+    .where(
+      and(
+        eq(testingEntries.testingId, testingId),
+        eq(orders.external, true),
+        inArray(orders.status, ['pending', 'awaiting_payment']),
+        eq(orders.amountPaid, 0),
+        eq(orders.amountSubmitted, 0),
+      ),
+    );
+  if (rows.length === 0) return 0;
+  await db
+    .update(orders)
+    .set({ status: 'cancelled', closedAt: new Date(), updatedAt: new Date() })
+    .where(
+      inArray(
+        orders.id,
+        rows.map((r) => r.id),
+      ),
+    );
+  return rows.length;
 }

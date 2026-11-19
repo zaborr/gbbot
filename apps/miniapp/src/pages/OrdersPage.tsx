@@ -11,6 +11,7 @@ import { ErrorView } from '../components/ErrorView.js';
 import { useShopPath } from '../providers/ShopProvider.js';
 import { t, tn } from '../i18n/index.js';
 import { OrderStatusChip } from '../components/OrderStatus.js';
+import { ExternalTestings } from '../components/ExternalTestings.js';
 
 /** Customers can delete orders with nothing paid or under verification. */
 const DELETABLE: OrderStatus[] = ['pending', 'cancelled'];
@@ -48,9 +49,13 @@ export function OrdersPage(): React.JSX.Element {
   if (error) return <ErrorView message={error} />;
   if (!orders || orders.length === 0) {
     return (
-      <Placeholder header={t('orders.empty')} description={t('orders.emptyHint')}>
-        <span style={{ fontSize: 48 }}>📦</span>
-      </Placeholder>
+      <List>
+        {/* Bought elsewhere: they can still join a testing open to people from outside. */}
+        <ExternalTestings orders={[]} onJoined={(id) => navigate(to(`/orders/${id}`))} />
+        <Placeholder header={t('orders.empty')} description={t('orders.emptyHint')}>
+          <span style={{ fontSize: 48 }}>📦</span>
+        </Placeholder>
+      </List>
     );
   }
 
@@ -68,7 +73,7 @@ export function OrdersPage(): React.JSX.Element {
           <Cell
             key={order.id}
             onClick={() => navigate(to(`/orders/${order.id}`))}
-            subtitle={tn(order.items.length, 'items.one', 'items.other')}
+            subtitle={order.external ? t('orders.externalTesting') : tn(order.items.length, 'items.one', 'items.other')}
             after={
               <span
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}
@@ -114,6 +119,7 @@ export function OrdersPage(): React.JSX.Element {
           </Cell>
         ))}
       </Section>
+      <ExternalTestings orders={orders} onJoined={(id) => navigate(to(`/orders/${id}`))} />
     </List>
   );
 }

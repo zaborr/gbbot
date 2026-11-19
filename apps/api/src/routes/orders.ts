@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
   addDonationRequest,
   extraRoundRequest,
+  joinExternalRequest,
   extraSignupRequest,
   addOrderDetailsRequest,
   cartTestingRequest,
@@ -44,7 +45,7 @@ import { eq } from 'drizzle-orm';
 import { users } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 import { assertOpen } from '../services/closing.js';
-import { joinTestingWithOrder } from '../services/testing.js';
+import { joinTestingExternal, joinTestingWithOrder } from '../services/testing.js';
 import { addDonation, removeDonation } from '../services/testingDonations.js';
 import { leaveExtra, answerRound, signUpExtra } from '../services/testingExtra.js';
 
@@ -72,6 +73,14 @@ export function orderRoutes(): Hono<AppBindings> {
       c.get('isVip'),
     );
     const response: CreateOrderResponse = { orderId: order.id };
+    return c.json(response, 201);
+  });
+
+  // Joining a testing from outside (bought elsewhere): an order of only the fee.
+  app.post('/external-testing/:id', zValidator('param', idParam), zValidator('json', joinExternalRequest), async (c) => {
+    const { sub } = c.get('claims');
+    const orderId = await joinTestingExternal(c.get('db'), c.get('shop'), sub, c.req.valid('param').id, c.req.valid('json'));
+    const response: CreateOrderResponse = { orderId };
     return c.json(response, 201);
   });
 

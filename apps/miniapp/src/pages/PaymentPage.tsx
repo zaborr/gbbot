@@ -113,6 +113,7 @@ export function PaymentPage(): React.JSX.Element {
           </span>
         }
       >
+        {current.external && <Cell multiline>{t('orders.externalNote')}</Cell>}
         {current.items.map((item) => (
           <Cell
             key={itemKey(item)}
@@ -193,6 +194,7 @@ export function PaymentPage(): React.JSX.Element {
         <PendingChange order={current} feeLabel={feeLabel} onWithdrawn={reload} />
       ) : (
         !closed &&
+        !current.external &&
         (direct || CHANGEABLE.includes(current.status)) &&
         (editing ? (
           <ChangeEditor

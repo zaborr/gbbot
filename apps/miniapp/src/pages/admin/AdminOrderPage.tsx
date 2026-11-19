@@ -72,6 +72,7 @@ function AdminOrder(): React.JSX.Element {
         }
       >
         {o.customerBlocked && <Cell multiline>{t('blacklist.orderNote')}</Cell>}
+        {o.external && <Cell multiline>{t('adminOrder.externalNote')}</Cell>}
         {o.extraUnpaid?.map((product) => (
           <Cell key={product} multiline>
             ⚠️ {t('blacklist.extraUnpaid', { product })}
