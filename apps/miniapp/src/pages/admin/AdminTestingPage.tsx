@@ -122,6 +122,7 @@ function TestingForm({
   const [perUnit, setPerUnit] = useState(money ? toMajor(money.perUnit) : '');
   const [feeMode, setFeeMode] = useState<TestingFeeMode>(testing?.feeMode ?? 'mandatory');
   const [donationHours, setDonationHours] = useState(String(testing?.donationHours ?? 48));
+  const [vialsPerUnit, setVialsPerUnit] = useState(String(testing?.vialsPerUnit ?? 10));
   const [tiers, setTiers] = useState<TierDraft[]>(
     money
       ? money.tiers.map((tier) => ({
@@ -162,7 +163,16 @@ function TestingForm({
 
   // The price of a vial (what a donor gets back), and what a unit adds.
   const variant = product?.variants.find((v) => v.id === variantId) ?? null;
-  const vialPrice = money?.vialPrice ?? variant?.price ?? product?.price ?? 0;
+  const vialsOk = COUNT_RE.test(vialsPerUnit.trim()) && Number(vialsPerUnit) >= 1 && Number(vialsPerUnit) <= 100;
+  const vialsNumber = vialsOk ? Number(vialsPerUnit) : 1;
+  // One vial's share of the unit's price (what its donor gets back).
+  const unitPrice = variant?.price ?? product?.price ?? null;
+  const vialPrice =
+    unitPrice !== null
+      ? Math.round(unitPrice / vialsNumber)
+      : money && testing?.vialsPerUnit === vialsNumber
+        ? money.vialPrice
+        : Math.round(((money?.vialPrice ?? 0) * (testing?.vialsPerUnit ?? 1)) / vialsNumber);
   const pot = money?.pot ?? 0;
   const draftUnitValue = perUnitCents > 0 ? perUnitCents : contributionOk ? cents(contribution) : 0;
   const unitValue = money && money.perUnit === perUnitCents ? money.unitValue : draftUnitValue;
@@ -190,7 +200,9 @@ function TestingForm({
           ? t('testing.badTiers')
           : !hoursOk
             ? t('testing.badDonationHours', { max: MAX_DONATION_HOURS })
-            : null;
+            : !vialsOk
+              ? t('testing.badVialsPerUnit')
+              : null;
 
   const save = async (): Promise<void> => {
     setBusy(true);
@@ -202,6 +214,7 @@ function TestingForm({
         feeMode,
         tiers: parsedTiers,
         donationHours: Number(donationHours),
+        vialsPerUnit: vialsNumber,
       };
       if (testing) {
         await api.adminUpdateTesting(testing.id, body);
@@ -273,6 +286,7 @@ function TestingForm({
           draw: null,
           reportSentAt: null,
           donationHours: Number(donationHours) || 48,
+          vialsPerUnit: vialsNumber,
           donationsUntil: null,
           donationsOpen: false,
           donationProductId: null,
@@ -371,6 +385,21 @@ function TestingForm({
         />
         <Cell multiline>
           <span className="gb-hint">{locked ? t('testing.feeLockedHint') : t('testing.perUnitHint')}</span>
+        </Cell>
+        <Input
+          header={t('testing.vialsPerUnitField')}
+          type="text"
+          inputMode="numeric"
+          placeholder="10"
+          status={vialsOk ? 'default' : 'error'}
+          value={vialsPerUnit}
+          disabled={!editable}
+          onChange={(e) => setVialsPerUnit(e.target.value)}
+        />
+        <Cell multiline>
+          <span className="gb-hint">
+            {t('testing.vialsPerUnitHint', { amount: fmt(vialPrice) })}
+          </span>
         </Cell>
         <Input
           header={t('testing.donationHoursField')}

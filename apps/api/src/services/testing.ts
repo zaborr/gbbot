@@ -131,7 +131,7 @@ export async function testingTotals(
   return result;
 }
 
-/** The price of one unit of what each testing tests (what a donor gets back for a vial). */
+/** The price of one vial of what each testing tests (what a donor gets back for it). */
 export async function vialPrices(db: Executor, rows: readonly TestingRow[]): Promise<Map<string, number>> {
   const result = new Map<string, number>();
   if (rows.length === 0) return result;
@@ -150,10 +150,14 @@ export async function vialPrices(db: Executor, rows: readonly TestingRow[]): Pro
   for (const row of rows) {
     const base = productRows.find((p) => p.id === row.productId)?.price ?? 0;
     const own = row.variantId ? variantRows.find((v) => v.id === row.variantId)?.price : null;
-    result.set(row.id, own ?? base);
+    result.set(row.id, vialShare(own ?? base, row.vialsPerUnit));
   }
   return result;
 }
+
+/** One vial's share of a unit's price. */
+export const vialShare = (unitPrice: number, vialsPerUnit: number): number =>
+  Math.round(unitPrice / Math.max(vialsPerUnit, 1));
 
 /** The pot: what was paid into the testing and the hidden part of the units sold. */
 export const testingPot = (row: Pick<TestingRow, 'perUnit'>, totals: TestingTotals): number =>
@@ -279,7 +283,13 @@ function toTestingDTO(
     participants: t.payers,
     joined,
     exempt: feeExempt(row, isVip),
-    draw: row.draw ?? null,
+    // Customers see who was drawn, not the orders behind them nor what they paid.
+    draw: row.draw
+      ? admin
+        ? row.draw
+        : { ...row.draw, candidates: row.draw.candidates.map((c) => ({ ...c, orderId: '', vialPrice: 0 })) }
+      : null,
+    vialsPerUnit: row.vialsPerUnit,
     reportSentAt: row.report?.sentAt ?? null,
     donationHours: row.donationHours,
     donationsUntil: row.donationsUntil?.toISOString() ?? null,
@@ -647,6 +657,7 @@ export async function createTesting(
         feeMode: input.feeMode,
         tiers: input.tiers,
         donationHours: input.donationHours,
+        vialsPerUnit: input.vialsPerUnit,
         donationProductId: donation?.id ?? null,
       })
       .returning();
@@ -683,6 +694,7 @@ export async function updateTesting(
       feeMode: input.feeMode,
       tiers: input.tiers,
       donationHours: input.donationHours,
+      vialsPerUnit: input.vialsPerUnit,
       updatedAt: new Date(),
     })
     .where(eq(testings.id, current.id))

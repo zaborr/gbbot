@@ -8,7 +8,7 @@ import { ApiError } from '../lib/errors.js';
 import { TelegramApi } from '../telegram/api.js';
 import { languagesOf, notifyUsers } from './notifications.js';
 import type { ShopRow } from './shop.js';
-import { audience, testedLabel } from './testingDraw.js';
+import { audience, testedLabel, vialLabel } from './testingDraw.js';
 import { botToken } from './activeBot.js';
 import { reachedTiers } from './testing.js';
 import { refundDonations } from './testingDonations.js';
@@ -77,11 +77,13 @@ export async function settleTesting(db: Database, env: Env, shop: ShopRow, id: s
   }
   const draw = testing.draw;
   const donors = (draw?.candidates ?? []).filter((c) => draw?.donors.includes(c.ref));
+  // Vials each donor gives (more than one only when the ranking went round again).
+  const vialsOf = (ref: string): number => (draw?.donors ?? []).filter((r) => r === ref).length;
   const rows = await liveEntries(db, testing.id);
   const [row] = await db.transaction(async (tx) => {
     for (const donor of donors) {
       const found = rows.find(({ order }) => order.id === donor.orderId);
-      if (found) await refundEntry(tx, found.entry, donor.vialPrice);
+      if (found) await refundEntry(tx, found.entry, donor.vialPrice * vialsOf(donor.ref));
     }
     return tx
       .update(testings)
@@ -99,7 +101,7 @@ export async function settleTesting(db: Database, env: Env, shop: ShopRow, id: s
       tr(lang, 'testing.vialRefund', {
         shop: shop.name,
         product: what,
-        amount: formatMoney(donor.vialPrice, testing.currency),
+        amount: formatMoney(donor.vialPrice * vialsOf(donor.ref), testing.currency),
       }),
     );
   }
@@ -121,7 +123,7 @@ export async function cancelTesting(db: Database, env: Env, shop: ShopRow, id: s
     throw ApiError.conflict('testing_finished', 'This testing is already finished');
   }
   const rows = await liveEntries(db, testing.id);
-  const what = await testedLabel(db, testing);
+  const what = await vialLabel(db, testing);
   const donorOrders = (testing.draw?.candidates ?? [])
     .filter((c) => testing.draw?.donors.includes(c.ref))
     .map((c) => c.orderId);

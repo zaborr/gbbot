@@ -1191,7 +1191,8 @@ describeDb('API integration', () => {
       expect(drawn).toMatchObject({ status: 'drawn' });
       expect(drawn?.draw).toMatchObject({ hash, donors: [orderId.slice(0, 8)], tiersDone: ['mp'] });
       const [donor] = await db.select().from(orders).where(eq(orders.id, orderId));
-      expect(donor?.donatedVials).toEqual(['Sencha']);
+      // One vial of a kit of 10 (the default).
+      expect(donor?.donatedVials).toEqual(['Sencha · 1/10']);
 
       // Opening the GB again cancels the draw (kept in its history) and the mark.
       await cancelDrawsOnReopen(db, testEnv, shopRow);
@@ -1491,8 +1492,8 @@ describeDb('API integration', () => {
         const o = rows.find((r) => r.id === id)!;
         return o.total - o.amountPaid;
       };
-      // The donor gets the price of the vial back; the other keeps the fee paid.
-      expect(due(volunteer)).toBe(-item!.unitPrice);
+      // The donor gets the price of the vial back (a tenth of the unit); the other keeps the fee paid.
+      expect(due(volunteer)).toBe(-Math.round(item!.unitPrice / 10));
       expect(due(other)).toBe(0);
       const [settled] = await db.select().from(testings).where(eq(testings.id, testingId));
       expect(settled?.status).toBe('settled');
