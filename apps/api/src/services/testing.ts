@@ -1258,8 +1258,8 @@ export async function dropUnpaidExternal(db: Database, testingId: string): Promi
 /** Of these GBs, those with a testing people from outside can join now (they reach it even closed). */
 export async function shopsOpenToOutside(db: Executor, shopIds: readonly string[]): Promise<Set<string>> {
   if (shopIds.length === 0) return new Set();
-  const rows = await db
-    .selectDistinct({ shopId: testings.shopId })
+  const rows: Array<{ shopId: string }> = await db
+    .select({ shopId: testings.shopId })
     .from(testings)
     .where(
       and(
