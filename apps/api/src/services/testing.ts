@@ -759,75 +759,89 @@ export async function createTesting(
   const variant = input.variantId
     ? await db.query.productVariants.findFirst({ where: eq(productVariants.id, input.variantId) })
     : undefined;
+  const row = await db.transaction((tx) => insertTesting(tx, shop.id, product, variant, input, posterior));
+  if (!row) throw new Error('Failed to create the testing');
+  return oneTesting(db, row);
+}
+
+/**
+ * A testing and its two hidden products (what buyers give, the shares of the
+ * extra round). Part of a transaction: making one, or restoring a GB's copy.
+ */
+export async function insertTesting(
+  tx: Pick<Database, 'insert'>,
+  shopId: string,
+  product: Pick<typeof products.$inferSelect, 'slug' | 'title' | 'titleEn' | 'currency' | 'id'>,
+  variant: Pick<typeof productVariants.$inferSelect, 'optionValues'> | undefined,
+  input: CreateTestingRequest,
+  posterior: boolean,
+): Promise<TestingRow> {
   const what = variant ? `${product.title} · ${variantLabel(variant.optionValues)}` : product.title;
   const whatEn = variant
     ? `${product.titleEn ?? product.title} · ${variantLabel(variant.optionValues)}`
     : (product.titleEn ?? product.title);
-  const row = await db.transaction(async (tx) => {
-    // What buyers give goes on their orders as lines of a hidden product, 1 a unit.
-    const [donation] = await tx
-      .insert(products)
-      .values({
-        shopId: shop.id,
-        slug: `donation-${product.slug}-${Math.random().toString(36).slice(2, 8)}`,
-        title: `Donación · ${what} (testing)`,
-        titleEn: `Donation · ${whatEn} (testing)`,
-        price: DONATION_UNIT,
-        currency: product.currency,
-        isActive: false,
-        kind: 'donation',
-      })
-      .returning({ id: products.id });
-    const [extraProduct] = await tx
-      .insert(products)
-      .values({
-        shopId: shop.id,
-        slug: `extra-${product.slug}-${Math.random().toString(36).slice(2, 8)}`,
-        title: `Fase extra · ${what} (testing)`,
-        titleEn: `Extra round · ${whatEn} (testing)`,
-        price: 1,
-        currency: product.currency,
-        isActive: false,
-        kind: 'extra',
-      })
-      .returning({ id: products.id });
-    const [created] = await tx
-      .insert(testings)
-      .values({
-        shopId: shop.id,
-        productId: product.id,
-        variantId: input.variantId,
-        currency: product.currency,
-        lab: input.lab,
-        contribution: input.contribution,
-        perUnit: input.perUnit,
-        feeMode: input.feeMode,
-        tiers: input.tiers,
-        donationHours: input.donationHours,
-        vialsPerUnit: input.vialsPerUnit,
-        extraEnabled: input.extraEnabled,
-        extraMin: input.extraMin,
-        extraSignupHours: input.extraSignupHours,
-        extraPayHours: input.extraPayHours,
-        allowExternal: input.allowExternal,
-        extraProductId: extraProduct?.id ?? null,
-        donationProductId: donation?.id ?? null,
-        // The GB is closed: a testing afterwards. Joining (with the fee) and
-        // giving are open from now until its time to give ends.
-        ...(posterior
-          ? {
-              posterior: true,
-              status: 'closed' as const,
-              feeMode: input.feeMode === 'optional' ? ('mandatory' as const) : input.feeMode,
-              donationsUntil: new Date(Date.now() + input.donationHours * 3600_000),
-            }
-          : {}),
-      })
-      .returning();
-    return created;
-  });
-  if (!row) throw new Error('Failed to create the testing');
-  return oneTesting(db, row);
+  // What buyers give goes on their orders as lines of a hidden product, 1 a unit.
+  const [donation] = await tx
+    .insert(products)
+    .values({
+      shopId,
+      slug: `donation-${product.slug}-${Math.random().toString(36).slice(2, 8)}`,
+      title: `Donación · ${what} (testing)`,
+      titleEn: `Donation · ${whatEn} (testing)`,
+      price: DONATION_UNIT,
+      currency: product.currency,
+      isActive: false,
+      kind: 'donation',
+    })
+    .returning({ id: products.id });
+  const [extraProduct] = await tx
+    .insert(products)
+    .values({
+      shopId,
+      slug: `extra-${product.slug}-${Math.random().toString(36).slice(2, 8)}`,
+      title: `Fase extra · ${what} (testing)`,
+      titleEn: `Extra round · ${whatEn} (testing)`,
+      price: 1,
+      currency: product.currency,
+      isActive: false,
+      kind: 'extra',
+    })
+    .returning({ id: products.id });
+  const [created] = await tx
+    .insert(testings)
+    .values({
+      shopId,
+      productId: product.id,
+      variantId: input.variantId,
+      currency: product.currency,
+      lab: input.lab,
+      contribution: input.contribution,
+      perUnit: input.perUnit,
+      feeMode: input.feeMode,
+      tiers: input.tiers,
+      donationHours: input.donationHours,
+      vialsPerUnit: input.vialsPerUnit,
+      extraEnabled: input.extraEnabled,
+      extraMin: input.extraMin,
+      extraSignupHours: input.extraSignupHours,
+      extraPayHours: input.extraPayHours,
+      allowExternal: input.allowExternal,
+      extraProductId: extraProduct?.id ?? null,
+      donationProductId: donation?.id ?? null,
+      // The GB is closed: a testing afterwards. Joining (with the fee) and
+      // giving are open from now until its time to give ends.
+      ...(posterior
+        ? {
+            posterior: true,
+            status: 'closed' as const,
+            feeMode: input.feeMode === 'optional' ? ('mandatory' as const) : input.feeMode,
+            donationsUntil: new Date(Date.now() + input.donationHours * 3600_000),
+          }
+        : {}),
+    })
+    .returning();
+  if (!created) throw new Error('Failed to create the testing');
+  return created;
 }
 
 /** With no fee the extra round's lowest cap cannot be the fee: it is set by hand. */

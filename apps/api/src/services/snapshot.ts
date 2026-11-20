@@ -1,16 +1,18 @@
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm';
 import { EMPTY_VIP_CLUB, type GbSnapshot } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
-import { categories, productVariants, products, shops } from '../db/schema.js';
+import { categories, labs, productVariants, products, shops, testings } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
+import { insertTesting } from './testing.js';
 import { assertSlugFree, nextSortOrder, parseAddressKey, type ShopRow } from './shop.js';
 
 /**
- * A GB's settings and catalog, without orders, customers or admins: what is
- * copied when duplicating it, and what goes into its JSON backup.
+ * A GB's settings, catalog, labs and testings as set up, without orders,
+ * customers or admins: what is copied when duplicating it, and what goes into
+ * its JSON backup.
  */
 export async function takeSnapshot(db: Database, shop: ShopRow): Promise<GbSnapshot> {
-  const [categoryRows, productRows] = await Promise.all([
+  const [categoryRows, productRows, labRows, testingRows] = await Promise.all([
     db
       .select()
       .from(categories)
@@ -21,6 +23,12 @@ export async function takeSnapshot(db: Database, shop: ShopRow): Promise<GbSnaps
       .from(products)
       .where(and(eq(products.shopId, shop.id), eq(products.kind, 'sale')))
       .orderBy(asc(products.createdAt)),
+    db.select().from(labs).where(eq(labs.shopId, shop.id)).orderBy(asc(labs.name)),
+    db
+      .select()
+      .from(testings)
+      .where(and(eq(testings.shopId, shop.id), ne(testings.status, 'cancelled')))
+      .orderBy(desc(testings.createdAt)),
   ]);
   const variantRows =
     productRows.length === 0
@@ -36,6 +44,16 @@ export async function takeSnapshot(db: Database, shop: ShopRow): Promise<GbSnaps
           )
           .orderBy(asc(productVariants.sortOrder));
   const categorySlug = new Map(categoryRows.map((c) => [c.id, c.slug]));
+  const productSlug = new Map(productRows.map((p) => [p.id, p.slug]));
+  const variantValues = new Map(variantRows.map((v) => [v.id, v.optionValues]));
+  // The newest of each product or variant: only one can be running at a time.
+  const tested = new Set<string>();
+  const latest = testingRows.filter((t) => {
+    const key = `${t.productId}:${t.variantId ?? ''}`;
+    if (tested.has(key) || !productSlug.has(t.productId)) return false;
+    tested.add(key);
+    return t.variantId === null || variantValues.has(t.variantId);
+  });
 
   return {
     format: 'tma-gb',
@@ -69,6 +87,7 @@ export async function takeSnapshot(db: Database, shop: ShopRow): Promise<GbSnaps
       disclaimer: shop.disclaimerVersion > 0 ? shop.disclaimer : null,
       goalAmount: shop.goalAmount,
       goalShowAmount: shop.goalShowAmount,
+      testingEnabled: shop.testingEnabled,
     },
     categories: categoryRows.map((c) => ({ slug: c.slug, title: c.title, sortOrder: c.sortOrder })),
     products: productRows.map((p) => ({
@@ -97,6 +116,23 @@ export async function takeSnapshot(db: Database, shop: ShopRow): Promise<GbSnaps
           stock: v.stock,
           isActive: v.isActive,
         })),
+    })),
+    labs: labRows.map((l) => ({ name: l.name, currency: l.currency, tests: l.tests, notes: l.notes })),
+    testings: latest.reverse().map((t) => ({
+      product: productSlug.get(t.productId)!,
+      variant: t.variantId ? (variantValues.get(t.variantId) ?? null) : null,
+      lab: t.lab,
+      contribution: t.contribution,
+      perUnit: t.perUnit,
+      feeMode: t.feeMode,
+      tiers: t.tiers,
+      donationHours: t.donationHours,
+      vialsPerUnit: t.vialsPerUnit,
+      extraEnabled: t.extraEnabled,
+      extraMin: t.extraMin,
+      extraSignupHours: t.extraSignupHours,
+      extraPayHours: t.extraPayHours,
+      allowExternal: t.allowExternal,
     })),
   };
 }
@@ -153,6 +189,7 @@ export async function restoreSnapshot(
         disclaimerVersion: s.disclaimer ? 1 : 0,
         goalAmount: s.goalAmount,
         goalShowAmount: s.goalShowAmount,
+        testingEnabled: s.testingEnabled || snapshot.testings.length > 0,
       })
       .returning();
     if (!shop) throw new Error('Failed to create shop');
@@ -168,6 +205,7 @@ export async function restoreSnapshot(
       categoryIds.set(category.slug, row.id);
     }
 
+    const made = new Map<string, { row: typeof products.$inferSelect; variants: Map<string, string> }>();
     const seen = new Set<string>();
     for (const product of snapshot.products) {
       if (seen.has(product.slug)) {
@@ -183,10 +221,12 @@ export async function restoreSnapshot(
           categoryId: category ? (categoryIds.get(category) ?? null) : null,
           stock: fields.options.length > 0 ? null : fields.stock,
         })
-        .returning({ id: products.id });
+        .returning();
       if (!row) throw new Error('Failed to create product');
+      const variantIds = new Map<string, string>();
+      made.set(product.slug, { row, variants: variantIds });
       if (fields.options.length > 0 && variants.length > 0) {
-        await tx.insert(productVariants).values(
+        const rows = await tx.insert(productVariants).values(
           variants.map((v, index) => ({
             productId: row.id,
             optionValues: v.values,
@@ -196,8 +236,37 @@ export async function restoreSnapshot(
             isActive: v.isActive,
             sortOrder: index,
           })),
-        );
+        ).returning({ id: productVariants.id, optionValues: productVariants.optionValues });
+        for (const v of rows) variantIds.set(v.optionValues.join('\u0000'), v.id);
       }
+    }
+
+    if (snapshot.labs.length > 0) {
+      await tx.insert(labs).values(snapshot.labs.map((lab) => ({ shopId: shop.id, ...lab })));
+    }
+
+    // Testings come back open, with nobody in them: the GB is hidden until shown.
+    const tested = new Set<string>();
+    for (const { product: slug, variant, ...setup } of snapshot.testings) {
+      const target = made.get(slug);
+      const variantId = variant ? target?.variants.get(variant.join('\u0000')) : null;
+      const what = variant ? `${slug} · ${variant.join(' / ')}` : slug;
+      if (!target || variantId === undefined || (variant === null && target.row.options.length > 0)) {
+        throw ApiError.badRequest('backup_testing', `The testing of "${what}" is not in the catalog of the backup`);
+      }
+      const key = `${slug}:${variantId ?? ''}`;
+      if (tested.has(key)) {
+        throw ApiError.badRequest('backup_testing', `"${what}" has two testings in the backup`);
+      }
+      tested.add(key);
+      await insertTesting(
+        tx,
+        shop.id,
+        target.row,
+        variant ? { optionValues: variant } : undefined,
+        { ...setup, productId: target.row.id, variantId: variantId ?? null },
+        false,
+      );
     }
     return shop;
   });

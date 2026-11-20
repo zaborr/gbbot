@@ -89,6 +89,8 @@ export function backupPreview(backup: GbSnapshot, slugTaken: boolean): GbBackupP
     variants: backup.products.reduce((n, p) => n + p.variants.length, 0),
     categories: backup.categories.length,
     shippingZones: backup.shop.shippingZones.length,
+    labs: backup.labs.length,
+    testings: backup.testings.length,
     evmAddress: setup?.evmAddress ?? null,
     solanaAddress: setup?.solanaAddress ?? null,
     manualMethods: (setup?.manual ?? []).map((m) => ({ name: m.name, instructions: m.instructions })),
