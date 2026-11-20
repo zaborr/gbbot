@@ -1184,6 +1184,7 @@ export const pt: Record<MessageKey, string> = {
   'testing.badThreshold': 'Escreva o limite de devolução, p. ex. 2.00 (0 = devolver sempre).',
   'testing.badTiers': 'Cada patamar precisa de nome, custo e frascos (um número inteiro).',
   'testing.badVialsPerUnit': 'Frascos por unidade: de 1 a 100',
+  'testing.canJoinCard': 'Pode aderir · {product}',
   'testing.canJoinTitle': 'Pode aderir',
   'testing.cancel': 'Cancelar o testing',
   'testing.cancelFooter': 'Por exemplo, se o laboratório não o puder fazer: tudo o que foi pago é devolvido (aparece em cada pedido), as contribuições por pagar saem dos pedidos e todos são avisados.',

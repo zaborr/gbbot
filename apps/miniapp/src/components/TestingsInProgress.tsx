@@ -133,23 +133,25 @@ export function TestingsInProgress({
     }
   };
 
+  const outside = rows.some((r) => r.action.kind === 'outside');
+  // One card per testing: its button, its bar and its own vial offer stay together.
   return (
-    <Section
-      header={t('testing.canJoinTitle')}
-      footer={rows.some((r) => r.action.kind === 'outside') ? t('testing.externalFooter') : undefined}
-    >
-      {rows.map(({ x, action }) => {
+    <>
+      {rows.map(({ x, action }, index) => {
         const { next } = testingState(x);
         const until =
           x.status === 'closed' && x.donationsUntil
             ? t('testing.joinUntil', { date: formatDateTime(x.donationsUntil) })
             : null;
         return (
-          <div key={x.id}>
+          <Section
+            key={x.id}
+            header={t('testing.canJoinCard', { product: nameOf(x) })}
+            footer={outside && index === rows.length - 1 ? t('testing.externalFooter') : undefined}
+          >
             <Cell
               multiline
               subtitle={[
-                x.lab,
                 next ? t('testing.shareCovered', { percent: sharePercent(next) }) : t('testing.allTiers'),
                 until,
               ]
@@ -157,7 +159,7 @@ export function TestingsInProgress({
                 .join(' · ')}
               after={button(x, action)}
             >
-              {nameOf(x)}
+              {x.lab}
             </Cell>
             {error?.id === x.id && (
               <Cell multiline>
@@ -188,9 +190,9 @@ export function TestingsInProgress({
                 {t('testing.volunteer')}
               </Cell>
             )}
-          </div>
+          </Section>
         );
       })}
-    </Section>
+    </>
   );
 }

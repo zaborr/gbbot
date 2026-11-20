@@ -347,7 +347,15 @@ export function ExtraSection({
  * Offering a vial, per testing this order takes part in, until its draw:
  * each testing has its own draw with its own volunteers.
  */
-export function VolunteerSection({ order, only, testings: given }: SectionProps): React.JSX.Element | null {
+export function VolunteerSection({
+  order,
+  only,
+  testings: given,
+  inCard = false,
+}: SectionProps & {
+  /** Inside the testing's own card: just its switch, no section of its own. */
+  inCard?: boolean;
+}): React.JSX.Element | null {
   const [reloadKey, setReloadKey] = useState(0);
   const testings = useAsync(() => (given ? Promise.resolve(given) : api.getTestings()), [given, order.id, order.testing, reloadKey]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -375,8 +383,8 @@ export function VolunteerSection({ order, only, testings: given }: SectionProps)
       .finally(() => setBusy(null));
   };
 
-  return (
-    <Section header={t('testing.volunteerTitle')} footer={t('testing.volunteerFooter')}>
+  const cells = (
+    <>
       {mine.map((x) => (
         <Cell
           key={x.id}
@@ -391,10 +399,17 @@ export function VolunteerSection({ order, only, testings: given }: SectionProps)
             />
           }
         >
-          {x.variantLabel ? `${x.productTitle} · ${x.variantLabel}` : x.productTitle}
+          {/* Inside a testing's own card it is clear which one: the switch's own words. */}
+          {inCard ? t('testing.volunteer') : x.variantLabel ? `${x.productTitle} · ${x.variantLabel}` : x.productTitle}
         </Cell>
       ))}
       {error && <Cell multiline>{error}</Cell>}
+    </>
+  );
+  if (inCard) return cells;
+  return (
+    <Section header={t('testing.volunteerTitle')} footer={t('testing.volunteerFooter')}>
+      {cells}
     </Section>
   );
 }
