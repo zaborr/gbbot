@@ -497,3 +497,38 @@ export const labProgressRequest = z.discriminatedUnion('step', [
   z.object({ step: z.literal('expected'), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }),
 ]);
 export type LabProgressRequest = z.infer<typeof labProgressRequest>;
+
+/** One test a lab offers, with its price (minor units) and the vials it needs. */
+export interface LabTest {
+  id: string;
+  name: string;
+  cost: number;
+  vials: number;
+}
+
+/** A lab a GB works with. */
+export interface Lab {
+  id: string;
+  name: string;
+  currency: string;
+  tests: LabTest[];
+  notes: string | null;
+  updatedAt: string;
+}
+
+export const labRequest = z.object({
+  name: z.string().trim().min(1).max(80),
+  currency: z.string().trim().min(1).max(12),
+  tests: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(40),
+        name: z.string().trim().min(1).max(80),
+        cost: z.number().int().positive().max(100_000_000),
+        vials: z.number().int().min(0).max(20),
+      }),
+    )
+    .max(30),
+  notes: z.string().trim().max(500).nullable().default(null),
+});
+export type LabRequest = z.infer<typeof labRequest>;

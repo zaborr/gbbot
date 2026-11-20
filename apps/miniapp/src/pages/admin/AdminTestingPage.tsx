@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button, Cell, List, Section, Switch } from '@telegram-apps/telegram-ui';
 import {
+  type LabTest,
   MAX_DONATION_HOURS,
   MAX_TESTING_TIERS,
   tierSteps,
@@ -651,6 +652,25 @@ function TestingForm({
               {t('testing.addTier')}
             </Button>
           </div>
+        )}
+        {editable && tiers.length < MAX_TESTING_TIERS && (
+          <LabPicker
+            onPick={(labName, test) => {
+              // The first lab picked is the testing's; others go on the tier.
+              const main = lab.trim() || labName;
+              if (!lab.trim()) setLab(labName);
+              const tier: TierDraft = {
+                ...newTier(),
+                name: test.name,
+                cost: toMajor(test.cost),
+                vials: String(test.vials),
+                lab: labName === main ? '' : labName,
+              };
+              // An empty first tier is replaced rather than kept.
+              const blank = tiers.length === 1 && !tiers[0]?.name.trim() && !tiers[0]?.cost.trim();
+              setTiers(blank ? [tier] : [...tiers, tier]);
+            }}
+          />
         )}
       </Section>
 
@@ -1328,6 +1348,47 @@ function LabSection({ testing, onChange }: { testing: Testing; onChange: () => v
         </Button>
       </div>
     </Section>
+  );
+}
+
+/** Tiers from the GB's labs: pick a lab, then add its tests (name, price and vials). */
+function LabPicker({ onPick }: { onPick: (lab: string, test: LabTest) => void }): React.JSX.Element | null {
+  const { to } = useShop();
+  const navigate = useNavigate();
+  const labs = useAsync(() => api.adminLabs(), []);
+  const [chosen, setChosen] = useState<string | null>(null);
+  const list = labs.data ?? [];
+  if (labs.loading && !labs.data) return null;
+  if (list.length === 0) {
+    return (
+      <Cell multiline onClick={() => navigate(to('/admin/labs'))} after="›" subtitle={t('labs.pickNoneHint')}>
+        {t('labs.pickNone')}
+      </Cell>
+    );
+  }
+  const lab = list.find((x) => x.id === chosen) ?? null;
+  return (
+    <div style={{ padding: '0 16px 16px' }}>
+      <div className="gb-hint" style={{ marginBottom: 8 }}>
+        {t('labs.pick')}
+      </div>
+      <div className="gb-chips">
+        {list.map((x) => (
+          <Button key={x.id} size="s" mode={chosen === x.id ? 'filled' : 'bezeled'} onClick={() => setChosen(x.id)}>
+            {x.name}
+          </Button>
+        ))}
+      </div>
+      {lab && (
+        <div className="gb-chips" style={{ marginTop: 8 }}>
+          {lab.tests.map((test) => (
+            <Button key={test.id} size="s" mode="bezeled" onClick={() => onPick(lab.name, test)}>
+              {`+ ${test.name} · ${formatPrice(test.cost, lab.currency)}`}
+            </Button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

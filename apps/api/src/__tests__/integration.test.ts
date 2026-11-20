@@ -1853,6 +1853,38 @@ describeDb('API integration', () => {
     }
   });
 
+  it('keeps the GB\'s labs and their tests with prices', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const body = {
+      name: 'Uzorak',
+      currency: 'USDC',
+      tests: [
+        { id: 'mp', name: 'Mass and purity', cost: 15000, vials: 1 },
+        { id: 'endo', name: 'Endotoxins', cost: 9000, vials: 1 },
+      ],
+      notes: null,
+    };
+    const created = await request('/api/admin/labs', { method: 'POST', headers: admin, body: JSON.stringify(body) });
+    expect(created.status).toBe(201);
+    const lab = (await created.json()) as { id: string };
+    const listed = (await (await request('/api/admin/labs', { headers: admin })).json()) as Array<{
+      id: string;
+      tests: unknown[];
+    }>;
+    expect(listed.find((x) => x.id === lab.id)?.tests).toHaveLength(2);
+    const changed = await request(`/api/admin/labs/${lab.id}`, {
+      method: 'PUT',
+      headers: admin,
+      body: JSON.stringify({ ...body, tests: body.tests.slice(0, 1) }),
+    });
+    expect(((await changed.json()) as { tests: unknown[] }).tests).toHaveLength(1);
+    expect((await request(`/api/admin/labs/${lab.id}`, { method: 'DELETE', headers: admin })).status).toBe(200);
+    expect((await request(`/api/admin/labs/${lab.id}`, { method: 'DELETE', headers: admin })).status).toBe(404);
+  });
+
   it('runs the extra round: equal shares within caps, only for the tests still missing', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,

@@ -16,6 +16,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import type {
+  LabTest,
   LabProgress,
   Blacklist,
   TestingFeeMode,
@@ -500,6 +501,26 @@ export const testingEntries = pgTable(
 );
 
 /** Someone signed up to the extra round of a testing, on one of their orders. */
+/**
+ * The labs a GB works with, and their tests with prices: a testing's tiers
+ * are picked from here instead of typed every time.
+ */
+export const labs = pgTable(
+  'labs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: uuid('shop_id')
+      .notNull()
+      .references(() => shops.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    currency: text('currency').notNull(),
+    tests: jsonb('tests').$type<LabTest[]>().notNull().default([]),
+    notes: text('notes'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('labs_shop_idx').on(table.shopId)],
+);
+
 /** Bytes kept in the database (a lab report's file). */
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType: () => 'bytea',
