@@ -67,7 +67,8 @@ describe('server status', () => {
     // Containers just stopped (a restart) and security updates the system installs on its own: not yet.
     const first = dueWarnings(warnings, {}, NOW);
     expect(first.due.map((w) => w.key).sort()).toEqual(['backup', 'disk', 'reboot']);
-    expect(dueWarnings(warnings, first.state, NOW + 3600).due).toEqual([]);
+    expect(dueWarnings(warnings, first.state, NOW + 5 * 60).due).toEqual([]);
+    expect(dueWarnings(warnings, first.state, NOW + 3600).due.map((w) => w.key)).toEqual(['services']);
     const later = dueWarnings(warnings, first.state, NOW + 25 * 3600);
     expect(later.due.map((w) => w.key).sort()).toEqual(['backup', 'disk', 'reboot', 'security', 'services']);
     expect(dueWarnings([], later.state, NOW + 26 * 3600).state).toEqual({});
