@@ -1,4 +1,4 @@
-import { announceNewTesting, reopenTesting } from '../services/testingDonations.js';
+import { announceNewTesting, moveTestingWindow, reopenTesting } from '../services/testingDonations.js';
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
@@ -70,6 +70,16 @@ export function testingAdminRoutes(): Hono<AppBindings> {
     zValidator('json', z.object({ hours: z.number().int().min(1).max(MAX_DONATION_HOURS) })),
     async (c) => {
       await reopenTesting(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('param').id, c.req.valid('json').hours);
+      return c.json({ ok: true });
+    },
+  );
+  // The open time to join and give ends some hours from now (longer or shorter), or now (0).
+  app.post(
+    '/:id/window',
+    zValidator('param', idParam),
+    zValidator('json', z.object({ hours: z.number().int().min(0).max(MAX_DONATION_HOURS) })),
+    async (c) => {
+      await moveTestingWindow(c.get('db'), c.get('shop'), c.req.valid('param').id, c.req.valid('json').hours);
       return c.json({ ok: true });
     },
   );

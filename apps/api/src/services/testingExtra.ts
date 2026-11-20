@@ -79,7 +79,7 @@ export async function startExtra(db: Database, env: Env, row: TestingRow, now = 
   }
   const state: TestingExtraState = {
     stage: 'signup',
-    until: new Date(now.getTime() + hours(row.extraSignupHours)).toISOString(),
+    until: new Date(now.getTime() + hours(Math.max(row.extraSignupHours, 0))).toISOString(),
     target: [],
     share: 0,
   };
@@ -91,6 +91,11 @@ export async function startExtra(db: Database, env: Env, row: TestingRow, now = 
   if (!started) return false;
   const shop = await db.query.shops.findFirst({ where: (s, { eq: same }) => same(s.id, row.shopId) });
   if (!shop) return true;
+  // One time for giving and setting caps: it is shared out now among those who set one.
+  if (row.extraSignupHours === 0) {
+    await shareOutExtra(db, env, shop, started, now);
+    return true;
+  }
   const what = await testedLabel(db, row);
   const list = missing
     .map((step, i) => `${step.tier.name}: ${formatMoney(step.missing - (missing[i - 1]?.missing ?? 0), row.currency)}`)
