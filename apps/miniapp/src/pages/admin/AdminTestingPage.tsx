@@ -57,6 +57,9 @@ const hoursField = (text: string): boolean =>
   /^\d+$/.test(text.trim()) && Number(text) >= 1 && Number(text) <= MAX_DONATION_HOURS;
 
 /** `/admin/testings/new` (optionally `?product=…&variant=…`) or `/admin/testings/:id`. */
+type TestingTab = 'config' | 'state' | 'draw';
+const TABS: TestingTab[] = ['state', 'config', 'draw'];
+
 export function AdminTestingPage(): React.JSX.Element {
   return (
     <AdminOnly>
@@ -259,6 +262,10 @@ function TestingForm({
     setBusy(false);
   };
 
+  // An existing testing in three tabs: its settings, where it is, and its draw and report.
+  const [tab, setTab] = useState<TestingTab>('state');
+  const on = (id: TestingTab): boolean => (testing ? tab === id : id === 'config');
+
   // Step 1 when creating: the product, then its variant.
   if (!testing && !product) {
     return (
@@ -340,6 +347,24 @@ function TestingForm({
   return (
     <List>
       <PageTitle title={testing ? t('testing.edit') : t('testing.new')} />
+      {testing && (
+        <div className="gb-tabs" role="tablist">
+          {TABS.map((id) => (
+            <Button
+              key={id}
+              size="s"
+              mode={tab === id ? 'filled' : 'bezeled'}
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+            >
+              {t(`testing.tab.${id}`)}
+            </Button>
+          ))}
+        </div>
+      )}
+      {on('config') && (
+        <>
       {posterior && (
         <Section>
           <Cell multiline subtitle={t('testing.posteriorHint')}>
@@ -402,8 +427,6 @@ function TestingForm({
           <Cell>{testing.variantLabel}</Cell>
         </Section>
       )}
-
-      {money && testing && <PotSection testing={testing} steps={steps} />}
 
       <Section header={t('testing.settings')} footer={t('testing.settingsFooter', { currency })}>
         <Input
@@ -695,8 +718,6 @@ function TestingForm({
         </Cell>
       </Section>
 
-      {testing?.extra && <ExtraStatus testing={testing} />}
-
       {parsedTiers.length > 0 && contributionOk && (
         <Simulator
           tiers={parsedTiers}
@@ -708,19 +729,29 @@ function TestingForm({
       )}
 
       {preview && <TestingCard testing={preview} preview />}
+        </>
+      )}
 
-      {testing && <DrawSection testing={testing} onChange={onChange} />}
+      {testing && on('state') && (
+        <>
+          {preview && <TestingCard testing={preview} preview />}
+          {money && <PotSection testing={testing} steps={steps} />}
+          {testing.extra && <ExtraStatus testing={testing} />}
+          <ReopenSection testing={testing} onChange={onChange} />
+          <Participants testing={testing} />
+        </>
+      )}
 
-      {testing && <ReopenSection testing={testing} onChange={onChange} />}
-      {testing && <SettleSection testing={testing} onChange={onChange} />}
+      {testing && on('draw') && (
+        <>
+          <DrawSection testing={testing} onChange={onChange} />
+          <SettleSection testing={testing} onChange={onChange} />
+          <ReportSection testing={testing} />
+          <CancelSection testing={testing} onChange={onChange} />
+        </>
+      )}
 
-      {testing && <ReportSection testing={testing} />}
-
-      {testing && <CancelSection testing={testing} onChange={onChange} />}
-
-      {testing && <Participants testing={testing} />}
-
-      {editable && (
+      {on('config') && editable && (
         <Section footer={problem ?? undefined}>
           <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Button

@@ -826,3 +826,14 @@ html[data-theme='dark'] .gb-testing-badge--hot {
   text-decoration: line-through;
   opacity: 0.7;
 }
+
+/* Tabs of a long admin page: one row of small buttons, the open one filled. */
+.gb-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 4px 16px 12px;
+  overflow-x: auto;
+}
+.gb-tabs > button {
+  flex: 1 0 auto;
+}
