@@ -94,6 +94,25 @@ describeDb('API integration', () => {
   let productId: string;
   let testEnv: Env;
 
+  // Telegram is never reached: the bot's fake tokens are refused at once, as
+  // Telegram would, without waiting on the network (a slow answer timed tests out).
+  const realFetch = globalThis.fetch;
+  beforeAll(() => {
+    vi.stubGlobal('fetch', (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.startsWith('https://api.telegram.org/')) {
+        return new Response(JSON.stringify({ ok: false, error_code: 401, description: 'Unauthorized' }), {
+          status: 401,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return realFetch(input, init);
+    }) as typeof fetch);
+  });
+  afterAll(() => {
+    vi.unstubAllGlobals();
+  });
+
   beforeAll(async () => {
     pool = createPool(DATABASE_URL as string);
     db = createDb(pool);
