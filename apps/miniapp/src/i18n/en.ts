@@ -1321,6 +1321,7 @@ export const en = {
   'testing.offerFooter': 'Optional: buyers pay a testing fee once, and the lab tests the product as the units bought reach each tier. Only those who pay it see the results. If no tier is reached, it is not refunded.',
   'testing.offerSubtitle': '🔬 {lab} · {amount}',
   'testing.offerTitle': '🧪 Testing available',
+  'testing.onlyBuyers': 'Only those who bought this product in this GB can join this testing.',
   'testing.orderLine': '🧪 Testing',
   'testing.orderLineHint': 'Stays while the order has the tested product.',
   'testing.orderLinkCan': '🧪 {products} has a testing you can join',

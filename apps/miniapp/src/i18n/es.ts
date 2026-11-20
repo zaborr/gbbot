@@ -1323,6 +1323,7 @@ export const es: Record<MessageKey, string> = {
   'testing.offerFooter': 'Opcional: los compradores pagan una tarifa de testing una vez, y el laboratorio analiza el producto según las unidades compradas alcanzan cada tramo. Solo quien la paga ve los resultados. Si no se alcanza ningún tramo, no se devuelve.',
   'testing.offerSubtitle': '🔬 {lab} · {amount}',
   'testing.offerTitle': '🧪 Testing disponible',
+  'testing.onlyBuyers': 'A este testing solo pueden unirse quienes compraron este producto en este GB.',
   'testing.orderLine': '🧪 Testing',
   'testing.orderLineHint': 'Se mantiene mientras el pedido tenga el producto testado.',
   'testing.orderLinkCan': '🧪 {products} tiene un testing al que puedes unirte',
