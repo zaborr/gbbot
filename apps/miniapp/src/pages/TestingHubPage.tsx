@@ -69,7 +69,7 @@ export function TestingHubPage(): React.JSX.Element {
             <TestingCard testing={x} title={nameOf(x)}>
               {order && <MyPlace order={order} onPay={() => navigate(to(`/orders/${order.id}`))} />}
               {/* The vial is this testing's: its switch lives in its card. */}
-              {order && <VolunteerSection order={order} only={x.id} testings={all} inCard />}
+              {order && <VolunteerSection order={order} only={x.id} testings={all} inCard onChanged={reload} />}
             </TestingCard>
             {order && (
               <>
