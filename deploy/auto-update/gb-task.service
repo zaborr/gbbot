@@ -1,0 +1,8 @@
+[Unit]
+Description=GB: run the maintenance task asked for with /server in the bot
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=@DIR@/deploy/auto-update/task.sh
+TimeoutStartSec=1h

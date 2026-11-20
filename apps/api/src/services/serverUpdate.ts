@@ -39,7 +39,7 @@ export type UpdateCheck =
       migrations: boolean;
     };
 
-function updateDir(env: Env): string {
+export function updateDir(env: Env): string {
   return env.UPDATE_DIR ?? UPDATE_DIR_DEFAULT;
 }
 
@@ -52,7 +52,7 @@ async function readText(path: string): Promise<string | null> {
 }
 
 /** Whether the file is there and newer than `maxAgeMs`. */
-async function recent(path: string, maxAgeMs: number, now = Date.now()): Promise<boolean> {
+export async function recent(path: string, maxAgeMs: number, now = Date.now()): Promise<boolean> {
   try {
     return now - (await stat(path)).mtimeMs < maxAgeMs;
   } catch {
@@ -121,7 +121,7 @@ const short = (sha: string): string => sha.slice(0, 7);
  * An update already asked for or under way. Old leftovers (the server
  * restarted mid-update, or nothing picked the request up) do not block.
  */
-async function busy(env: Env): Promise<boolean> {
+export async function busy(env: Env): Promise<boolean> {
   const dir = updateDir(env);
   return (
     (await recent(join(dir, 'request'), 10 * 60 * 1000)) ||

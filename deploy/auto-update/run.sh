@@ -7,6 +7,9 @@ cd "$(dirname "$0")/../.."
 DIR=deploy/runtime
 [ -f "$DIR/request" ] || exit 0
 mv "$DIR/request" "$DIR/running"
+# Never during a maintenance task from /server (nor two at once).
+exec 9>"$DIR/.lock"
+flock 9
 
 get() { sed -n "s/^$1=//p" "$DIR/running" | head -n 1; }
 TARGET=$(get target)

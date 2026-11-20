@@ -7,6 +7,7 @@ import { TelegramApi, TelegramError, type InlineKeyboard } from '../telegram/api
 import type { TelegramUpdate } from '../telegram/types.js';
 import { handleUploadChoice, handleUploadedFile } from './uploads.js';
 import { handleUpdateButton, isUpdateCommand, updateReply } from './serverUpdate.js';
+import { answerServerCommand, handleServerButton, isServerCommand } from './serverTasks.js';
 import { handleReportReply } from './testingSettle.js';
 import { isSuperAdmin } from './shop.js';
 import { botToken } from './activeBot.js';
@@ -84,6 +85,7 @@ export async function handleBotMessage(
       (db ? (await languagesOf(db, [query.from.id])).get(query.from.id) : undefined) ??
       langFrom(query.from.language_code);
     if (await handleUpdateButton(env, telegram, query, queryLang)) return;
+    if (await handleServerButton(env, telegram, query, queryLang)) return;
     if (db) {
       await handleUploadChoice(db, env, telegram, update.callback_query, await miniAppUrl(telegram));
     }
@@ -110,6 +112,11 @@ export async function handleBotMessage(
   if (fromId !== undefined && isUpdateCommand(message.text) && isSuperAdmin(env, fromId)) {
     const answer = await updateReply(env, lang);
     await telegram.sendMessage(message.chat.id, answer.text, answer.keyboard);
+    return;
+  }
+  // Looking after the server: platform administrators only.
+  if (fromId !== undefined && isServerCommand(message.text) && isSuperAdmin(env, fromId)) {
+    await answerServerCommand(env, telegram, message.chat.id, lang);
     return;
   }
   const reply = buildStartReply(await miniAppUrl(telegram), message.from?.first_name, lang);

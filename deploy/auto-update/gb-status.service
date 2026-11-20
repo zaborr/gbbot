@@ -1,0 +1,8 @@
+[Unit]
+Description=GB: write how the server is, for /server in the bot
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=@DIR@/deploy/auto-update/status.sh
+TimeoutStartSec=5min

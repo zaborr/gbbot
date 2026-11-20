@@ -1,0 +1,9 @@
+[Unit]
+Description=GB: how the server is, every 15 minutes and after booting
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+
+[Install]
+WantedBy=timers.target

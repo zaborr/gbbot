@@ -46,6 +46,22 @@ Después, cualquier administrador de plataforma (`ADMIN_TELEGRAM_IDS`) puede esc
 
 La API no tiene ningún permiso sobre Docker: solo deja la petición en `deploy/runtime/`. Quien actualiza es la unidad de systemd `gb-update.path`. Para desactivarlo: `sudo systemctl disable --now gb-update.path`.
 
+### Desde el bot: /server
+
+Lo instala el mismo `install.sh` (vuelve a ejecutarlo si ya tenías /update). **/server** muestra cómo está el servidor: tiempo encendido y carga, RAM, disco, contenedores, la última copia de la base de datos y su subida a B2, actualizaciones del sistema pendientes (y cuántas son de seguridad), si hace falta reiniciar y si las actualizaciones automáticas (`unattended-upgrades`) están activadas. Debajo, botones para:
+
+- **Actualizar sistema**: `apt-get update` y `apt-get upgrade` sin preguntas, conservando la configuración propia (no instala ni quita paquetes). Si después hace falta reiniciar, ofrece el botón.
+- **Copia ahora**: ejecuta `backup.sh` (y la subida a B2).
+- **Reiniciar el bot**: reinicia la API, la Mini App y el servicio de creación, sin reconstruir. La base de datos no se toca.
+- **Liberar disco**: imágenes viejas y caché de construcción de Docker (más de 3 días), caché de apt y registros del sistema de más de 14 días.
+- **Reiniciar servidor**: espera a que no se esté instalando nada, para Docker en orden (la base de datos se cierra limpia y los contenedores arrancan solos al volver) y reinicia sin esperar a cada servicio, que es donde se puede quedar colgado en máquinas virtuales. Avisa cuando el servidor vuelve.
+
+Actualizar sistema, Reiniciar el bot y Reiniciar servidor piden confirmación. Nunca hay dos tareas a la vez, ni durante un /update. El registro de la última queda en `deploy/runtime/last-task.log`.
+
+El estado se renueva cada 15 minutos (`gb-status.timer`) y la API avisa a los administradores de plataforma si el disco pasa del 85 %, algún contenedor lleva parado más de 10 minutos, la última copia tiene más de 26 horas, hay actualizaciones de seguridad (con un día de margen si las automáticas están activadas), hace falta reiniciar o el estado deja de renovarse. Cada aviso se repite como mucho una vez al día (cada 6 horas los del disco y los contenedores) mientras dure.
+
+Como con /update, la API solo deja la petición (`deploy/runtime/task`) con una de esas acciones fijas; quien la ejecuta es `gb-task.path`. Para desactivarlo: `sudo systemctl disable --now gb-task.path gb-status.timer`.
+
 ## Datos
 
 - **Copia de seguridad diaria**: `deploy/backup.sh` guarda un `pg_dump` comprimido en `backups/` y conserva 14 días. Añádelo a cron:
