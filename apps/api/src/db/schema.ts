@@ -1,6 +1,7 @@
 import {
   bigint,
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -496,6 +497,43 @@ export const testingEntries = pgTable(
 );
 
 /** Someone signed up to the extra round of a testing, on one of their orders. */
+/** Bytes kept in the database (a lab report's file). */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => 'bytea',
+});
+
+/**
+ * Every lab report sent (base or extra round), kept for good: a copy of the
+ * file (so it does not depend on Telegram or on the bot in use), who sent it
+ * and to how many. Re-sending one (a correction) adds a row; the newest is
+ * the one shown first.
+ */
+export const testingReports = pgTable(
+  'testing_reports',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    testingId: uuid('testing_id')
+      .notNull()
+      .references(() => testings.id, { onDelete: 'cascade' }),
+    shopId: uuid('shop_id')
+      .notNull()
+      .references(() => shops.id, { onDelete: 'cascade' }),
+    kind: text('kind').$type<'base' | 'extra'>().notNull(),
+    fileKind: text('file_kind').$type<'document' | 'photo'>().notNull(),
+    /** Telegram's id of the file, for the bot that received it. */
+    fileId: text('file_id').notNull(),
+    fileName: text('file_name'),
+    mime: text('mime'),
+    /** The file itself (null when it could not be downloaded). */
+    data: bytea('data'),
+    size: integer('size'),
+    uploadedBy: bigint('uploaded_by', { mode: 'number' }),
+    delivered: integer('delivered').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('testing_reports_shop_idx').on(table.shopId), index('testing_reports_testing_idx').on(table.testingId)],
+);
+
 export const testingExtraMembers = pgTable(
   'testing_extra_members',
   {

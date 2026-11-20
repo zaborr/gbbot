@@ -19,6 +19,7 @@ import { notifyUsersWithButton } from './notifications.js';
 import { TelegramApi } from '../telegram/api.js';
 import { miniAppUrl } from './bot.js';
 import { testingLink } from './reminders.js';
+import { copyMissingReports } from './testingReports.js';
 import type { ShopRow } from './shop.js';
 import { botToken } from './activeBot.js';
 import { donationsOpen, reachedTiers, takesPart, vialPrices, vialShare } from './testing.js';
@@ -400,6 +401,8 @@ export async function watchDraws(db: Database, env: Env): Promise<void> {
   } catch (error) {
     console.error('Extra rounds failed:', error);
   }
+  // Reports kept before copies existed: their files, a few at a time.
+  await copyMissingReports(db, env).catch((error: unknown) => console.error('Report copies failed:', error));
   const waiting = await db.select().from(testings).where(eq(testings.status, 'drawing'));
   for (const testing of waiting) {
     try {

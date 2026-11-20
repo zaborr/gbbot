@@ -9,6 +9,7 @@ import { loadGoalProgress } from '../services/goal.js';
 import { loadPeople, organizerTags } from '../services/team.js';
 import { acceptDisclaimer } from '../services/disclaimer.js';
 import { listVisibleTestings } from '../services/testing.js';
+import { findReport, reportCaption, reportFile, reportsFor, sendReportTo } from '../services/testingReports.js';
 import { requireAuth, requireTelegramUser } from '../auth/middleware.js';
 import { ApiError } from '../lib/errors.js';
 
@@ -58,6 +59,29 @@ export function catalogRoutes(): Hono<AppBindings> {
   app.get('/products/testings', requireAuth, async (c) =>
     c.json(await listVisibleTestings(c.get('db'), c.get('shop'), c.get('claims').sub, undefined, c.get('isVip'))),
   );
+  // The lab reports one can see again (of the testings they took part in).
+  app.get('/products/testing-reports', requireAuth, async (c) =>
+    c.json(await reportsFor(c.get('db'), c.get('shopId'), c.get('claims').sub)),
+  );
+  app.get('/products/testing-reports/:id/file', requireAuth, zValidator('param', idParam), async (c) => {
+    const id = c.req.valid('param').id;
+    if (!(await reportsFor(c.get('db'), c.get('shopId'), c.get('claims').sub)).some((r) => r.id === id)) {
+      throw ApiError.notFound('Report not found');
+    }
+    return reportFile(await findReport(c.get('db'), id));
+  });
+  app.post('/products/testing-reports/:id/send', requireAuth, zValidator('param', idParam), async (c) => {
+    const id = c.req.valid('param').id;
+    const sub = c.get('claims').sub;
+    if (!(await reportsFor(c.get('db'), c.get('shopId'), sub)).some((r) => r.id === id)) {
+      throw ApiError.notFound('Report not found');
+    }
+    if (sub <= 0) throw ApiError.conflict('report_telegram', 'Open the app from Telegram to send the report');
+    const row = await findReport(c.get('db'), id);
+    await sendReportTo(c.get('env'), row, sub, await reportCaption(c.get('db'), row));
+    return c.json({ ok: true });
+  });
+
   app.get('/products/:id', zValidator('param', idParam), async (c) => {
     const product = await getProductById(
       c.get('db'),

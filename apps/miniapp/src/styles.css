@@ -837,3 +837,34 @@ html[data-theme='dark'] .gb-testing-badge--hot {
 .gb-tabs > button {
   flex: 1 0 auto;
 }
+
+/* A lab report opened in the app: the whole screen, with a bar to close it. */
+.gb-file-view {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: var(--tgui--bg_color);
+}
+.gb-file-view-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--tgui--divider);
+}
+.gb-file-view-bar > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gb-file-view img,
+.gb-file-view iframe {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  object-fit: contain;
+}

@@ -18,6 +18,7 @@ import { AdminHomePage } from './pages/admin/AdminHomePage.js';
 import { AdminCatalogPage } from './pages/admin/AdminCatalogPage.js';
 import { AdminProductPage } from './pages/admin/AdminProductPage.js';
 import { AdminTestingsPage } from './pages/admin/AdminTestingsPage.js';
+import { AdminTestingReportsPage } from './pages/admin/AdminTestingReportsPage.js';
 import { AdminTestingPage } from './pages/admin/AdminTestingPage.js';
 import { AdminFeePage } from './pages/admin/AdminFeePage.js';
 import { AdminOrdersPage } from './pages/admin/AdminOrdersPage.js';
@@ -41,6 +42,7 @@ import { AdminDisclaimerPage } from './pages/admin/AdminDisclaimerPage.js';
 import { AdminUnpaidPage } from './pages/admin/AdminUnpaidPage.js';
 import { AdminBlacklistPage } from './pages/admin/AdminBlacklistPage.js';
 import { PlatformBlacklistPage } from './pages/platform/PlatformBlacklistPage.js';
+import { PlatformTestingReportsPage } from './pages/platform/PlatformTestingReportsPage.js';
 import { NewShopPage } from './pages/NewShopPage.js';
 import { ImportShopPage } from './pages/ImportShopPage.js';
 import { UploadPage } from './pages/UploadPage.js';
@@ -113,6 +115,7 @@ function Shell(): React.JSX.Element {
       <Route path="/platform/organizers" element={<PlatformOrganizersPage />} />
       <Route path="/platform/notices" element={<PlatformNoticesPage />} />
       <Route path="/platform/blacklist" element={<PlatformBlacklistPage />} />
+      <Route path="/platform/testing-reports" element={<PlatformTestingReportsPage />} />
       <Route path="/web-access" element={<WebAccessPage />} />
       <Route path="/security-phrase" element={<SecurityPhrasePage />} />
       <Route path="/web-password" element={<WebPasswordPage />} />
@@ -133,6 +136,7 @@ function Shell(): React.JSX.Element {
         <Route path="admin/catalog" element={<AdminCatalogPage />} />
         <Route path="admin/products/:id" element={<AdminProductPage />} />
         <Route path="admin/testings" element={<AdminTestingsPage />} />
+        <Route path="admin/testing-reports" element={<AdminTestingReportsPage />} />
         <Route path="admin/testings/:id" element={<AdminTestingPage />} />
         <Route path="admin/fee" element={<AdminFeePage />} />
         <Route path="admin/settings" element={<AdminSettingsPage />} />
