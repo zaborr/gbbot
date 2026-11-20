@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
-import type { Lang } from '@tma-shop/shared';
+import type { Lang, LabProgressRequest } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { orderItems, orders, testingEntries, testings } from '../db/schema.js';
@@ -345,4 +345,49 @@ export async function handleReportReply(
     .where(eq(testings.id, testing.id));
   await telegram.sendMessage(chatId, tr(lang, 'testing.reportSent', { count: delivered }));
   return true;
+}
+
+/**
+ * Where the vials are after the draw: sent to the lab, received there, or
+ * the day results are expected. Those who will get a report hear each step.
+ */
+export async function markLabProgress(
+  db: Database,
+  env: Env,
+  shop: ShopRow,
+  id: string,
+  step: LabProgressRequest,
+): Promise<TestingRow> {
+  const testing = await findTesting(db, shop.id, id);
+  if (!testing.draw?.hash || (testing.status !== 'drawn' && testing.status !== 'settled')) {
+    throw ApiError.conflict('lab_not_drawn', 'Once the donors are drawn');
+  }
+  const now = new Date().toISOString();
+  const progress = {
+    ...testing.labProgress,
+    ...(step.step === 'sent' ? { sentAt: now } : step.step === 'received' ? { receivedAt: now } : { expected: step.date }),
+  };
+  const [saved] = await db
+    .update(testings)
+    .set({ labProgress: progress, updatedAt: new Date() })
+    .where(eq(testings.id, testing.id))
+    .returning();
+  const what = await testedLabel(db, testing);
+  const extraIds = testing.extra?.outcome?.tiers ?? [];
+  const ids = [
+    ...new Set([
+      ...(await reportAudience(db, env, shop, testing)),
+      ...(extraIds.length > 0 ? await extraReportAudience(db, env, shop, testing) : []),
+    ]),
+  ];
+  const day = (iso: string, lang: Lang): string =>
+    new Date(`${iso.length === 10 ? `${iso}T12:00:00` : iso}`).toLocaleDateString(lang);
+  await notifyTesting(db, env, shop, ids, (lang) =>
+    step.step === 'sent'
+      ? tr(lang, 'testing.labSent', { shop: shop.name, product: what, lab: testing.lab })
+      : step.step === 'received'
+        ? tr(lang, 'testing.labReceived', { shop: shop.name, product: what, lab: testing.lab })
+        : tr(lang, 'testing.labExpected', { shop: shop.name, product: what, lab: testing.lab, date: day(step.date, lang) }),
+  ).catch((error: unknown) => console.error('Lab notice failed:', error));
+  return saved ?? testing;
 }

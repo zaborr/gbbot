@@ -2,7 +2,7 @@ import { Cell, Section } from '@telegram-apps/telegram-ui';
 import type { Testing, TestingTierView } from '@tma-shop/shared';
 import { formatPrice, formatDateTime } from '../lib/format.js';
 import { sharePercent, testingState } from '../lib/testingState.js';
-import { t, tn } from '../i18n/index.js';
+import { locale, t, tn } from '../i18n/index.js';
 
 const GREEN = '#31b545';
 
@@ -148,6 +148,7 @@ export function TestingCard({
           </span>
         )}
         <TestingSteps testing={testing} />
+        <LabLines testing={testing} />
         {testing.status === 'settled' && <span className="gb-hint">{t('testing.cardSettled')}</span>}
         {testing.status === 'cancelled' && <span className="gb-hint">{t('testing.cardCancelled')}</span>}
         {testing.reportSentAt && (
@@ -196,5 +197,28 @@ export function TestingCard({
       ))}
       {children}
     </Section>
+  );
+}
+
+/** After the draw: where the vials are, as the organiser marks it. */
+function LabLines({ testing }: { testing: Testing }): React.JSX.Element | null {
+  const p = testing.labProgress;
+  if (!p || testing.reportSentAt) return null;
+  const day = (iso: string): string =>
+    new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString(locale());
+  const lines = [
+    p.sentAt ? t('lab.lineSent', { date: day(p.sentAt) }) : null,
+    p.receivedAt ? t('lab.lineReceived', { date: day(p.receivedAt) }) : null,
+    p.expected ? t('lab.lineExpected', { date: day(p.expected) }) : null,
+  ].filter(Boolean);
+  if (lines.length === 0) return null;
+  return (
+    <span className="gb-hint">
+      {lines.map((line) => (
+        <span key={line} style={{ display: 'block' }}>
+          {line}
+        </span>
+      ))}
+    </span>
   );
 }

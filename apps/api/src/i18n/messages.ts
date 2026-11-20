@@ -217,6 +217,9 @@ const en = {
   'testing.extraNotNeeded': '🧪 {shop}: the testing of {product} needs no extra round: gifts covered it. You signed up early, but you have nothing to pay.',
   'testing.extraOff': '🧪 {shop}: the testing of {product} will have no extra round. You signed up early, but you have nothing to pay.',
   'testing.reminderCap': 'If money is still missing at the end, it is shared out among those who set a cap. Set yours now on the Testing screen: you never pay more, and nothing if it is not needed.',
+  'testing.labSent': '🔬 {shop}: the vials of {product} are on their way to {lab}.',
+  'testing.labReceived': '🔬 {shop}: {lab} has received the vials of {product}.',
+  'testing.labExpected': '🔬 {shop}: the results of {product} ({lab}) are expected on {date}.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -426,6 +429,9 @@ const es: Record<BotMessageKey, string> = {
   'testing.extraNotNeeded': '🧪 {shop}: el testing de {product} no necesita fase extra: las donaciones lo han cubierto. Te apuntaste por adelantado, pero no tienes nada que pagar.',
   'testing.extraOff': '🧪 {shop}: el testing de {product} no tendrá fase extra. Te apuntaste por adelantado, pero no tienes nada que pagar.',
   'testing.reminderCap': 'Si al final falta dinero, se reparte entre quienes hayan puesto su máximo. Pon el tuyo ya en la pantalla Testing: nunca pagarás más, y nada si no hace falta.',
+  'testing.labSent': '🔬 {shop}: los viales de {product} van de camino a {lab}.',
+  'testing.labReceived': '🔬 {shop}: {lab} ha recibido los viales de {product}.',
+  'testing.labExpected': '🔬 {shop}: el resultado de {product} ({lab}) se espera para el {date}.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -633,6 +639,9 @@ const it: Record<BotMessageKey, string> = {
   'testing.extraNotNeeded': '🧪 {shop}: il testing di {product} non ha bisogno della fase extra: le donazioni l\'hanno coperto. Ti eri iscritto in anticipo, ma non devi pagare nulla.',
   'testing.extraOff': '🧪 {shop}: il testing di {product} non avrà fase extra. Ti eri iscritto in anticipo, ma non devi pagare nulla.',
   'testing.reminderCap': 'Se alla fine mancano soldi, si ripartisce tra chi ha messo il suo massimo. Metti il tuo ora nella schermata Testing: non pagherai mai di più, e nulla se non serve.',
+  'testing.labSent': '🔬 {shop}: le fiale di {product} sono in viaggio verso {lab}.',
+  'testing.labReceived': '🔬 {shop}: {lab} ha ricevuto le fiale di {product}.',
+  'testing.labExpected': '🔬 {shop}: il risultato di {product} ({lab}) è previsto per il {date}.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -840,6 +849,9 @@ const pt: Record<BotMessageKey, string> = {
   'testing.extraNotNeeded': '🧪 {shop}: o testing de {product} não precisa de fase extra: as doações cobriram-no. Inscreveu-se antecipadamente, mas não tem nada a pagar.',
   'testing.extraOff': '🧪 {shop}: o testing de {product} não terá fase extra. Inscreveu-se antecipadamente, mas não tem nada a pagar.',
   'testing.reminderCap': 'Se no fim faltar dinheiro, divide-se entre quem pôs o seu máximo. Ponha o seu já no ecrã Testing: nunca pagará mais, e nada se não for preciso.',
+  'testing.labSent': '🔬 {shop}: os frascos de {product} estão a caminho de {lab}.',
+  'testing.labReceived': '🔬 {shop}: {lab} recebeu os frascos de {product}.',
+  'testing.labExpected': '🔬 {shop}: o resultado de {product} ({lab}) é esperado para {date}.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

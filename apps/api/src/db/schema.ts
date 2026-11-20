@@ -16,6 +16,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import type {
+  LabProgress,
   Blacklist,
   TestingFeeMode,
   BotGroupStatus,
@@ -459,6 +460,8 @@ export const testings = pgTable(
     report: jsonb('report').$type<{ fileId: string; kind: 'document' | 'photo'; sentAt: string }>(),
     /** The bot asked an organiser for the report: their reply carries it. */
     reportRequest: jsonb('report_request').$type<{ chatId: number; messageId: number; kind?: 'base' | 'extra' }>(),
+    /** After the draw: when the vials went to the lab, when it got them, and when results are expected. */
+    labProgress: jsonb('lab_progress').$type<LabProgress>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

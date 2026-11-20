@@ -396,6 +396,7 @@ function toTestingDTO(
     allowExternal: row.allowExternal,
     externalOpen: externalOpen(row),
     reportSentAt: row.report?.sentAt ?? null,
+    labProgress: row.labProgress ?? null,
     extraReportSentAt: row.extraReport?.sentAt ?? null,
     donationHours: row.donationHours,
     donationsUntil: row.donationsUntil?.toISOString() ?? null,

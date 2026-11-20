@@ -332,6 +332,7 @@ function TestingForm({
           // Editing: where it really is (its time, extra round, draw).
           draw: testing?.draw ?? null,
           reportSentAt: testing?.reportSentAt ?? null,
+          labProgress: testing?.labProgress ?? null,
           donationHours: Number(donationHours) || 48,
           vialsPerUnit: vialsNumber,
           extraEnabled,
@@ -759,6 +760,7 @@ function TestingForm({
         <>
           <DrawSection testing={testing} onChange={onChange} />
           <SettleSection testing={testing} onChange={onChange} />
+          <LabSection testing={testing} onChange={onChange} />
           <ReportSection testing={testing} />
           <KeptReports testing={testing} />
           <CancelSection testing={testing} onChange={onChange} />
@@ -1264,6 +1266,66 @@ function ReportSection({ testing }: { testing: Testing }): React.JSX.Element | n
               : t('testing.extraReportSend')}
           </Button>
         )}
+      </div>
+    </Section>
+  );
+}
+
+/**
+ * After the draw, where the vials are: sent to the lab, received there, and
+ * the day results are expected. Each step is shown and told to participants.
+ */
+function LabSection({ testing, onChange }: { testing: Testing; onChange: () => void }): React.JSX.Element | null {
+  const actions = useAdminActions(onChange);
+  const progress = testing.labProgress ?? {};
+  const [date, setDate] = useState(progress.expected ?? '');
+  if (!testing.draw?.hash || (testing.status !== 'drawn' && testing.status !== 'settled')) return null;
+  return (
+    <Section header={t('lab.title')} footer={t('lab.footer')}>
+      <ErrorBanner message={actions.error} />
+      <Cell
+        multiline
+        subtitle={progress.sentAt ? formatDateTime(progress.sentAt) : undefined}
+        after={
+          <Button
+            size="s"
+            mode={progress.sentAt ? 'bezeled' : 'filled'}
+            onClick={() => void actions.twoTap('labSent', () => api.adminTestingLab(testing.id, { step: 'sent' }))}
+          >
+            {actions.tapLabel('labSent', progress.sentAt ? t('lab.again') : t('lab.mark'))}
+          </Button>
+        }
+      >
+        {t('lab.sent')}
+      </Cell>
+      <Cell
+        multiline
+        subtitle={progress.receivedAt ? formatDateTime(progress.receivedAt) : undefined}
+        after={
+          <Button
+            size="s"
+            mode={progress.receivedAt ? 'bezeled' : 'filled'}
+            onClick={() =>
+              void actions.twoTap('labReceived', () => api.adminTestingLab(testing.id, { step: 'received' }))
+            }
+          >
+            {actions.tapLabel('labReceived', progress.receivedAt ? t('lab.again') : t('lab.mark'))}
+          </Button>
+        }
+      >
+        {t('lab.received')}
+      </Cell>
+      <div className="gb-donation-row" style={{ padding: '0 16px 16px', alignItems: 'flex-end' }}>
+        <div style={{ flex: 1 }}>
+          <Input header={t('lab.expected')} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <Button
+          size="m"
+          disabled={!/^\d{4}-\d{2}-\d{2}$/.test(date) || date === progress.expected}
+          onClick={() => void actions.run(() => api.adminTestingLab(testing.id, { step: 'expected', date }))}
+        >
+          {t('lab.save')}
+        </Button>
       </div>
     </Section>
   );
