@@ -1092,7 +1092,16 @@ export async function announceTestingTiers(db: Database, env: Env, shopId: strin
  * products are paid but not its testing drops the testing and is paid again.
  * `orderId` limits it to one order (a payment rejected after closing).
  */
-export async function dropUnpaidTesting(db: Database, shopId: string, orderId?: string): Promise<number> {
+export async function dropUnpaidTesting(
+  db: Database,
+  shopId: string,
+  orderId?: string,
+  /**
+   * When the GB closes: only a testing made after closing keeps its unpaid
+   * parts (the rest had the GB's time to pay). Later: any still taking people.
+   */
+  atClose = false,
+): Promise<number> {
   const rows = await db
     .select()
     .from(orders)
@@ -1111,13 +1120,19 @@ export async function dropUnpaidTesting(db: Database, shopId: string, orderId?: 
     );
   let dropped = 0;
   for (const row of rows) {
-    // A testing made after closing still takes people: its part can be paid until then.
+    // A testing still taking people (its time to join lasts): its part can be paid until then.
     const live = await db
       .select({ testing: testings })
       .from(testingEntries)
       .innerJoin(testings, eq(testingEntries.testingId, testings.id))
       .where(eq(testingEntries.orderId, row.id));
-    if (live.some(({ testing }) => testing.posterior && donationsOpen(testing))) continue;
+    if (
+      live.some(
+        ({ testing }) => testing.status === 'closed' && joinOpen(testing) && (!atClose || testing.posterior),
+      )
+    ) {
+      continue;
+    }
     dropped += 1;
     await db.transaction(async (tx) => {
       await tx.delete(testingEntries).where(eq(testingEntries.orderId, row.id));
@@ -1163,14 +1178,15 @@ export async function joinTestingWithOrder(
       where: and(eq(testings.shopId, shop.id), eq(testings.id, testingId)),
     });
     if (!testing) throw ApiError.notFound('Testing not found');
-    // Open, or one made after closing while its time is not over.
-    const joinable = testing.status === 'open' || (testing.posterior && donationsOpen(testing));
-    if (!joinable) throw ApiError.conflict('testing_not_open', 'This testing is closed');
+    // Open, or the GB closed and its time to join lasts (made before closing or after).
+    if (!joinOpen(testing)) throw ApiError.conflict('testing_not_open', 'This testing is closed');
     // Not while a payment is being checked: its amount would not match any more.
-    // Sent orders only for a testing after closing (they go back to sent once paid).
+    // Sent orders once the GB closed (they go back to sent once paid).
     const sent = order.status === 'shipped' || order.status === 'fulfilled';
     const state =
-      order.status === 'paid' || (order.status === 'pending' && order.amountSubmitted === 0) || (sent && testing.posterior);
+      order.status === 'paid' ||
+      (order.status === 'pending' && order.amountSubmitted === 0) ||
+      (sent && testing.status === 'closed');
     if (!state) throw ApiError.conflict('testing_order_state', 'A testing cannot be added to this order now');
     if (testing.currency !== order.currency) {
       throw ApiError.conflict('mixed_currency', `This order is in ${order.currency}`);
@@ -1217,12 +1233,25 @@ export async function joinTestingWithOrder(
  * the time to give lasts (a testing made after closing, or one from before).
  */
 export const externalOpen = (
-  row: Pick<TestingRow, 'allowExternal' | 'status' | 'donationsDone' | 'donationsUntil'>,
+  row: Pick<TestingRow, 'allowExternal' | 'status' | 'donationsDone' | 'donationsUntil' | 'extra'>,
+  now = new Date(),
+): boolean => row.allowExternal && joinOpen(row, now);
+
+/**
+ * Takes people now: while it is open, and once the GB closes while the time
+ * to join and give lasts (before the extra round) — whether it was made
+ * before closing or after.
+ */
+export const joinOpen = (
+  row: Pick<TestingRow, 'status' | 'donationsDone' | 'donationsUntil' | 'extra'>,
   now = new Date(),
 ): boolean =>
-  row.allowExternal &&
-  (row.status === 'open' ||
-    (row.status === 'closed' && !row.donationsDone && row.donationsUntil !== null && row.donationsUntil > now));
+  row.status === 'open' ||
+  (row.status === 'closed' &&
+    !row.donationsDone &&
+    row.donationsUntil !== null &&
+    row.donationsUntil > now &&
+    row.extra === null);
 
 /**
  * Joins a testing from outside (bought elsewhere): an order of only the fee,

@@ -40,7 +40,8 @@ export function TestingsInProgress({
   // Each testing has its own draw: offering a vial is per testing.
   const [volunteer, setVolunteer] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Shown under the testing it is about, next to its button.
+  const [error, setError] = useState<{ id: string; message: string } | null>(null);
 
   const withProduct = (x: Testing): Order[] =>
     orders.filter(
@@ -52,13 +53,13 @@ export function TestingsInProgress({
     if (!joinable(x) || x.exempt) return null;
     const mine = withProduct(x);
     if (mine.length > 0) {
-      // Not while a payment is being checked; sent ones only for a testing made after closing.
+      // Not while a payment is being checked; sent ones once the GB closed.
       const fits = mine.find(
         (o) =>
           o.currency === x.currency &&
           (o.status === 'paid' ||
             (o.status === 'pending' && o.amountSubmitted === 0) ||
-            (x.posterior && (o.status === 'shipped' || o.status === 'fulfilled'))),
+            (x.status === 'closed' && (o.status === 'shipped' || o.status === 'fulfilled'))),
       );
       return fits ? { kind: 'order', orderId: fits.id } : { kind: 'see', orderId: mine[0]!.id };
     }
@@ -80,7 +81,9 @@ export function TestingsInProgress({
         onChanged();
         onJoined(nameOf(x));
       })
-      .catch((err: unknown) => setError(err instanceof ApiClientError ? err.message : t('error.title')))
+      .catch((err: unknown) =>
+        setError({ id: x.id, message: err instanceof ApiClientError ? err.message : t('error.title') }),
+      )
       .finally(() => setBusy(null));
   };
 
@@ -156,6 +159,11 @@ export function TestingsInProgress({
             >
               {nameOf(x)}
             </Cell>
+            {error?.id === x.id && (
+              <Cell multiline>
+                <span style={{ color: 'var(--tgui--destructive_text_color)' }}>{error.message}</span>
+              </Cell>
+            )}
             <div style={{ padding: '0 16px 12px' }}>
               <TestingBar testing={x} />
             </div>
@@ -183,7 +191,6 @@ export function TestingsInProgress({
           </div>
         );
       })}
-      {error && <Cell multiline>{error}</Cell>}
     </Section>
   );
 }
