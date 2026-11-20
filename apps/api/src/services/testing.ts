@@ -406,6 +406,7 @@ function toTestingDTO(
     extraSignupHours: row.extraSignupHours,
     extraPayHours: row.extraPayHours,
     extra: null,
+    extraPre: null,
     money: admin
       ? {
           perUnit: row.perUnit,
@@ -489,7 +490,9 @@ async function withLabels(
       options.isVip ?? false,
       options.admin,
     ),
-    extra: extras.get(row.id) ?? null,
+    // Started: its view; not yet, but signing up already: the early one.
+    extra: row.extra ? (extras.get(row.id) ?? null) : null,
+    extraPre: row.extra ? null : (extras.get(row.id) ?? null),
     volunteer: offered.has(row.id),
   }));
 }

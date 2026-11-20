@@ -161,14 +161,14 @@ export function ExtraSection({
   const list = (testings.data ?? []).filter(
     (x) =>
       (!only || x.id === only) &&
-      x.extra &&
       x.joined &&
       !x.exempt &&
       (order.externalTestingId === x.id ||
         order.items.some(
           (item) => item.productId === x.productId && (x.variantId === null || item.variantId === x.variantId),
         )) &&
-      (x.extra.stage === 'signup' || x.extra.mine),
+      // Started, or signing up early before it opens.
+      ((x.extra && (x.extra.stage === 'signup' || x.extra.mine)) || x.extraPre),
   );
   if (list.length === 0) return null;
   const fmt = (amount: number): string => formatPrice(amount, order.currency);
@@ -185,8 +185,10 @@ export function ExtraSection({
   return (
     <Section header={t('extra.title')} footer={t('extra.footer')}>
       {list.map((x) => {
-        const extra = x.extra;
+        const extra = x.extra ?? x.extraPre;
         if (!extra) return null;
+        // Before it opens: signing up early with a cap, nothing to pay yet.
+        const early = extra.stage === 'pre';
         const mine = extra.mine && extra.mine.orderId === order.id ? extra.mine : null;
         const name = x.variantLabel ? `${x.productTitle} · ${x.variantLabel}` : x.productTitle;
         const text = caps[x.id] ?? (mine ? (mine.cap / 100).toFixed(2) : '');
@@ -199,12 +201,15 @@ export function ExtraSection({
               subtitle={
                 extra.stage === 'done'
                   ? undefined
-                  : t('extra.until', { date: formatDateTime(extra.until) })
+                  : early
+                    ? t('extra.preUntil', { date: formatDateTime(extra.until) })
+                    : t('extra.until', { date: formatDateTime(extra.until) })
               }
             >
               {name}
             </Cell>
-            {extra.stage === 'signup' && (
+            {early && <Cell multiline>{mine ? t('extra.preSigned', { cap: fmt(mine.cap) }) : t('extra.preIntro')}</Cell>}
+            {(extra.stage === 'signup' || early) && (
               <>
                 {extra.missing.map((m) => (
                   <Cell key={m.id} after={<span className="gb-testing-money">{fmt(m.amount)}</span>}>

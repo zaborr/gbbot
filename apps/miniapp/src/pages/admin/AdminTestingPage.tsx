@@ -333,6 +333,7 @@ function TestingForm({
           extraSignupHours: 24,
           extraPayHours: 48,
           extra: testing?.extra ?? null,
+          extraPre: testing?.extraPre ?? null,
           extraReportSentAt: testing?.extraReportSentAt ?? null,
           posterior,
           allowExternal,
@@ -737,6 +738,11 @@ function TestingForm({
           {preview && <TestingCard testing={preview} preview />}
           {money && <PotSection testing={testing} steps={steps} />}
           {testing.extra && <ExtraStatus testing={testing} />}
+          {testing.extraPre && (
+            <Section header={t('extra.title')} footer={t('testing.extraPreAdminFooter')}>
+              <Cell after={String(testing.extraPre.signed)}>{t('testing.extraPreSigned')}</Cell>
+            </Section>
+          )}
           <ReopenSection testing={testing} onChange={onChange} />
           <Participants testing={testing} />
         </>
