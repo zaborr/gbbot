@@ -12,6 +12,12 @@ set -u
 cd "$(dirname "$0")/../.."
 DIR=deploy/runtime
 [ -f "$DIR/task" ] || exit 0
+# Asked for before the server booted (say, tapped again while restarting): not run now.
+boot=$(($(date +%s) - $(cut -d. -f1 /proc/uptime)))
+if [ "$(stat -c %Y "$DIR/task")" -lt "$boot" ]; then
+  rm -f "$DIR/task"
+  exit 0
+fi
 mv "$DIR/task" "$DIR/task-running"
 # Never two at once, nor during an update.
 exec 9>"$DIR/.lock"
@@ -22,6 +28,7 @@ ACTION=$(get action)
 CHAT=$(get chat)
 MESSAGE=$(get message)
 LOG=$DIR/last-task.log
+: >"$LOG"
 DETAIL=""
 BUTTON=""
 DONE=done
@@ -67,21 +74,27 @@ case "$ACTION" in
     # status.sh tells them once the server is back.
     printf 'chat=%s\n---\n%s\n' "$CHAT" "$(get done)" >"$DIR/reboot-pending.tmp" &&
       mv "$DIR/reboot-pending.tmp" "$DIR/reboot-pending"
-    rm -f "$DIR/task-running"
-    # Never in the middle of installing packages (automatic updates): up to 10 minutes.
+    # Never in the middle of installing packages: up to 10 minutes. Only real
+    # installs count, not unattended-upgrade-shutdown, which is always running.
     i=0
-    while pgrep -x 'apt|apt-get|dpkg|unattended-upgr' >/dev/null && [ "$i" -lt 120 ]; do
+    while { pgrep -x 'apt|apt-get|dpkg' || pgrep -f 'bin/unattended-upgrade( |$)'; } >/dev/null && [ "$i" -lt 120 ]; do
       sleep 5
       i=$((i + 1))
     done
     # Docker first, in order: the database closes cleanly, and the containers
     # start again on boot (they were not stopped by hand).
-    systemctl stop docker.socket docker >/dev/null 2>&1
+    systemctl stop docker.socket docker >>"$LOG" 2>&1
     sync
     # Without waiting for every service to stop (where a reboot can hang on
     # some virtual machines); processes are still ended and disks unmounted.
-    systemctl reboot --force
-    exit 0
+    rm -f "$DIR/task-running"
+    systemctl reboot --force >>"$LOG" 2>&1 || systemctl reboot --force --force >>"$LOG" 2>&1
+    # Still here after two minutes: it did not restart. Back as it was, and say so.
+    sleep 120
+    echo "The server did not restart." >>"$LOG"
+    rm -f "$DIR/reboot-pending"
+    systemctl start docker >>"$LOG" 2>&1
+    api_ok
     ;;
   backup)
     if ./deploy/backup.sh >"$LOG" 2>&1; then
