@@ -363,6 +363,15 @@ function TestingActions({
   const to = useShopPath();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // With the GB closed: did they buy it here (else only people from outside can join).
+  const orders = useAsync(() => (closed ? api.getOrders() : Promise.resolve([])), [closed]);
+  const boughtHere = (orders.data ?? []).some(
+    (o) =>
+      o.status !== 'cancelled' &&
+      o.items.some(
+        (i) => i.productId === testing.productId && (testing.variantId === null || i.variantId === testing.variantId),
+      ),
+  );
   const run = (action: () => Promise<void>): void => {
     setBusy(true);
     setError(null);
@@ -381,14 +390,14 @@ function TestingActions({
   const what = testing.variantLabel ?? productTitle(product);
 
   if (testing.joined) return <Cell multiline>{t('testing.joinedAlready')}</Cell>;
-  // The GB closed, but the time to join lasts: buyers join from their order,
-  // people from outside from «My orders» too.
-  const lateJoin =
-    testing.status === 'closed' &&
-    testing.donationsOpen &&
-    testing.extra === null &&
-    (testing.posterior || testing.externalOpen);
-  if (lateJoin) {
+  // The GB closed, but the time to join lasts: those who bought it here, and
+  // people from outside when it takes them, join from the testing screen.
+  const lateWindow =
+    testing.status === 'closed' && testing.donationsOpen && testing.extra === null;
+  if (lateWindow && !boughtHere && !testing.externalOpen) {
+    return <Cell multiline>{t('testing.onlyBuyers')}</Cell>;
+  }
+  if (lateWindow) {
     return (
       <>
         <Cell multiline>

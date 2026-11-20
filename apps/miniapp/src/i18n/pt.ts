@@ -1323,6 +1323,7 @@ export const pt: Record<MessageKey, string> = {
   'testing.offerFooter': 'Opcional: os compradores pagam uma tarifa de testing uma vez, e o laboratório analisa o produto à medida que as unidades compradas alcançam cada patamar. Só quem a paga vê os resultados. Se não se alcançar nenhum patamar, não é devolvida.',
   'testing.offerSubtitle': '🔬 {lab} · {amount}',
   'testing.offerTitle': '🧪 Testing disponível',
+  'testing.onlyBuyers': 'A este testing só podem aderir os que compraram este produto neste GB.',
   'testing.orderLine': '🧪 Testing',
   'testing.orderLineHint': 'Mantém-se enquanto o pedido tiver o produto testado.',
   'testing.orderLinkCan': '🧪 {products} tem um testing a que pode aderir',
