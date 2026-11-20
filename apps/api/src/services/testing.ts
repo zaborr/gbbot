@@ -1127,7 +1127,13 @@ export async function dropUnpaidTesting(
       .from(testingEntries)
       .innerJoin(testings, eq(testingEntries.testingId, testings.id))
       .where(eq(testingEntries.orderId, row.id));
-    if (live.some(({ testing }) => joinOpen(testing) && (!atClose || testing.posterior))) continue;
+    if (
+      live.some(
+        ({ testing }) => testing.status === 'closed' && joinOpen(testing) && (!atClose || testing.posterior),
+      )
+    ) {
+      continue;
+    }
     dropped += 1;
     await db.transaction(async (tx) => {
       await tx.delete(testingEntries).where(eq(testingEntries.orderId, row.id));
