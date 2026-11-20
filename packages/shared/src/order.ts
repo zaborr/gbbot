@@ -195,3 +195,23 @@ export function editableDirectly(
 ): boolean {
   return order.status === 'pending' && order.amountPaid === 0 && order.amountSubmitted === 0;
 }
+
+/** Why money is owed back. */
+export type RefundReason =
+  | 'cancelled'
+  | 'vial'
+  | 'extraLeft'
+  | 'extraLeftover'
+  | 'testingCancelled'
+  | 'changed';
+
+/** One order with money owed back to its customer (the organiser's list). */
+export interface PendingRefund {
+  orderId: string;
+  ref: string;
+  customer: string;
+  amount: number;
+  currency: string;
+  reasons: RefundReason[];
+  updatedAt: string;
+}

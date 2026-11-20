@@ -63,6 +63,7 @@ import type {
   LabProgressRequest,
   Lab,
   LabRequest,
+  PendingRefund,
   TestingParticipant,
   UpdateTestingRequest,
 } from '@tma-shop/shared';
@@ -1132,6 +1133,11 @@ export class ApiClient {
   /** Checks the order's submitted transaction on the blockchain again. */
   adminRecheckPayment(orderId: string): Promise<Order> {
     return this.request<Order>(`/admin/orders/${orderId}/recheck`, { method: 'POST' });
+  }
+
+  /** Everything owed back to customers in this GB, with why. */
+  adminPendingRefunds(): Promise<PendingRefund[]> {
+    return this.request<PendingRefund[]>('/admin/refunds');
   }
 
   adminRecordRefund(orderId: string): Promise<Order> {
