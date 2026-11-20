@@ -31,6 +31,7 @@ import {
   duplicateShopRequest,
   productsCsvRequest,
   broadcastAudience,
+  labRequest,
   sendBroadcastRequest,
   updateDisclaimerRequest,
   type WebFile,
@@ -45,6 +46,7 @@ import { requireAdmin, requireAuth, requireOwner } from '../auth/middleware.js';
 import { testingAdminRoutes } from './testing.js';
 import { announceTestingTiers, listTestings, setTestingEnabled } from '../services/testing.js';
 import { unpaidExtras } from '../services/testingExtra.js';
+import { createLab, deleteLab, listLabs, updateLab } from '../services/labs.js';
 import { findReport, listReports, reportCaption, reportFile, sendReportTo } from '../services/testingReports.js';
 import {
   createCategory,
@@ -546,6 +548,19 @@ export function adminRoutes(): Hono<AppBindings> {
   app.put('/shop/testing', requireOwner, zValidator('json', updateTestingEnabledRequest), async (c) =>
     c.json(await setTestingEnabled(c.get('db'), c.get('shopId'), c.req.valid('json').enabled)),
   );
+  // The labs the GB works with, and their tests with prices.
+  app.get('/labs', async (c) => c.json(await listLabs(c.get('db'), c.get('shopId'))));
+  app.post('/labs', zValidator('json', labRequest), async (c) =>
+    c.json(await createLab(c.get('db'), c.get('shopId'), c.req.valid('json')), 201),
+  );
+  app.put('/labs/:id', zValidator('param', idParam), zValidator('json', labRequest), async (c) =>
+    c.json(await updateLab(c.get('db'), c.get('shopId'), c.req.valid('param').id, c.req.valid('json'))),
+  );
+  app.delete('/labs/:id', zValidator('param', idParam), async (c) => {
+    await deleteLab(c.get('db'), c.get('shopId'), c.req.valid('param').id);
+    return c.json({ ok: true });
+  });
+
   // Every lab report kept in this GB.
   app.get('/testing-reports', async (c) => c.json(await listReports(c.get('db'), { shopIds: [c.get('shopId')] })));
   app.get('/testing-reports/:id/file', zValidator('param', idParam), async (c) =>

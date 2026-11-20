@@ -512,6 +512,13 @@
       "when": 1796241600000,
       "tag": "0072_lab_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1796328000000,
+      "tag": "0073_labs",
+      "breakpoints": true
     }
   ]
 }

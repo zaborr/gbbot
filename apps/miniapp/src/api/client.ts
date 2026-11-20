@@ -61,6 +61,8 @@ import type {
   Testing,
   TestingReportView,
   LabProgressRequest,
+  Lab,
+  LabRequest,
   TestingParticipant,
   UpdateTestingRequest,
 } from '@tma-shop/shared';
@@ -679,6 +681,22 @@ export class ApiClient {
   /** Closes a drawn testing: donors get their vial's price back. */
   adminSettleTesting(id: string): Promise<{ ok: boolean }> {
     return this.request<{ ok: boolean }>(`/admin/testings/${id}/settle`, { method: 'POST' });
+  }
+
+  // --- the GB's labs and their tests with prices ---
+  adminLabs(): Promise<Lab[]> {
+    return this.request<Lab[]>('/admin/labs');
+  }
+
+  adminSaveLab(id: string | null, input: LabRequest): Promise<Lab> {
+    return this.request<Lab>(id ? `/admin/labs/${id}` : '/admin/labs', {
+      method: id ? 'PUT' : 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  adminDeleteLab(id: string): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/labs/${id}`, { method: 'DELETE' });
   }
 
   /** After the draw: vials sent to the lab, received there, or the day results are expected. */
