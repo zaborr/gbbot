@@ -1853,6 +1853,60 @@ describeDb('API integration', () => {
     }
   });
 
+  it('hides the testing of a VIP-only product from those who are not VIPs', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const [seed] = await db.select().from(products).where(eq(products.id, productId));
+    const [own] = await db
+      .insert(products)
+      .values({
+        shopId,
+        categoryId: seed!.categoryId,
+        slug: 'gyokuro-vip',
+        title: 'Gyokuro',
+        description: '',
+        price: 150,
+        currency: 'USDC',
+        stock: 10,
+        isActive: true,
+        vipOnly: true,
+      })
+      .returning();
+    const made: string[] = [];
+    try {
+      const created = await request('/api/admin/testings', {
+        method: 'POST',
+        headers: admin,
+        body: JSON.stringify({
+          productId: own!.id,
+          variantId: null,
+          lab: 'Lab',
+          contribution: 500,
+          perUnit: 0,
+          feeMode: 'mandatory',
+          tiers: [{ id: 'mp', name: 'M&P', cost: 5000, vials: 1 }],
+        }),
+      });
+      const testing = (await created.json()) as { id: string; donationProductId: string | null };
+      made.push(testing.id);
+      const ids = async (headers: Record<string, string>): Promise<string[]> =>
+        ((await (await request('/api/products/testings', { headers })).json()) as Array<{ id: string }>).map((x) => x.id);
+      const someone = { Authorization: `Bearer ${await authToken(555006001, 'Ivo')}` };
+      expect(await ids(someone)).not.toContain(testing.id);
+      expect(await ids(admin)).toContain(testing.id);
+      if (testing.donationProductId) made.push(`p:${testing.donationProductId}`);
+    } finally {
+      const tids = made.filter((x) => !x.startsWith('p:'));
+      if (tids.length > 0) await db.delete(testings).where(inArray(testings.id, tids));
+      const pids = made.filter((x) => x.startsWith('p:')).map((x) => x.slice(2));
+      await db.delete(products).where(inArray(products.id, [own!.id, ...pids]));
+      await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
+    }
+  });
+
   it('keeps the GB\'s labs and their tests with prices', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,

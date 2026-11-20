@@ -80,7 +80,14 @@ export function orderRoutes(): Hono<AppBindings> {
   app.post('/external-testing/:id', zValidator('param', idParam), zValidator('json', joinExternalRequest), async (c) => {
     const { sub } = c.get('claims');
     const testingId = c.req.valid('param').id;
-    const orderId = await joinTestingExternal(c.get('db'), c.get('shop'), sub, testingId, c.req.valid('json'));
+    const orderId = await joinTestingExternal(
+      c.get('db'),
+      c.get('shop'),
+      sub,
+      testingId,
+      c.req.valid('json'),
+      c.get('isVip') || c.get('canManage'),
+    );
     void tellJoined(c.get('db'), c.get('env'), c.get('shop'), sub, orderId, testingId).catch((error: unknown) =>
       console.error('Joined notice failed:', error),
     );
