@@ -10,6 +10,7 @@ import { ErrorView } from '../components/ErrorView.js';
 import { PageTitle } from '../components/PageTitle.js';
 import { TestingCard } from '../components/TestingCard.js';
 import { TestingsInProgress } from '../components/TestingsInProgress.js';
+import { TestingReports } from '../components/TestingReports.js';
 import { DonationSection, ExtraSection, VolunteerSection } from '../components/TestingOrderSections.js';
 import { useShopPath } from '../providers/ShopProvider.js';
 import { t } from '../i18n/index.js';
@@ -31,6 +32,7 @@ export function TestingHubPage(): React.JSX.Element {
   const [joinedNow, setJoinedNow] = useState<string | null>(null);
   const testings = useAsync(() => api.getTestings(), [reloadKey]);
   const orders = useAsync(() => api.getOrders(), [reloadKey]);
+  const reports = useAsync(() => api.testingReports('mine'), [reloadKey]);
   const reload = (): void => setReloadKey((k) => k + 1);
 
   if ((testings.loading && !testings.data) || (orders.loading && !orders.data)) return <Loader />;
@@ -91,6 +93,13 @@ export function TestingHubPage(): React.JSX.Element {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onChanged={reload}
+      />
+
+      <TestingReports
+        reports={reports.data ?? []}
+        scope="mine"
+        header={t('reports.mine')}
+        footer={t('reports.mineFooter')}
       />
 
       {done.length > 0 && (

@@ -11,6 +11,7 @@ import type { ShopRow } from './shop.js';
 import { notifyTesting, audience, testedLabel, vialLabel } from './testingDraw.js';
 import { botToken } from './activeBot.js';
 import { takesPart, reachedTiers } from './testing.js';
+import { saveReport } from './testingReports.js';
 import { refundDonations } from './testingDonations.js';
 import { cancelExtra, extraPayers } from './testingExtra.js';
 
@@ -286,7 +287,7 @@ export async function handleReportReply(
   message: {
     chat?: { id: number };
     reply_to_message?: { message_id?: number };
-    document?: { file_id: string };
+    document?: { file_id: string; file_name?: string; mime_type?: string };
     photo?: Array<{ file_id: string }>;
   },
   lang: Lang,
@@ -328,6 +329,16 @@ export async function handleReportReply(
     }
   }
   const sentReport = { ...file, sentAt: new Date().toISOString() };
+  // Kept for good, with a copy of the file: organisers and participants can look it up later.
+  await saveReport(db, telegram, testing, {
+    kind: extra ? 'extra' : 'base',
+    fileKind: file.kind,
+    fileId: file.fileId,
+    fileName: message.document?.file_name ?? null,
+    mime: message.document?.mime_type ?? null,
+    uploadedBy: chatId,
+    delivered,
+  }).catch((error: unknown) => console.error('Report not kept:', error));
   await db
     .update(testings)
     .set({ ...(extra ? { extraReport: sentReport } : { report: sentReport }), reportRequest: null, updatedAt: new Date() })

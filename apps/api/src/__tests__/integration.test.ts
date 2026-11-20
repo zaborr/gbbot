@@ -19,6 +19,7 @@ import {
   shops,
   testingEntries,
   testingExtraMembers,
+  testingReports,
   testings,
   bots,
   botSwitches,
@@ -1814,6 +1815,36 @@ describeDb('API integration', () => {
       await db.delete(testings).where(eq(testings.id, newer));
       expect((await reopen(id)).status).toBe(200);
       expect(await state(id)).toMatchObject({ status: 'closed', donationsOpen: true });
+
+      // Reports are kept with their file: the organisers list and open them; others do not see them.
+      await db.insert(testingReports).values({
+        testingId: id,
+        shopId,
+        kind: 'base',
+        fileKind: 'document',
+        fileId: 'file-1',
+        fileName: 'report.pdf',
+        mime: 'application/pdf',
+        data: Buffer.from('%PDF-1'),
+        size: 6,
+        delivered: 3,
+      });
+      const kept = (await (await request('/api/admin/testing-reports', { headers: admin })).json()) as Array<{
+        id: string;
+        testingId: string;
+        hasCopy: boolean;
+        delivered: number;
+      }>;
+      const mine = kept.find((r) => r.testingId === id);
+      expect(mine).toMatchObject({ hasCopy: true, delivered: 3 });
+      const file = await request(`/api/admin/testing-reports/${mine!.id}/file`, { headers: admin });
+      expect(file.status).toBe(200);
+      expect(await file.text()).toBe('%PDF-1');
+      const stranger = { Authorization: `Bearer ${await authToken(555004001, 'Sol')}` };
+      // (The GB is closed and they have nothing in it: they do not even reach it.)
+      const theirs = await request('/api/products/testing-reports', { headers: stranger });
+      expect(theirs.status === 404 || JSON.stringify(await theirs.json()) === '[]').toBe(true);
+      expect((await request(`/api/products/testing-reports/${mine!.id}/file`, { headers: stranger })).status).toBe(404);
     } finally {
       await db.update(shops).set({ closedAt: null }).where(eq(shops.id, shopId));
       if (made.length > 0) await db.delete(testings).where(inArray(testings.id, made));

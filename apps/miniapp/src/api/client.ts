@@ -59,6 +59,7 @@ import type {
   CheckoutFields,
   CreateTestingRequest,
   Testing,
+  TestingReportView,
   TestingParticipant,
   UpdateTestingRequest,
 } from '@tma-shop/shared';
@@ -94,6 +95,14 @@ export interface CategoryInput {
   title: string;
   sortOrder: number;
 }
+
+/** Where lab reports are listed: one's own, a GB's (admin), or every GB's (platform). */
+export type ReportScope = 'mine' | 'admin' | 'platform';
+const REPORT_BASE: Record<ReportScope, string> = {
+  mine: '/products/testing-reports',
+  admin: '/admin/testing-reports',
+  platform: '/platform/testing-reports',
+};
 
 export class ApiClientError extends Error {
   constructor(
@@ -162,6 +171,34 @@ export class ApiClient {
       throw new ApiClientError(res.status, err?.code ?? 'error', err?.message ?? res.statusText);
     }
     return data as T;
+  }
+
+  /** A file from the API (a lab report), with the same credentials. */
+  private async requestBlob(path: string, retried = false): Promise<Blob> {
+    const headers = new Headers();
+    if (this.token) headers.set('Authorization', `Bearer ${this.token}`);
+    if (this.shop) headers.set('X-Shop', this.shop);
+    headers.set('X-Lang', lang());
+    const res = await fetch(`${BASE_URL}${path}`, { headers });
+    if (res.status === 401 && !retried && (await this.refreshToken())) return this.requestBlob(path, true);
+    if (!res.ok) {
+      const data = (await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
+      throw new ApiClientError(res.status, data?.error?.code ?? 'error', data?.error?.message ?? res.statusText);
+    }
+    return res.blob();
+  }
+
+  // --- lab reports kept: `mine` (taking part), `admin` (this GB), `platform` (every GB) ---
+  testingReports(scope: ReportScope): Promise<TestingReportView[]> {
+    return this.request<TestingReportView[]>(`${REPORT_BASE[scope]}`);
+  }
+
+  testingReportFile(scope: ReportScope, id: string): Promise<Blob> {
+    return this.requestBlob(`${REPORT_BASE[scope]}/${id}/file`);
+  }
+
+  sendTestingReport(scope: ReportScope, id: string): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`${REPORT_BASE[scope]}/${id}/send`, { method: 'POST' });
   }
 
   // --- auth ---

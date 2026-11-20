@@ -88,6 +88,9 @@ function AdminTestings(): React.JSX.Element {
               </Cell>
             ))}
             <Cell onClick={() => navigate(to('/admin/testings/new'))}>{t('testing.new')}</Cell>
+            <Cell onClick={() => navigate(to('/admin/testing-reports'))} after="›">
+              {t('reports.title')}
+            </Cell>
           </Section>
         ))}
     </List>

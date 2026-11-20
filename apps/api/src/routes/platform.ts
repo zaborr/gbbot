@@ -19,6 +19,7 @@ import type { AppBindings } from '../context.js';
 import type { Database } from '../db/client.js';
 import type { Env } from '../config/env.js';
 import { requireAuth, requireFullPlatform, requireSuperAdmin } from '../auth/middleware.js';
+import { findReport, listReports, reportCaption, reportFile, sendReportTo } from '../services/testingReports.js';
 import {
   createShop,
   deleteShop,
@@ -136,6 +137,19 @@ export function platformRoutes(): Hono<AppBindings> {
 
   // Platform blacklist: for those in it no GB exists.
   app.get('/blacklist', async (c) => c.json(await platformBlacklistView(c.get('db'))));
+
+  // Every lab report kept, of every GB.
+  app.get('/testing-reports', async (c) => c.json(await listReports(c.get('db'), {})));
+  app.get('/testing-reports/:id/file', zValidator('param', z.object({ id: z.uuid() })), async (c) =>
+    reportFile(await findReport(c.get('db'), c.req.valid('param').id)),
+  );
+  app.post('/testing-reports/:id/send', zValidator('param', z.object({ id: z.uuid() })), async (c) => {
+    const sub = c.get('claims').sub;
+    if (sub <= 0) throw ApiError.conflict('report_telegram', 'Open the app from Telegram to send the report');
+    const row = await findReport(c.get('db'), c.req.valid('param').id);
+    await sendReportTo(c.get('env'), row, sub, await reportCaption(c.get('db'), row));
+    return c.json({ ok: true });
+  });
   app.post('/blacklist/check', zValidator('json', blacklistWho), async (c) =>
     c.json(await checkBlacklist(c.get('db'), c.req.valid('json').who, null)),
   );

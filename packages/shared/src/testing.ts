@@ -458,3 +458,25 @@ export function shareOut<K>(
   }
   return null;
 }
+
+/** A lab report kept (base or extra round), as organisers and participants list them. */
+export interface TestingReportView {
+  id: string;
+  testingId: string;
+  shopId: string;
+  shopName: string;
+  /** What was tested. */
+  product: string;
+  lab: string;
+  kind: 'base' | 'extra';
+  fileKind: 'document' | 'photo';
+  fileName: string | null;
+  /** The tiers of its round. */
+  tiers: string[];
+  createdAt: string;
+  /** People it was sent to. */
+  delivered: number;
+  uploadedBy: string | null;
+  /** A copy is kept (it can be opened here); else only through Telegram. */
+  hasCopy: boolean;
+}

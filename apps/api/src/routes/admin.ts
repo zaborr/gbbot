@@ -45,6 +45,7 @@ import { requireAdmin, requireAuth, requireOwner } from '../auth/middleware.js';
 import { testingAdminRoutes } from './testing.js';
 import { announceTestingTiers, listTestings, setTestingEnabled } from '../services/testing.js';
 import { unpaidExtras } from '../services/testingExtra.js';
+import { findReport, listReports, reportCaption, reportFile, sendReportTo } from '../services/testingReports.js';
 import {
   createCategory,
   createProduct,
@@ -545,6 +546,18 @@ export function adminRoutes(): Hono<AppBindings> {
   app.put('/shop/testing', requireOwner, zValidator('json', updateTestingEnabledRequest), async (c) =>
     c.json(await setTestingEnabled(c.get('db'), c.get('shopId'), c.req.valid('json').enabled)),
   );
+  // Every lab report kept in this GB.
+  app.get('/testing-reports', async (c) => c.json(await listReports(c.get('db'), { shopIds: [c.get('shopId')] })));
+  app.get('/testing-reports/:id/file', zValidator('param', idParam), async (c) =>
+    reportFile(await findReport(c.get('db'), c.req.valid('param').id, [c.get('shopId')])),
+  );
+  app.post('/testing-reports/:id/send', zValidator('param', idParam), async (c) => {
+    const sub = c.get('claims').sub;
+    if (sub <= 0) throw ApiError.conflict('report_telegram', 'Open the app from Telegram to send the report');
+    const row = await findReport(c.get('db'), c.req.valid('param').id, [c.get('shopId')]);
+    await sendReportTo(c.get('env'), row, sub, await reportCaption(c.get('db'), row));
+    return c.json({ ok: true });
+  });
   app.route('/testings', testingAdminRoutes());
   app.put('/shop/currency', requireOwner, zValidator('json', updateShopCurrencyRequest), async (c) =>
     c.json(await updateShopCurrency(c.get('db'), c.get('shopId'), c.req.valid('json').currency)),

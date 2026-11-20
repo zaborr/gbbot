@@ -18,6 +18,7 @@ import { ErrorView } from '../../components/ErrorView.js';
 import { PageTitle } from '../../components/PageTitle.js';
 import { Input } from '../../components/Field.js';
 import { TestingCard } from '../../components/TestingCard.js';
+import { TestingReports } from '../../components/TestingReports.js';
 import { productTitle } from '../../lib/localize.js';
 import { formatPrice, formatDateTime } from '../../lib/format.js';
 import { AdminOnly, ErrorBanner, toMajor, useAdminActions } from './common.js';
@@ -759,6 +760,7 @@ function TestingForm({
           <DrawSection testing={testing} onChange={onChange} />
           <SettleSection testing={testing} onChange={onChange} />
           <ReportSection testing={testing} />
+          <KeptReports testing={testing} />
           <CancelSection testing={testing} onChange={onChange} />
         </>
       )}
@@ -1265,6 +1267,13 @@ function ReportSection({ testing }: { testing: Testing }): React.JSX.Element | n
       </div>
     </Section>
   );
+}
+
+/** This testing's reports kept (every one sent, corrections included). */
+function KeptReports({ testing }: { testing: Testing }): React.JSX.Element | null {
+  const reports = useAsync(() => api.testingReports('admin'), [testing.id, testing.reportSentAt, testing.extraReportSentAt]);
+  const mine = (reports.data ?? []).filter((r) => r.testingId === testing.id);
+  return <TestingReports reports={mine} scope="admin" header={t('reports.kept')} />;
 }
 
 /** Cancelling: everything paid for it goes back. */
