@@ -10,6 +10,11 @@ mkdir -p "$DIR"
 now=$(date +%s)
 boot=$((now - $(cut -d. -f1 /proc/uptime)))
 
+# Taps on /server from before booting are not run now.
+for stale in task task-running; do
+  if [ -f "$DIR/$stale" ] && [ "$(stat -c %Y "$DIR/$stale")" -lt "$boot" ]; then rm -f "$DIR/$stale"; fi
+done
+
 # After /server → Reiniciar servidor: tell whoever asked that it is back.
 if [ -f "$DIR/reboot-pending" ] && [ "$(stat -c %Y "$DIR/reboot-pending")" -lt "$boot" ]; then
   mv "$DIR/reboot-pending" "$DIR/outbox-reboot-$now.msg"
