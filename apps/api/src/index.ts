@@ -11,6 +11,7 @@ import { scheduleMaintenance } from './services/maintenance.js';
 import { scheduleDrawWatcher } from './services/testingDraw.js';
 import { resumePaymentChecks } from './services/paymentCheck.js';
 import { scheduleOutbox } from './services/serverOutbox.js';
+import { scheduleServerWarnings } from './services/serverTasks.js';
 
 // A stray failed background task must not take the whole API down.
 process.on('unhandledRejection', (reason) => {
@@ -42,6 +43,8 @@ scheduleBotWatch(db, env);
 
 // What the server's scripts (update, off-site backup) left for the bot to send.
 scheduleOutbox(env);
+// Every 15 minutes: does the server need its administrators (disk, backups, updates)?
+scheduleServerWarnings(db, env);
 
 // Payment checks that were running before a restart.
 resumePaymentChecks(db, env).catch((error: unknown) => {

@@ -38,8 +38,15 @@ notify() {
       --data-urlencode "chat_id=$id" --data-urlencode "text=$1" || true
   done
 }
+# For /server in the bot: when the last copy went up, or why it did not.
+mark() {
+  [ -d deploy/runtime ] || return 0
+  rm -f deploy/runtime/offsite-ok deploy/runtime/offsite-failed
+  printf '%s\n' "$2" >"deploy/runtime/$1"
+}
 fail() {
   echo "Off-site copy failed: $1"
+  mark offsite-failed "$1"
   notify "❌ Backup: no se pudo guardar la copia cifrada en B2 ($1). La copia local está bien: $DUMP"
   exit 1
 }
@@ -61,4 +68,5 @@ age -r "$AGE_RECIPIENT" -o "$WORK/backup.tar.age" "$WORK/backup.tar" || fail "ag
 NAME="$(basename "$DUMP" .sql.gz).tar.age"
 rclone --config deploy/offsite/rclone.conf copyto --no-check-dest \
   "$WORK/backup.tar.age" "gb-b2:$B2_BUCKET/$NAME" || fail "rclone"
+mark offsite-ok "$NAME"
 echo "Encrypted copy uploaded to B2: $NAME"

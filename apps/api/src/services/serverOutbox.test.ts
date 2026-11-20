@@ -12,8 +12,16 @@ describe('server outbox', () => {
       chat: 42,
       message: 7,
       text: '✅ Done\nline two',
+      button: null,
     });
-    expect(parseOutbox('chat=42\nmessage=\n---\nHi\n')).toEqual({ chat: 42, message: null, text: 'Hi' });
+    expect(parseOutbox('chat=42\nmessage=\n---\nHi\n')).toEqual({ chat: 42, message: null, text: 'Hi', button: null });
+    // Only /server's own buttons.
+    expect(parseOutbox('chat=42\nbutton=srv:reboot|Reiniciar\n---\nHi')?.button).toEqual({
+      data: 'srv:reboot',
+      text: 'Reiniciar',
+    });
+    expect(parseOutbox('chat=42\nbutton=upd:0123|Instalar\n---\nHi')?.button).toBeNull();
+    expect(parseOutbox('chat=42\nbutton=\n---\nHi')?.button).toBeNull();
     expect(parseOutbox('chat=x\n---\nHi')).toBeNull();
     expect(parseOutbox('no separator')).toBeNull();
   });
@@ -33,9 +41,9 @@ describe('server outbox', () => {
     } as unknown as TelegramApi;
 
     expect(await sendOutbox(env, telegram)).toBe(2);
-    expect(telegram.editMessageText).toHaveBeenCalledWith(42, 7, '✅ Updated');
-    expect(telegram.sendMessage).toHaveBeenCalledWith(42, '✅ Updated');
-    expect(telegram.sendMessage).toHaveBeenCalledWith(42, '❌ Backup');
+    expect(telegram.editMessageText).toHaveBeenCalledWith(42, 7, '✅ Updated', undefined);
+    expect(telegram.sendMessage).toHaveBeenCalledWith(42, '✅ Updated', undefined);
+    expect(telegram.sendMessage).toHaveBeenCalledWith(42, '❌ Backup', undefined);
     expect((await readdir(dir)).sort()).toEqual(['current', 'outbox-half.msg.tmp']);
   });
 });

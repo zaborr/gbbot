@@ -1,0 +1,9 @@
+[Unit]
+Description=GB: maintenance task asked for with /server in the bot
+
+[Path]
+PathExists=@DIR@/deploy/runtime/task
+Unit=gb-task.service
+
+[Install]
+WantedBy=multi-user.target
