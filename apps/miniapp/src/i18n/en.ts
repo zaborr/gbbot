@@ -1182,6 +1182,7 @@ export const en = {
   'testing.badThreshold': 'Enter the refund threshold, e.g. 2.00 (0 = always refund).',
   'testing.badTiers': 'Each tier needs a name, a cost and its vials (a whole number).',
   'testing.badVialsPerUnit': 'Vials in each unit: from 1 to 100',
+  'testing.canJoinCard': 'You can join · {product}',
   'testing.canJoinTitle': 'You can join',
   'testing.cancel': 'Cancel the testing',
   'testing.cancelFooter': 'If the lab cannot do it, for instance: everything paid for it goes back (shown on each order), unpaid contributions leave their orders and everyone is told.',

@@ -1184,6 +1184,7 @@ export const es: Record<MessageKey, string> = {
   'testing.badThreshold': 'Escribe el umbral de devolución, p. ej. 2.00 (0 = devolver siempre).',
   'testing.badTiers': 'Cada tramo necesita nombre, coste y viales (un número entero).',
   'testing.badVialsPerUnit': 'Viales por unidad: de 1 a 100',
+  'testing.canJoinCard': 'Puedes unirte · {product}',
   'testing.canJoinTitle': 'Puedes unirte',
   'testing.cancel': 'Cancelar el testing',
   'testing.cancelFooter': 'Por ejemplo, si el laboratorio no puede hacerlo: todo lo pagado se devuelve (aparece en cada pedido), las aportaciones sin pagar salen de sus pedidos y se avisa a todos.',

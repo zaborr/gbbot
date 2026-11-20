@@ -1184,6 +1184,7 @@ export const it: Record<MessageKey, string> = {
   'testing.badThreshold': 'Scrivi la soglia di rimborso, es. 2.00 (0 = rimborsare sempre).',
   'testing.badTiers': 'Ogni fascia ha bisogno di nome, costo e fiale (un numero intero).',
   'testing.badVialsPerUnit': 'Fiale per unità: da 1 a 100',
+  'testing.canJoinCard': 'Puoi unirti · {product}',
   'testing.canJoinTitle': 'Puoi unirti',
   'testing.cancel': 'Annulla il testing',
   'testing.cancelFooter': 'Per esempio, se il laboratorio non può farlo: tutto quanto pagato si restituisce (appare in ogni ordine), i contributi non pagati escono dai loro ordini e si avvisano tutti.',
