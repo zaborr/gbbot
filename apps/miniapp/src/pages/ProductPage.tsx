@@ -7,7 +7,7 @@ import { api, ApiClientError } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useCart } from '../providers/CartProvider.js';
 import { useMainButton } from '../hooks/useMainButton.js';
-import { formatPrice } from '../lib/format.js';
+import { formatPrice, formatDateTime } from '../lib/format.js';
 import { convertedPrice, otherPayment } from '../lib/exchange.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
@@ -393,7 +393,7 @@ function TestingActions({
       <>
         <Cell multiline>
           {t('testing.joinFromOrders', {
-            date: testing.donationsUntil ? new Date(testing.donationsUntil).toLocaleString() : '',
+            date: testing.donationsUntil ? formatDateTime(testing.donationsUntil) : '',
           })}
         </Cell>
         <div style={{ padding: '4px 16px 16px' }}>

@@ -208,6 +208,10 @@ const en = {
   'testing.announcedFree': '🧪 {shop}: {product} now has a lab testing ({lab}). Signing up has no fee: the test is paid with gifts and, if that falls short, with an extra round where you set your cap. Sign up from your order; once in, you can also give and offer a vial.',
   'testing.announcedAfterFree': '🧪 {shop}: {product}, which you bought, has a lab testing ({lab}). Signing up has no fee: the test is paid with gifts and, if that falls short, with an extra round where you set your cap. Sign up from your order within {hours} h.',
   'testing.drawDonorExternal': '🎁 {shop}: you donate one vial of {product} to the testing (draw with block {height}: {link}). You send it yourself: the organiser will tell you where. You get the vial\'s price back.',
+  'testing.joinedNotice': '✅ {shop}: you\'re in the testing of {product}.',
+  'testing.joinedPay': 'Pay {amount} from your order to stay in.',
+  'testing.joinedVolunteer': 'You offer a vial for its draw; you can change it from your order until the draw.',
+  'testing.joinedNoVolunteer': 'If you want to offer a vial for its draw, you can do it from your order until the draw.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -408,6 +412,10 @@ const es: Record<BotMessageKey, string> = {
   'testing.announcedFree': '🧪 {shop}: {product} ya tiene testing de laboratorio ({lab}). Apuntarse no tiene cuota: el test se paga con donaciones y, si falta, con una fase extra en la que tú decides tu máximo. Apúntate desde tu pedido; una vez dentro también puedes donar y ofrecer un vial.',
   'testing.announcedAfterFree': '🧪 {shop}: {product}, que compraste, tiene testing de laboratorio ({lab}). Apuntarse no tiene cuota: el test se paga con donaciones y, si falta, con una fase extra en la que tú decides tu máximo. Apúntate desde tu pedido en las próximas {hours} h.',
   'testing.drawDonorExternal': '🎁 {shop}: donas un vial de {product} para el testing (sorteo con el bloque {height}: {link}). Lo envías tú: el organizador te dirá a dónde. Se te devuelve el precio del vial.',
+  'testing.joinedNotice': '✅ {shop}: te has apuntado al testing de {product}.',
+  'testing.joinedPay': 'Paga {amount} desde tu pedido para quedar dentro.',
+  'testing.joinedVolunteer': 'Te ofreces a donar un vial en su sorteo; puedes cambiarlo desde tu pedido hasta el sorteo.',
+  'testing.joinedNoVolunteer': 'Si quieres ofrecer un vial para su sorteo, puedes hacerlo desde tu pedido hasta el sorteo.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -606,6 +614,10 @@ const it: Record<BotMessageKey, string> = {
   'testing.announcedFree': '🧪 {shop}: {product} ora ha un testing di laboratorio ({lab}). Iscriversi non ha quota: il test si paga con le donazioni e, se non basta, con una fase extra in cui decidi tu il tuo tetto. Iscriviti dal tuo ordine; una volta dentro puoi anche donare e offrire una fiala.',
   'testing.announcedAfterFree': '🧪 {shop}: {product}, che hai comprato, ha un testing di laboratorio ({lab}). Iscriversi non ha quota: il test si paga con le donazioni e, se non basta, con una fase extra in cui decidi tu il tuo tetto. Iscriviti dal tuo ordine entro {hours} h.',
   'testing.drawDonorExternal': '🎁 {shop}: doni una fiala di {product} per il testing (sorteggio con il blocco {height}: {link}). La invii tu: l\'organizzatore ti dirà dove. Ti viene restituito il prezzo della fiala.',
+  'testing.joinedNotice': '✅ {shop}: ti sei iscritto al testing di {product}.',
+  'testing.joinedPay': 'Paga {amount} dal tuo ordine per restare dentro.',
+  'testing.joinedVolunteer': 'Ti offri di donare una fiala nel suo sorteggio; puoi cambiarlo dal tuo ordine fino al sorteggio.',
+  'testing.joinedNoVolunteer': 'Se vuoi offrire una fiala per il suo sorteggio, puoi farlo dal tuo ordine fino al sorteggio.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -804,6 +816,10 @@ const pt: Record<BotMessageKey, string> = {
   'testing.announcedFree': '🧪 {shop}: {product} já tem testing de laboratório ({lab}). Inscrever-se não tem quota: o teste paga-se com doações e, se faltar, com uma fase extra em que decide o seu máximo. Inscreva-se a partir da sua encomenda; depois de entrar também pode doar e oferecer um frasco.',
   'testing.announcedAfterFree': '🧪 {shop}: {product}, que comprou, tem testing de laboratório ({lab}). Inscrever-se não tem quota: o teste paga-se com doações e, se faltar, com uma fase extra em que decide o seu máximo. Inscreva-se a partir da sua encomenda nas próximas {hours} h.',
   'testing.drawDonorExternal': '🎁 {shop}: doa um frasco de {product} para o testing (sorteio com o bloco {height}: {link}). Envia-o você: o organizador dir-lhe-á para onde. É-lhe devolvido o preço do frasco.',
+  'testing.joinedNotice': '✅ {shop}: inscreveu-se no testing de {product}.',
+  'testing.joinedPay': 'Pague {amount} a partir da sua encomenda para ficar dentro.',
+  'testing.joinedVolunteer': 'Oferece-se para doar um frasco no seu sorteio; pode mudar isso na sua encomenda até ao sorteio.',
+  'testing.joinedNoVolunteer': 'Se quiser oferecer um frasco para o seu sorteio, pode fazê-lo na sua encomenda até ao sorteio.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

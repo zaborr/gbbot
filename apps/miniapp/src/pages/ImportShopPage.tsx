@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formatDateTime } from '../lib/format.js';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import type { GbBackupPreview } from '@tma-shop/shared';
@@ -103,7 +104,7 @@ export function ImportShopPage(): React.JSX.Element {
             <Cell after={String(preview.categories)}>{t('categories.title')}</Cell>
             <Cell after={String(preview.shippingZones)}>{t('importGb.zones')}</Cell>
             <Cell after={preview.hasAddressKey ? '✓' : '—'}>{t('adminHome.addressKey')}</Cell>
-            <Cell multiline>{t('importGb.exportedAt', { date: new Date(preview.exportedAt).toLocaleString() })}</Cell>
+            <Cell multiline>{t('importGb.exportedAt', { date: formatDateTime(preview.exportedAt) })}</Cell>
           </Section>
 
           <Section header={t('importGb.walletsTitle')} footer={t('importGb.walletsFooter')}>

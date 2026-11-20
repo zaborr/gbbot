@@ -584,3 +584,35 @@ export async function reopenTesting(
     console.error('Testing announcement failed:', error),
   );
 }
+
+/**
+ * Joined a testing: a word from the bot, with what is left to do (paying the
+ * fee) and whether they offer a vial (it can change from the order until the draw).
+ */
+export async function tellJoined(
+  db: Database,
+  env: Env,
+  shop: ShopRow,
+  userId: number,
+  orderId: string,
+  testingId: string,
+): Promise<void> {
+  const row = await db.query.testings.findFirst({ where: eq(testings.id, testingId) });
+  if (!row) return;
+  const [entry] = await db
+    .select({ volunteer: testingEntries.volunteer })
+    .from(testingEntries)
+    .where(and(eq(testingEntries.testingId, row.id), eq(testingEntries.orderId, orderId)));
+  const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+  const what = await testedLabel(db, row);
+  const owes = order ? order.total - order.amountPaid : 0;
+  await notifyUsers(db, botToken(env), [userId], (lang: Lang) =>
+    [
+      tr(lang, 'testing.joinedNotice', { shop: shop.name, product: what }),
+      owes > 0 ? tr(lang, 'testing.joinedPay', { amount: formatMoney(owes, row.currency) }) : null,
+      tr(lang, entry?.volunteer ? 'testing.joinedVolunteer' : 'testing.joinedNoVolunteer'),
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  );
+}

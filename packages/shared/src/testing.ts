@@ -175,6 +175,8 @@ export const testing = z.object({
   /** Made once the GB was closed: the fee is paid to join (from an order), until the time to give ends. */
   posterior: z.boolean(),
   /** Those who did not buy it here can join (an order of only the fee). */
+  /** This person offers a vial in it (each testing has its own draw). */
+  volunteer: z.boolean(),
   allowExternal: z.boolean(),
   /** Those from outside can join now. */
   externalOpen: z.boolean(),

@@ -1701,6 +1701,22 @@ describeDb('API integration', () => {
       expect(await count(`audience=testing&testingId=${testingId}`)).toBe(1);
       expect(await count(`audience=donors&testingId=${testingId}`)).toBe(1);
       expect((await request('/api/admin/broadcasts/count?audience=testing', { headers: admin })).status).toBe(400);
+      // Offering a vial is per testing, and it can change until the draw.
+      const offer = (volunteer: boolean): Promise<Response> =>
+        Promise.resolve(
+          request(`/api/orders/${orderId}/testings/${testingId}/volunteer`, {
+            method: 'PUT',
+            headers: outside,
+            body: JSON.stringify({ volunteer }),
+          }),
+        );
+      expect((await offer(false)).status).toBe(200);
+      expect(await count(`audience=donors&testingId=${testingId}`)).toBe(0);
+      const mineNow = ((await (await request(`/api/products/${tested}/testings`, { headers: outside })).json()) as Array<{
+        volunteer: boolean;
+      }>)[0];
+      expect(mineNow?.volunteer).toBe(false);
+      expect((await offer(true)).status).toBe(200);
       // In like anyone: they can give from that order.
       const gift = await request(`/api/orders/${orderId}/donations`, {
         method: 'POST',

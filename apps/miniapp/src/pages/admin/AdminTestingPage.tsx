@@ -19,7 +19,7 @@ import { PageTitle } from '../../components/PageTitle.js';
 import { Input } from '../../components/Field.js';
 import { TestingCard } from '../../components/TestingCard.js';
 import { productTitle } from '../../lib/localize.js';
-import { formatPrice } from '../../lib/format.js';
+import { formatPrice, formatDateTime } from '../../lib/format.js';
 import { AdminOnly, ErrorBanner, toMajor, useAdminActions } from './common.js';
 import { TestingStatusChip } from './AdminTestingsPage.js';
 import { t, tn } from '../../i18n/index.js';
@@ -314,22 +314,24 @@ function TestingForm({
           status: testing?.status ?? 'open',
           participants: testing?.participants ?? 0,
           joined: false,
+          volunteer: false,
           exempt: false,
-          draw: null,
-          reportSentAt: null,
+          // Editing: where it really is (its time, extra round, draw).
+          draw: testing?.draw ?? null,
+          reportSentAt: testing?.reportSentAt ?? null,
           donationHours: Number(donationHours) || 48,
           vialsPerUnit: vialsNumber,
           extraEnabled,
           extraMin: 0,
           extraSignupHours: 24,
           extraPayHours: 48,
-          extra: null,
-          extraReportSentAt: null,
+          extra: testing?.extra ?? null,
+          extraReportSentAt: testing?.extraReportSentAt ?? null,
           posterior,
           allowExternal,
-          externalOpen: false,
-          donationsUntil: null,
-          donationsOpen: false,
+          externalOpen: testing?.externalOpen ?? false,
+          donationsUntil: testing?.donationsUntil ?? null,
+          donationsOpen: testing?.donationsOpen ?? false,
           donationProductId: null,
           money: null,
         }
@@ -967,7 +969,7 @@ function DrawSection({ testing, onChange }: { testing: Testing; onChange: () => 
           ? t('testing.drawExtraOpen')
           : blocker === 'donations_open'
           ? t('testing.drawDonationsOpen', {
-              date: testing.donationsUntil ? new Date(testing.donationsUntil).toLocaleString() : '—',
+              date: testing.donationsUntil ? formatDateTime(testing.donationsUntil) : '—',
             })
           : blocker === 'unpaid'
             ? t('testing.drawUnpaid')
@@ -1141,7 +1143,7 @@ function ReportSection({ testing }: { testing: Testing }): React.JSX.Element | n
       <ErrorBanner message={actions.error} />
       {testing.reportSentAt && (
         <Cell multiline>
-          {t('testing.reportSentOn', { date: new Date(testing.reportSentAt).toLocaleString() })}
+          {t('testing.reportSentOn', { date: formatDateTime(testing.reportSentAt) })}
         </Cell>
       )}
       {asked && <Cell multiline>{t('testing.reportAsked')}</Cell>}
@@ -1171,7 +1173,7 @@ function ReportSection({ testing }: { testing: Testing }): React.JSX.Element | n
             }
           >
             {testing.extraReportSentAt
-              ? t('testing.extraReportAgain', { date: new Date(testing.extraReportSentAt).toLocaleString() })
+              ? t('testing.extraReportAgain', { date: formatDateTime(testing.extraReportSentAt) })
               : t('testing.extraReportSend')}
           </Button>
         )}
@@ -1206,7 +1208,7 @@ function ExtraStatus({ testing }: { testing: Testing }): React.JSX.Element | nul
   const extra = testing.extra;
   if (!extra) return null;
   const fmt = (amount: number): string => formatPrice(amount, testing.currency);
-  const until = new Date(extra.until).toLocaleString();
+  const until = formatDateTime(extra.until);
   return (
     <Section header={t('testing.extraStatusTitle')}>
       <Cell multiline subtitle={extra.stage === 'done' ? undefined : t('testing.extraUntil', { date: until })}>

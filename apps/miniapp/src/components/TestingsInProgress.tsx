@@ -3,7 +3,7 @@ import { Button, Cell, Section, Switch } from '@telegram-apps/telegram-ui';
 import type { Order, Testing } from '@tma-shop/shared';
 import { api, ApiClientError } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
-import { formatPrice } from '../lib/format.js';
+import { formatPrice, formatDateTime } from '../lib/format.js';
 import { sharePercent, testingLive as joinable, testingState } from '../lib/testingState.js';
 import { useSession } from '../providers/SessionProvider.js';
 import { TestingBar } from './TestingCard.js';
@@ -30,12 +30,14 @@ export function TestingsInProgress({
   onChanged,
 }: {
   orders: readonly Order[];
-  onOrder: (orderId: string) => void;
+  /** To the order; `joined` names the testing just joined, to say so there. */
+  onOrder: (orderId: string, joined?: string) => void;
   onChanged: () => void;
 }): React.JSX.Element | null {
   const testings = useAsync(() => api.getTestings(), []);
   const { user } = useSession();
-  const [volunteer, setVolunteer] = useState(false);
+  // Each testing has its own draw: offering a vial is per testing.
+  const [volunteer, setVolunteer] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,15 +77,15 @@ export function TestingsInProgress({
     .map((x) => ({ x, action: actionOf(x) }))
     .filter((r): r is { x: Testing; action: Action } => r.action !== null);
   if (rows.length === 0) return null;
-  const joining = rows.some((r) => r.action.kind === 'order' || r.action.kind === 'outside');
+  const nameOf = (x: Testing): string => (x.variantLabel ? `${x.productTitle} · ${x.variantLabel}` : x.productTitle);
 
-  const run = (id: string, act: () => Promise<string>): void => {
-    setBusy(id);
+  const run = (x: Testing, act: () => Promise<string>): void => {
+    setBusy(x.id);
     setError(null);
     void act()
       .then((orderId) => {
         onChanged();
-        onOrder(orderId);
+        onOrder(orderId, nameOf(x));
       })
       .catch((err: unknown) => setError(err instanceof ApiClientError ? err.message : t('error.title')))
       .finally(() => setBusy(null));
@@ -115,7 +117,9 @@ export function TestingsInProgress({
             mode="bezeled"
             loading={busy === x.id}
             onClick={() =>
-              run(x.id, () => api.addOrderTesting(action.orderId, x.id, volunteer).then(() => action.orderId))
+              run(x, () =>
+                api.addOrderTesting(action.orderId, x.id, volunteer[x.id] ?? false).then(() => action.orderId),
+              )
             }
           >
             {fee(x)}
@@ -128,8 +132,8 @@ export function TestingsInProgress({
             mode="bezeled"
             loading={busy === x.id}
             onClick={() =>
-              run(x.id, () =>
-                api.joinExternalTesting(x.id, volunteer, user?.username ?? null).then((r) => r.orderId),
+              run(x, () =>
+                api.joinExternalTesting(x.id, volunteer[x.id] ?? false, user?.username ?? null).then((r) => r.orderId),
               )
             }
           >
@@ -148,7 +152,7 @@ export function TestingsInProgress({
         const { next } = testingState(x);
         const until =
           x.status === 'closed' && x.donationsUntil
-            ? t('testing.joinUntil', { date: new Date(x.donationsUntil).toLocaleString() })
+            ? t('testing.joinUntil', { date: formatDateTime(x.donationsUntil) })
             : null;
         return (
           <div key={x.id}>
@@ -163,24 +167,35 @@ export function TestingsInProgress({
                 .join(' · ')}
               after={button(x, action)}
             >
-              {x.variantLabel ? `${x.productTitle} · ${x.variantLabel}` : x.productTitle}
+              {nameOf(x)}
             </Cell>
             <div style={{ padding: '0 16px 12px' }}>
               <TestingBar testing={x} />
             </div>
+            {(action.kind === 'order' || action.kind === 'outside') && (
+              <Cell
+                Component="label"
+                after={
+                  <Switch
+                    checked={volunteer[x.id] ?? false}
+                    onChange={(e) => setVolunteer((current) => ({ ...current, [x.id]: e.target.checked }))}
+                  />
+                }
+                subtitle={
+                  // No package to take it from: from outside, or the order was already sent.
+                  action.kind === 'outside' ||
+                  ['shipped', 'fulfilled'].includes(orders.find((o) => o.id === action.orderId)?.status ?? '')
+                    ? t('testing.externalVolunteerHint')
+                    : t('testing.volunteerHint')
+                }
+                multiline
+              >
+                {t('testing.volunteer')}
+              </Cell>
+            )}
           </div>
         );
       })}
-      {joining && (
-        <Cell
-          Component="label"
-          after={<Switch checked={volunteer} onChange={(e) => setVolunteer(e.target.checked)} />}
-          subtitle={t('testing.externalVolunteerHint')}
-          multiline
-        >
-          {t('testing.volunteer')}
-        </Cell>
-      )}
       {error && <Cell multiline>{error}</Cell>}
     </Section>
   );

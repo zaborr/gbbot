@@ -1,6 +1,6 @@
 import { Cell, Section } from '@telegram-apps/telegram-ui';
 import type { Testing, TestingTierView } from '@tma-shop/shared';
-import { formatPrice } from '../lib/format.js';
+import { formatPrice, formatDateTime } from '../lib/format.js';
 import { sharePercent, testingState } from '../lib/testingState.js';
 import { t, tn } from '../i18n/index.js';
 
@@ -58,7 +58,7 @@ function stepOf(testing: Testing): Step | null {
 function TestingSteps({ testing }: { testing: Testing }): React.JSX.Element | null {
   const now = stepOf(testing);
   if (!now) return null;
-  const until = testing.donationsUntil ? new Date(testing.donationsUntil).toLocaleString() : null;
+  const until = testing.donationsUntil ? formatDateTime(testing.donationsUntil) : null;
   const steps: Array<{ id: Step; text: string }> = [
     {
       id: 'join',
@@ -139,7 +139,7 @@ export function TestingCard({
         </span>
         {testing.donationsOpen && testing.donationsUntil && (
           <span className="gb-hint">
-            {t('testing.cardDonations', { date: new Date(testing.donationsUntil).toLocaleString() })}
+            {t('testing.cardDonations', { date: formatDateTime(testing.donationsUntil) })}
           </span>
         )}
         <TestingSteps testing={testing} />

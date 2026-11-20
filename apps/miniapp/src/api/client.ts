@@ -601,6 +601,14 @@ export class ApiClient {
     });
   }
 
+  /** Offering a vial in one testing (or not), until its draw. */
+  setTestingVolunteer(orderId: string, testingId: string, volunteer: boolean): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/orders/${orderId}/testings/${testingId}/volunteer`, {
+      method: 'PUT',
+      body: JSON.stringify({ volunteer }),
+    });
+  }
+
   /** Joins a testing from outside (bought elsewhere): an order of only the fee. */
   joinExternalTesting(testingId: string, volunteer: boolean, contactUsername: string | null): Promise<CreateOrderResponse> {
     return this.request<CreateOrderResponse>(`/orders/external-testing/${testingId}`, {

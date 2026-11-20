@@ -523,12 +523,20 @@ export async function cancelDrawsOnReopen(db: Database, env: Env, shop: ShopRow)
   }
 }
 
-/** Of these orders, those from outside (they send their vial themselves). */
+/**
+ * Of these orders, those whose vial is sent by the person: from outside, or
+ * already sent (a testing made after closing) — no package to take it from.
+ */
 async function externalOf(db: Database, orderIds: readonly string[]): Promise<string[]> {
   if (orderIds.length === 0) return [];
   const rows = await db
     .select({ id: orders.id })
     .from(orders)
-    .where(and(inArray(orders.id, [...orderIds]), eq(orders.external, true)));
+    .where(
+      and(
+        inArray(orders.id, [...orderIds]),
+        sql`(${orders.external} or ${orders.status} in ('shipped', 'fulfilled'))`,
+      ),
+    );
   return rows.map((r) => r.id);
 }

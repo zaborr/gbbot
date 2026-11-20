@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button, Cell, List, Placeholder, Section, Switch } from '@telegram-apps/telegram-ui';
 import { Input } from '../components/Field.js';
 import {
@@ -22,7 +22,7 @@ import { useAsync } from '../hooks/useAsync.js';
 import { useMainButton } from '../hooks/useMainButton.js';
 import { useLiveRefresh } from '../hooks/useLiveRefresh.js';
 import { copyText } from '../lib/clipboard.js';
-import { formatFiat, formatPrice, formatTokenAmount } from '../lib/format.js';
+import { formatFiat, formatPrice, formatTokenAmount, formatDateTime } from '../lib/format.js';
 import { activeVariants, hasVariants, itemKey, customerItemName, vipPriceFor } from '../lib/variants.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
@@ -51,6 +51,11 @@ export function PaymentPage(): React.JSX.Element {
   const [reloadKey, setReloadKey] = useState(0);
   const [done, setDone] = useState<Done>(null);
   const [editing, setEditing] = useState(false);
+  // Just joined a testing (here, or from «Testings going on»): say so.
+  const location = useLocation();
+  const [joinedNow, setJoinedNow] = useState<string | null>(
+    (location.state as { joined?: string } | null)?.joined ?? null,
+  );
   const order = useAsync(() => api.getOrder(id), [id, reloadKey]);
   const shop = useAsync(() => api.getShop(), []);
 
@@ -141,7 +146,7 @@ export function PaymentPage(): React.JSX.Element {
         )}
         {current.donatedVials.map((v) => (
           <Cell key={v} multiline>
-            {t(current.external ? 'testing.donorLineExternal' : 'testing.donorLine', { item: v })}
+            {t(sendsOwn(current) ? 'testing.donorLineExternal' : 'testing.donorLine', { item: v })}
           </Cell>
         ))}
         <Cell after={formatPrice(current.total, current.currency)}>{t('cart.total')}</Cell>
@@ -159,7 +164,23 @@ export function PaymentPage(): React.JSX.Element {
         )}
       </Section>
 
-      {shop.data.testingEnabled && <OrderTestingOffers order={current} onAdded={reload} />}
+      {joinedNow && (
+        <Section>
+          <Cell multiline>{t('testing.joinedBanner', { product: joinedNow })}</Cell>
+        </Section>
+      )}
+
+      {shop.data.testingEnabled && (
+        <OrderTestingOffers
+          order={current}
+          onAdded={(what) => {
+            setJoinedNow(what);
+            reload();
+          }}
+        />
+      )}
+
+      {shop.data.testingEnabled && <VolunteerSection order={current} />}
 
       {shop.data.testingEnabled && <DonationSection order={current} onChanged={reload} />}
 
@@ -959,9 +980,16 @@ function StepHeader({ text }: { text: string }): React.JSX.Element {
  * Product testings this order could still join (it has what they test): the
  * contribution is added to the order and only that difference is paid.
  */
-function OrderTestingOffers({ order, onAdded }: { order: Order; onAdded: () => void }): React.JSX.Element | null {
+function OrderTestingOffers({
+  order,
+  onAdded,
+}: {
+  order: Order;
+  onAdded: (what: string) => void;
+}): React.JSX.Element | null {
   const testings = useAsync(() => api.getTestings(), [order.id, order.testing]);
-  const [volunteer, setVolunteer] = useState(false);
+  // Each testing has its own draw: offering a vial is per testing.
+  const [volunteer, setVolunteer] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Not while a payment is being checked (its amount would not match any more);
@@ -987,8 +1015,11 @@ function OrderTestingOffers({ order, onAdded }: { order: Order; onAdded: () => v
     setBusy(testingId);
     setError(null);
     void api
-      .addOrderTesting(order.id, testingId, volunteer)
-      .then(onAdded)
+      .addOrderTesting(order.id, testingId, volunteer[testingId] ?? false)
+      .then(() => {
+        const x = offers.find((o) => o.id === testingId);
+        onAdded(x ? (x.variantLabel ? `${x.productTitle} · ${x.variantLabel}` : x.productTitle) : '');
+      })
       .catch((err: unknown) => setError(err instanceof ApiClientError ? err.message : t('error.title')))
       .finally(() => setBusy(null));
   };
@@ -996,15 +1027,15 @@ function OrderTestingOffers({ order, onAdded }: { order: Order; onAdded: () => v
   return (
     <Section header={t('testing.offerTitle')} footer={t('testing.addToOrderFooter')}>
       {offers.map((x) => (
+        <div key={x.id}>
         <Cell
-          key={x.id}
           subtitle={[
             t('testing.offerSubtitle', {
               lab: x.lab,
               amount: x.contribution > 0 ? formatPrice(x.contribution, x.currency) : t('testing.free'),
             }),
             x.posterior && x.donationsUntil
-              ? t('testing.joinUntil', { date: new Date(x.donationsUntil).toLocaleString() })
+              ? t('testing.joinUntil', { date: formatDateTime(x.donationsUntil) })
               : null,
           ]
             .filter(Boolean)
@@ -1022,15 +1053,21 @@ function OrderTestingOffers({ order, onAdded }: { order: Order; onAdded: () => v
         >
           {x.variantLabel ? `${x.productTitle} · ${x.variantLabel}` : x.productTitle}
         </Cell>
+        <Cell
+          Component="label"
+          after={
+            <Switch
+              checked={volunteer[x.id] ?? false}
+              onChange={(e) => setVolunteer((current) => ({ ...current, [x.id]: e.target.checked }))}
+            />
+          }
+          subtitle={sendsOwn(order) ? t('testing.externalVolunteerHint') : t('testing.volunteerHint')}
+          multiline
+        >
+          {t('testing.volunteer')}
+        </Cell>
+        </div>
       ))}
-      <Cell
-        Component="label"
-        after={<Switch checked={volunteer} onChange={(e) => setVolunteer(e.target.checked)} />}
-        subtitle={t('testing.volunteerHint')}
-        multiline
-      >
-        {t('testing.volunteer')}
-      </Cell>
       {error && <Cell multiline>{error}</Cell>}
     </Section>
   );
@@ -1098,7 +1135,7 @@ function DonationSection({ order, onChanged }: { order: Order; onChanged: () => 
                     : t('donation.nextShare', { tier: next.name, percent: Math.floor(next.share * 100) })
                   : t('testing.allTiers'),
                 x.donationsUntil
-                  ? t('donation.until', { date: new Date(x.donationsUntil).toLocaleString() })
+                  ? t('donation.until', { date: formatDateTime(x.donationsUntil) })
                   : null,
               ]
                 .filter(Boolean)
@@ -1199,7 +1236,7 @@ function ExtraSection({ order, onChanged }: { order: Order; onChanged: () => voi
               subtitle={
                 extra.stage === 'done'
                   ? undefined
-                  : t('extra.until', { date: new Date(extra.until).toLocaleString() })
+                  : t('extra.until', { date: formatDateTime(extra.until) })
               }
             >
               {name}
@@ -1342,3 +1379,62 @@ function ExtraSection({ order, onChanged }: { order: Order; onChanged: () => voi
     </Section>
   );
 }
+
+/**
+ * Offering a vial, per testing this order takes part in, until its draw:
+ * each testing has its own draw with its own volunteers.
+ */
+function VolunteerSection({ order }: { order: Order }): React.JSX.Element | null {
+  const [reloadKey, setReloadKey] = useState(0);
+  const testings = useAsync(() => api.getTestings(), [order.id, order.testing, reloadKey]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const mine = (testings.data ?? []).filter(
+    (x) =>
+      x.joined &&
+      x.draw === null &&
+      (x.status === 'open' || x.status === 'closed') &&
+      (order.externalTestingId === x.id ||
+        order.items.some(
+          (item) => item.productId === x.productId && (x.variantId === null || item.variantId === x.variantId),
+        )),
+  );
+  if (mine.length === 0 || order.status === 'cancelled') return null;
+
+  const change = (testingId: string, volunteer: boolean): void => {
+    setBusy(testingId);
+    setError(null);
+    void api
+      .setTestingVolunteer(order.id, testingId, volunteer)
+      .then(() => setReloadKey((k) => k + 1))
+      .catch((err: unknown) => setError(err instanceof ApiClientError ? err.message : t('error.title')))
+      .finally(() => setBusy(null));
+  };
+
+  return (
+    <Section header={t('testing.volunteerTitle')} footer={t('testing.volunteerFooter')}>
+      {mine.map((x) => (
+        <Cell
+          key={x.id}
+          Component="label"
+          multiline
+          subtitle={sendsOwn(order) ? t('testing.externalVolunteerHint') : t('testing.volunteerHint')}
+          after={
+            <Switch
+              checked={x.volunteer}
+              disabled={busy === x.id}
+              onChange={(e) => change(x.id, e.target.checked)}
+            />
+          }
+        >
+          {x.variantLabel ? `${x.productTitle} · ${x.variantLabel}` : x.productTitle}
+        </Cell>
+      ))}
+      {error && <Cell multiline>{error}</Cell>}
+    </Section>
+  );
+}
+
+/** Their vial is sent by them: from outside, or the package already left. */
+const sendsOwn = (order: Order): boolean =>
+  order.external || order.status === 'shipped' || order.status === 'fulfilled';

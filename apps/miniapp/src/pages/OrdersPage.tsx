@@ -53,7 +53,7 @@ export function OrdersPage(): React.JSX.Element {
         {/* Bought elsewhere: they can still join a testing open to people from outside. */}
         <TestingsInProgress
           orders={[]}
-          onOrder={(id) => navigate(to(`/orders/${id}`))}
+          onOrder={(id, joined) => navigate(to(`/orders/${id}`), joined ? { state: { joined } } : undefined)}
           onChanged={() => setReloadKey((k) => k + 1)}
         />
         <Placeholder header={t('orders.empty')} description={t('orders.emptyHint')}>
@@ -74,7 +74,7 @@ export function OrdersPage(): React.JSX.Element {
       )}
       <TestingsInProgress
         orders={orders}
-        onOrder={(id) => navigate(to(`/orders/${id}`))}
+        onOrder={(id, joined) => navigate(to(`/orders/${id}`), joined ? { state: { joined } } : undefined)}
         onChanged={() => setReloadKey((k) => k + 1)}
       />
       <Section header={t('orders.title')}>
