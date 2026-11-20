@@ -67,7 +67,7 @@ async function cleanUpClosed(db: Database, env: Env, shop: ShopRow): Promise<voi
     .set({ status: 'closed', updatedAt: new Date() })
     .where(and(eq(testings.shopId, shop.id), eq(testings.status, 'open')));
   // Testings added to paid orders and not paid: they drop out (the order is paid again).
-  await dropUnpaidTesting(db, shop.id);
+  await dropUnpaidTesting(db, shop.id, undefined, true);
   // Their buyers can now give for a while (once per closing).
   await openDonationWindows(db, env, shop);
   await db.delete(orders).where(unpaidOrders(shop.id));

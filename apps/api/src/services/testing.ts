@@ -1093,7 +1093,16 @@ export async function announceTestingTiers(db: Database, env: Env, shopId: strin
  * products are paid but not its testing drops the testing and is paid again.
  * `orderId` limits it to one order (a payment rejected after closing).
  */
-export async function dropUnpaidTesting(db: Database, shopId: string, orderId?: string): Promise<number> {
+export async function dropUnpaidTesting(
+  db: Database,
+  shopId: string,
+  orderId?: string,
+  /**
+   * When the GB closes: only a testing made after closing keeps its unpaid
+   * parts (the rest had the GB's time to pay). Later: any still taking people.
+   */
+  atClose = false,
+): Promise<number> {
   const rows = await db
     .select()
     .from(orders)
@@ -1118,7 +1127,7 @@ export async function dropUnpaidTesting(db: Database, shopId: string, orderId?: 
       .from(testingEntries)
       .innerJoin(testings, eq(testingEntries.testingId, testings.id))
       .where(eq(testingEntries.orderId, row.id));
-    if (live.some(({ testing }) => joinOpen(testing))) continue;
+    if (live.some(({ testing }) => joinOpen(testing) && (!atClose || testing.posterior))) continue;
     dropped += 1;
     await db.transaction(async (tx) => {
       await tx.delete(testingEntries).where(eq(testingEntries.orderId, row.id));
