@@ -57,7 +57,16 @@ export function catalogRoutes(): Hono<AppBindings> {
   // Product testings of the GB (lab tests paid between the buyers). Before
   // `/products/:id`, which would take "testings" for an id.
   app.get('/products/testings', requireAuth, async (c) =>
-    c.json(await listVisibleTestings(c.get('db'), c.get('shop'), c.get('claims').sub, undefined, c.get('isVip'))),
+    c.json(
+      await listVisibleTestings(
+        c.get('db'),
+        c.get('shop'),
+        c.get('claims').sub,
+        undefined,
+        c.get('isVip'),
+        c.get('isVip') || c.get('canManage'),
+      ),
+    ),
   );
   // The lab reports one can see again (of the testings they took part in).
   app.get('/products/testing-reports', requireAuth, async (c) =>
@@ -97,7 +106,14 @@ export function catalogRoutes(): Hono<AppBindings> {
   // One product's testings.
   app.get('/products/:id/testings', requireAuth, zValidator('param', idParam), async (c) =>
     c.json(
-      await listVisibleTestings(c.get('db'), c.get('shop'), c.get('claims').sub, c.req.valid('param').id, c.get('isVip')),
+      await listVisibleTestings(
+        c.get('db'),
+        c.get('shop'),
+        c.get('claims').sub,
+        c.req.valid('param').id,
+        c.get('isVip'),
+        c.get('isVip') || c.get('canManage'),
+      ),
     ),
   );
 

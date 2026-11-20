@@ -511,12 +511,21 @@ export async function listTestings(db: Database, shopId: string): Promise<Testin
  * The testings customers see (all of the GB's, or one product's): those not
  * cancelled, while the GB has testing on.
  */
+/** The GB's VIP-only products (a subquery). */
+const vipOnlyProducts = (db: Executor, shopId: string) =>
+  db
+    .select({ id: products.id })
+    .from(products)
+    .where(and(eq(products.shopId, shopId), eq(products.vipOnly, true)));
+
 export async function listVisibleTestings(
   db: Database,
   shop: ShopRow,
   userId: number | undefined,
   productId?: string,
   isVip = false,
+  /** Sees the VIP-only products (a VIP, or the GB's team). */
+  seesVipOnly = isVip,
 ): Promise<Testing[]> {
   if (!shop.testingEnabled) return [];
   const rows = await db
@@ -527,6 +536,8 @@ export async function listVisibleTestings(
         eq(testings.shopId, shop.id),
         productId ? eq(testings.productId, productId) : undefined,
         notInArray(testings.status, ['cancelled']),
+        // A VIP-only product does not exist for the rest: nor does its testing.
+        seesVipOnly ? undefined : notInArray(testings.productId, vipOnlyProducts(db, shop.id)),
       ),
     )
     .orderBy(asc(testings.createdAt));
@@ -540,13 +551,16 @@ export async function listVisibleTestings(
 export async function shopTestingCounts(
   db: Database,
   shopIds: readonly string[],
+  /** GBs where this person sees VIP-only products (VIP there, or on its team). */
+  seesVipOnly: ReadonlySet<string> = new Set(),
 ): Promise<Map<string, { count: number; reached: number }>> {
   const result = new Map<string, { count: number; reached: number }>();
   if (shopIds.length === 0) return result;
-  const rows = await db
-    .select({ testing: testings })
+  const all = await db
+    .select({ testing: testings, vipOnly: products.vipOnly })
     .from(testings)
     .innerJoin(shops, eq(testings.shopId, shops.id))
+    .innerJoin(products, eq(testings.productId, products.id))
     .where(
       and(
         inArray(testings.shopId, [...shopIds]),
@@ -555,6 +569,8 @@ export async function shopTestingCounts(
         sql`(${testings.status} = 'open' or (${testings.status} = 'closed' and not ${testings.donationsDone} and ${testings.donationsUntil} > now()))`,
       ),
     );
+  // A VIP-only product's testing counts only for those who see the product.
+  const rows = all.filter((r) => !r.vipOnly || seesVipOnly.has(r.testing.shopId));
   const totals = await testingTotals(
     db,
     rows.map((r) => r.testing.id),
@@ -1269,6 +1285,7 @@ export async function joinTestingExternal(
   userId: number,
   testingId: string,
   input: { volunteer: boolean; contactUsername: string | null },
+  seesVipOnly = false,
 ): Promise<string> {
   if (!shop.testingEnabled) {
     throw ApiError.conflict('testing_off', 'Turn on product testing in the GB settings first');
@@ -1279,6 +1296,14 @@ export async function joinTestingExternal(
     });
     if (!testing) throw ApiError.notFound('Testing not found');
     if (!testing.allowExternal) throw ApiError.conflict('testing_no_external', 'This testing is only for buyers');
+    // A VIP-only product: its testing exists only for those who see it.
+    if (!seesVipOnly) {
+      const [vipOnly] = await tx
+        .select({ id: products.id })
+        .from(products)
+        .where(and(eq(products.id, testing.productId), eq(products.vipOnly, true)));
+      if (vipOnly) throw ApiError.notFound('Testing not found');
+    }
     if (!externalOpen(testing)) throw ApiError.conflict('testing_not_open', 'This testing is closed');
     if ((await joinedBy(tx, userId, [testing.id])).size > 0) {
       throw ApiError.conflict('testing_joined', 'You already take part in this testing');

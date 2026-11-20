@@ -86,9 +86,15 @@ export async function listShops(db: Database, env: Env, userId: number): Promise
     db,
     rows.filter((row) => row.goalAmount).map((row) => row.id),
   );
+  // Where they see VIP-only products (and so those products' testings).
+  const seesVipOnly = new Set<string>();
+  for (const row of rows.filter((r) => r.testingEnabled)) {
+    if (canManageShop(env, row, userId) || (await isVip(row))) seesVipOnly.add(row.id);
+  }
   const withTesting = await shopTestingCounts(
     db,
     rows.filter((row) => row.testingEnabled).map((row) => row.id),
+    seesVipOnly,
   );
   // Closed, but with a testing open to people from outside: they see it too.
   const outside = await shopsOpenToOutside(
