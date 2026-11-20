@@ -5,10 +5,12 @@ import { priceTier } from './pricing.js';
 import { paymentSetup } from './payments.js';
 import { DEFAULT_CHECKOUT_FIELDS, checkoutFields, shippingZone } from './shop.js';
 import { vipClub } from './vip.js';
+import { labRequest, updateTestingRequest } from './testing.js';
 
 /**
  * Everything that makes up a GB except its orders, customers and admins: its
- * settings and its catalog. Used to duplicate a GB and as the JSON backup
+ * settings, its catalog, its labs and how its testings are set up (without
+ * anyone in them or any money). Used to duplicate a GB and as the JSON backup
  * file (export / import).
  */
 export const gbSnapshot = z.object({
@@ -44,6 +46,7 @@ export const gbSnapshot = z.object({
     disclaimer: z.string().max(4000).nullable(),
     goalAmount: z.number().int().positive().nullable().default(null),
     goalShowAmount: z.boolean().default(true),
+    testingEnabled: z.boolean().default(false),
   }),
   categories: z
     .array(
@@ -88,6 +91,19 @@ export const gbSnapshot = z.object({
       }),
     )
     .max(5000),
+  labs: z.array(labRequest).max(100).default([]),
+  /** Testings as set up: they come back open, with nobody in them yet. */
+  testings: z
+    .array(
+      updateTestingRequest.extend({
+        /** Link name of the product tested. */
+        product: slug,
+        /** The variant tested (its values), or null for the whole product. */
+        variant: z.array(z.string().min(1).max(32)).min(1).max(3).nullable(),
+      }),
+    )
+    .max(5000)
+    .default([]),
 });
 export type GbSnapshot = z.infer<typeof gbSnapshot>;
 
@@ -107,6 +123,8 @@ export const gbBackupPreview = z.object({
   variants: z.number().int().nonnegative(),
   categories: z.number().int().nonnegative(),
   shippingZones: z.number().int().nonnegative(),
+  labs: z.number().int().nonnegative(),
+  testings: z.number().int().nonnegative(),
   /** Where payments would go: shown so the importer checks them before saving. */
   evmAddress: z.string().nullable(),
   solanaAddress: z.string().nullable(),

@@ -103,6 +103,12 @@ export function ImportShopPage(): React.JSX.Element {
             <Cell after={String(preview.variants)}>{t('importGb.variants')}</Cell>
             <Cell after={String(preview.categories)}>{t('categories.title')}</Cell>
             <Cell after={String(preview.shippingZones)}>{t('importGb.zones')}</Cell>
+            {preview.labs > 0 && <Cell after={String(preview.labs)}>{t('importGb.labs')}</Cell>}
+            {preview.testings > 0 && (
+              <Cell after={String(preview.testings)} multiline>
+                {t('importGb.testings')}
+              </Cell>
+            )}
             <Cell after={preview.hasAddressKey ? '✓' : '—'}>{t('adminHome.addressKey')}</Cell>
             <Cell multiline>{t('importGb.exportedAt', { date: formatDateTime(preview.exportedAt) })}</Cell>
           </Section>

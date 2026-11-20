@@ -375,7 +375,7 @@ export function adminRoutes(): Hono<AppBindings> {
     },
   );
 
-  // Owner only: a new, hidden GB with the same settings and catalog (no orders).
+  // Owner only: a new, hidden GB with the same settings, catalog, labs and testings (no orders).
   app.post('/shop/duplicate', requireOwner, zValidator('json', duplicateShopRequest), async (c) => {
     const db = c.get('db');
     const { sub } = c.get('claims');
@@ -392,7 +392,7 @@ export function adminRoutes(): Hono<AppBindings> {
     return c.json(getShopAdminView(copy), 201);
   });
 
-  // Owner only: the bot sends a backup of the GB (settings and catalog, no orders) as JSON.
+  // Owner only: the bot sends a backup of the GB (settings, catalog, labs, testings; no orders) as JSON.
   app.post('/shop/backup', requireOwner, async (c) => {
     const shop = c.get('shop');
     const lang = langFrom(c.req.header('X-Lang'));

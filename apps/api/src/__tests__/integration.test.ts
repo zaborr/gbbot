@@ -12,6 +12,7 @@ import {
   cartItems,
   carts,
   categories,
+  labs,
   orderItems,
   orders,
   productVariants,
@@ -4003,6 +4004,74 @@ describeDb('API integration', () => {
     await db.delete(shops).where(eq(shops.id, copy.id));
     await db.update(shops).set({ orderFee: 0, vipNoFee: false }).where(eq(shops.id, shopId));
     await db.update(products).set({ vipPrice: null }).where(eq(products.id, productId));
+  });
+
+  it('a copy of a GB takes its labs and its testings as set up, open and with nobody in them', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Ivan')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const lab = await request('/api/admin/labs', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ name: 'Lab Copia', currency: 'USDC', tests: [{ id: 'mp', name: 'M&P', cost: 5000, vials: 1 }] }),
+    });
+    expect(lab.status).toBe(201);
+    const labId = ((await lab.json()) as { id: string }).id;
+    const created = await request('/api/admin/testings', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({
+        productId,
+        variantId: null,
+        lab: 'Lab Copia',
+        contribution: 300,
+        perUnit: 50,
+        feeMode: 'optional',
+        allowExternal: true,
+        tiers: [{ id: 'mp', name: 'M&P', cost: 5000, vials: 1 }],
+      }),
+    });
+    expect(created.status).toBe(201);
+    const original = (await created.json()) as { id: string };
+    let copyId: string | null = null;
+    try {
+      const res = await request('/api/admin/shop/duplicate', {
+        method: 'POST',
+        headers: admin,
+        body: JSON.stringify({ name: 'Con testing', slug: `con-testing-${Date.now()}` }),
+      });
+      expect(res.status).toBe(201);
+      copyId = ((await res.json()) as { id: string }).id;
+      const [shop] = await db.select().from(shops).where(eq(shops.id, copyId));
+      expect(shop?.testingEnabled).toBe(true);
+      const copiedLabs = await db.select().from(labs).where(eq(labs.shopId, copyId));
+      expect(copiedLabs.map((l) => l.name)).toContain('Lab Copia');
+      const [sencha] = await db
+        .select()
+        .from(products)
+        .where(and(eq(products.shopId, copyId), eq(products.slug, 'sencha')));
+      const copied = await db.select().from(testings).where(eq(testings.productId, sencha!.id));
+      expect(copied).toHaveLength(1);
+      expect(copied[0]).toMatchObject({
+        status: 'open',
+        lab: 'Lab Copia',
+        contribution: 300,
+        perUnit: 50,
+        feeMode: 'optional',
+        allowExternal: true,
+        report: null,
+        draw: null,
+      });
+      expect(copied[0]!.donationProductId).not.toBeNull();
+      expect(await db.select().from(testingEntries).where(eq(testingEntries.testingId, copied[0]!.id))).toHaveLength(0);
+    } finally {
+      if (copyId) await db.delete(shops).where(eq(shops.id, copyId));
+      await request(`/api/admin/testings/${original.id}`, { method: 'DELETE', headers: admin });
+      await db.delete(labs).where(eq(labs.id, labId));
+      await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
+    }
   });
 
   it('imports products from CSV after a preview, and exports them through the bot', async () => {
