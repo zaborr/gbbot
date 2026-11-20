@@ -17,7 +17,7 @@ import { notifyShopTeam } from './webNotices.js';
 import { getOrder } from './orders.js';
 import type { ShopRow } from './shop.js';
 import { notifyTesting, audience, testedLabel } from './testingDraw.js';
-import { feeExempt, stepsOf, takesPart, testingTotals, vialPrices } from './testing.js';
+import { feeExempt, joinOpen, stepsOf, takesPart, testingTotals, vialPrices } from './testing.js';
 import { dropUnpaidDonations, giversOf, takeOff } from './testingDonations.js';
 
 /**
@@ -34,6 +34,12 @@ type Member = typeof testingExtraMembers.$inferSelect;
 const formatMoney = (amount: number, currency: string): string => `${(amount / 100).toFixed(2)} ${currency}`;
 const hours = (n: number): number => n * 3600_000;
 
+/**
+ * Signing up early: the extra round is on but not started, and the testing
+ * still takes people (open, or its time to join after closing lasts).
+ */
+export const preOpen = (row: TestingRow): boolean => row.extraEnabled && row.extra === null && joinOpen(row);
+
 /** The lowest cap to sign up: the one set, or the fee. */
 export const extraMin = (row: Pick<TestingRow, 'extraMin' | 'contribution'>): number =>
   row.extraMin > 0 ? row.extraMin : row.contribution;
@@ -48,9 +54,29 @@ async function missingSteps(db: Database, row: TestingRow): Promise<TierStep[]> 
 
 /** The time to give is over: the extra round starts when it is on and tests are missing. */
 export async function startExtra(db: Database, env: Env, row: TestingRow, now = new Date()): Promise<boolean> {
-  if (!row.extraEnabled || row.extra || !row.extraProductId) return false;
-  const missing = await missingSteps(db, row);
-  if (missing.length === 0) return false;
+  if (row.extra) return false;
+  const early = await earlyMembers(db, row);
+  const missing = row.extraEnabled && row.extraProductId ? await missingSteps(db, row) : [];
+  if (missing.length === 0) {
+    // Signed up early, but no extra round after all (covered, or turned off): nothing to pay.
+    if (early.length > 0) {
+      await db.delete(testingExtraMembers).where(eq(testingExtraMembers.testingId, row.id));
+      const shop = await db.query.shops.findFirst({ where: (s, { eq: same }) => same(s.id, row.shopId) });
+      if (shop) {
+        const what = await testedLabel(db, row);
+        const ids = await audience(
+          db,
+          env,
+          shop,
+          early.map((m) => m.orderId),
+        );
+        await notifyTesting(db, env, shop, ids, (lang: Lang) =>
+          tr(lang, row.extraEnabled ? 'testing.extraNotNeeded' : 'testing.extraOff', { shop: shop.name, product: what }),
+        );
+      }
+    }
+    return false;
+  }
   const state: TestingExtraState = {
     stage: 'signup',
     until: new Date(now.getTime() + hours(row.extraSignupHours)).toISOString(),
@@ -69,7 +95,16 @@ export async function startExtra(db: Database, env: Env, row: TestingRow, now = 
   const list = missing
     .map((step, i) => `${step.tier.name}: ${formatMoney(step.missing - (missing[i - 1]?.missing ?? 0), row.currency)}`)
     .join('\n');
-  const ids = await giversOf(db, env, shop, row);
+  // Those signed up early are in already (with their cap); the rest are invited.
+  const signedIds = new Set(
+    await audience(
+      db,
+      env,
+      shop,
+      early.map((m) => m.orderId),
+    ),
+  );
+  const ids = (await giversOf(db, env, shop, row)).filter((id) => !signedIds.has(id));
   await notifyTesting(db, env, shop, ids, (lang: Lang) =>
     tr(lang, 'testing.extraOpen', {
       shop: shop.name,
@@ -79,7 +114,37 @@ export async function startExtra(db: Database, env: Env, row: TestingRow, now = 
       list,
     }),
   );
+  for (const member of early) {
+    const to = await audience(db, env, shop, [member.orderId]);
+    await notifyTesting(db, env, shop, to, (lang: Lang) =>
+      tr(lang, 'testing.extraOpenSigned', {
+        shop: shop.name,
+        product: what,
+        hours: row.extraSignupHours,
+        cap: formatMoney(member.cap, row.currency),
+        list,
+      }),
+    );
+  }
   return true;
+}
+
+/**
+ * Those signed up early who are still in (their order not cancelled, their
+ * part paid); the others are dropped, so the share-out counts only them.
+ */
+async function earlyMembers(db: Database, row: TestingRow): Promise<Member[]> {
+  const rows = await db
+    .select({ member: testingExtraMembers, order: orders })
+    .from(testingExtraMembers)
+    .innerJoin(orders, eq(testingExtraMembers.orderId, orders.id))
+    .where(eq(testingExtraMembers.testingId, row.id));
+  const keep: Member[] = [];
+  for (const { member, order } of rows) {
+    if (order.status !== 'cancelled' && (await isIn(db, row, order))) keep.push(member);
+    else await db.delete(testingExtraMembers).where(eq(testingExtraMembers.id, member.id));
+  }
+  return keep;
 }
 
 /** Whether this order is in the testing (paid its part): only those can sign up. */
@@ -104,7 +169,9 @@ export async function signUpExtra(
 ): Promise<Order> {
   const row = await db.query.testings.findFirst({ where: and(eq(testings.shopId, shop.id), eq(testings.id, testingId)) });
   if (!row) throw ApiError.notFound('Testing not found');
-  if (row.extra?.stage !== 'signup') throw ApiError.conflict('extra_closed', 'Signing up to the extra round is over');
+  if (row.extra?.stage !== 'signup' && !preOpen(row)) {
+    throw ApiError.conflict('extra_closed', 'Signing up to the extra round is over');
+  }
   const order = await db.query.orders.findFirst({
     where: and(eq(orders.shopId, shop.id), eq(orders.id, orderId), eq(orders.userId, userId)),
   });
@@ -128,7 +195,9 @@ export async function signUpExtra(
 export async function leaveExtra(db: Database, shop: ShopRow, userId: number, orderId: string, testingId: string): Promise<Order> {
   const row = await db.query.testings.findFirst({ where: and(eq(testings.shopId, shop.id), eq(testings.id, testingId)) });
   if (!row) throw ApiError.notFound('Testing not found');
-  if (row.extra?.stage !== 'signup') throw ApiError.conflict('extra_closed', 'Signing up to the extra round is over');
+  if (row.extra?.stage !== 'signup' && !preOpen(row)) {
+    throw ApiError.conflict('extra_closed', 'Signing up to the extra round is over');
+  }
   await db
     .delete(testingExtraMembers)
     .where(
@@ -150,7 +219,8 @@ export async function extraViews(
   userId?: number,
 ): Promise<Map<string, TestingExtraView>> {
   const result = new Map<string, TestingExtraView>();
-  const live = rows.filter((r) => r.extra);
+  // Started, or on and not yet (signing up early while the time to join lasts).
+  const live = rows.filter((r) => r.extra || preOpen(r));
   if (live.length === 0) return result;
   const members = await db
     .select()
@@ -162,14 +232,19 @@ export async function extraViews(
       ),
     );
   for (const row of live) {
-    const extra = row.extra as TestingExtraState;
+    const extra: Omit<TestingExtraState, 'stage'> & { stage: TestingExtraView['stage'] } = row.extra ?? {
+      stage: 'pre',
+      until: row.donationsUntil?.toISOString() ?? '',
+      target: [],
+      share: 0,
+    };
     const missing = await missingSteps(db, row);
     const needs = missing.map((s) => s.missing);
     const own = members.filter((m) => m.testingId === row.id);
     const mine = userId === undefined ? undefined : own.find((m) => m.userId === userId);
     const signed = own.filter((m) => m.state !== 'out');
-    const estimate =
-      extra.stage === 'signup'
+    const early = extra.stage === 'signup' || extra.stage === 'pre';
+    const estimate = early
         ? shareOut(
             signed.map((m) => ({ key: m.id, cap: m.cap })),
             needs,
@@ -186,8 +261,7 @@ export async function extraViews(
       })),
       signed: signed.length,
       mine: mine ? { cap: mine.cap, share: mine.share, state: mine.state, orderId: mine.orderId } : null,
-      estimate:
-        extra.stage === 'signup'
+      estimate: early
           ? {
               tiers: estimate ? missing.slice(0, estimate.count).map((s) => s.tier.name) : [],
               share: estimate?.share ?? null,
@@ -734,7 +808,11 @@ export async function advanceExtras(db: Database, env: Env, now = new Date()): P
  * every share comes off its order (what was paid is owed back).
  */
 export async function cancelExtra(tx: Pick<Database, 'select' | 'selectDistinct' | 'insert' | 'update' | 'delete'>, row: TestingRow): Promise<void> {
-  if (!row.extra) return;
+  if (!row.extra) {
+    // Not started: only those signed up early go.
+    await tx.delete(testingExtraMembers).where(eq(testingExtraMembers.testingId, row.id));
+    return;
+  }
   if (row.extraProductId) {
     const rows = await tx
       .selectDistinct({ order: orders })

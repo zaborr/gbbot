@@ -187,6 +187,11 @@ export const testing = z.object({
   extraPayHours: z.number().int(),
   /** The extra round, once it started (with money: what is missing is shown to those in it). */
   extra: z.custom<TestingExtraView>().nullable(),
+  /**
+   * Before the extra round opens (it is on, and the time to join lasts): who
+   * already signed up with a cap, and what it would be now. Null otherwise.
+   */
+  extraPre: z.custom<TestingExtraView>().nullable(),
   donationsUntil: z.string().nullable(),
   donationsOpen: z.boolean(),
   /** The hidden product whose order lines are what was given. */
@@ -396,7 +401,8 @@ export interface TestingExtraState {
 
 /** The extra round as the customer (or organiser) sees it. */
 export interface TestingExtraView {
-  stage: TestingExtraState['stage'];
+  /** `pre`: not open yet (the time to join and give lasts); one can already sign up with a cap. */
+  stage: TestingExtraState['stage'] | 'pre';
   until: string;
   /** The lowest cap to sign up. */
   min: number;

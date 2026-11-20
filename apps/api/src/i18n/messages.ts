@@ -213,6 +213,9 @@ const en = {
   'testing.joinedVolunteer': 'You offer a vial for its draw; you can change it from your order until the draw.',
   'testing.joinedNoVolunteer': 'If you want to offer a vial for its draw, you can do it from your order until the draw.',
   'testing.openButton': 'Open testing',
+  'testing.extraOpenSigned': '🧪 {shop}: the extra round of {product} is open. You\'re in with your cap of {cap}; you never pay more. What is missing:\n{list}\nYou can change it or leave within {hours} h, then it is shared out.',
+  'testing.extraNotNeeded': '🧪 {shop}: the testing of {product} needs no extra round: gifts covered it. You signed up early, but you have nothing to pay.',
+  'testing.extraOff': '🧪 {shop}: the testing of {product} will have no extra round. You signed up early, but you have nothing to pay.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -418,6 +421,9 @@ const es: Record<BotMessageKey, string> = {
   'testing.joinedVolunteer': 'Te ofreces a donar un vial en su sorteo; puedes cambiarlo desde tu pedido hasta el sorteo.',
   'testing.joinedNoVolunteer': 'Si quieres ofrecer un vial para su sorteo, puedes hacerlo desde tu pedido hasta el sorteo.',
   'testing.openButton': 'Ver testing',
+  'testing.extraOpenSigned': '🧪 {shop}: se abre la fase extra de {product}. Estás dentro con tu máximo de {cap}; nunca pagarás más. Lo que falta:\n{list}\nPuedes cambiarlo o borrarte en las próximas {hours} h; después se reparte.',
+  'testing.extraNotNeeded': '🧪 {shop}: el testing de {product} no necesita fase extra: las donaciones lo han cubierto. Te apuntaste por adelantado, pero no tienes nada que pagar.',
+  'testing.extraOff': '🧪 {shop}: el testing de {product} no tendrá fase extra. Te apuntaste por adelantado, pero no tienes nada que pagar.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -621,6 +627,9 @@ const it: Record<BotMessageKey, string> = {
   'testing.joinedVolunteer': 'Ti offri di donare una fiala nel suo sorteggio; puoi cambiarlo dal tuo ordine fino al sorteggio.',
   'testing.joinedNoVolunteer': 'Se vuoi offrire una fiala per il suo sorteggio, puoi farlo dal tuo ordine fino al sorteggio.',
   'testing.openButton': 'Apri testing',
+  'testing.extraOpenSigned': '🧪 {shop}: si apre la fase extra di {product}. Sei dentro con il tuo massimo di {cap}; non pagherai mai di più. Cosa manca:\n{list}\nPuoi cambiarlo o ritirarti entro {hours} h; poi si ripartisce.',
+  'testing.extraNotNeeded': '🧪 {shop}: il testing di {product} non ha bisogno della fase extra: le donazioni l\'hanno coperto. Ti eri iscritto in anticipo, ma non devi pagare nulla.',
+  'testing.extraOff': '🧪 {shop}: il testing di {product} non avrà fase extra. Ti eri iscritto in anticipo, ma non devi pagare nulla.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -824,6 +833,9 @@ const pt: Record<BotMessageKey, string> = {
   'testing.joinedVolunteer': 'Oferece-se para doar um frasco no seu sorteio; pode mudar isso na sua encomenda até ao sorteio.',
   'testing.joinedNoVolunteer': 'Se quiser oferecer um frasco para o seu sorteio, pode fazê-lo na sua encomenda até ao sorteio.',
   'testing.openButton': 'Ver testing',
+  'testing.extraOpenSigned': '🧪 {shop}: abre a fase extra de {product}. Está dentro com o seu máximo de {cap}; nunca pagará mais. O que falta:\n{list}\nPode mudar ou sair nas próximas {hours} h; depois divide-se.',
+  'testing.extraNotNeeded': '🧪 {shop}: o testing de {product} não precisa de fase extra: as doações cobriram-no. Inscreveu-se antecipadamente, mas não tem nada a pagar.',
+  'testing.extraOff': '🧪 {shop}: o testing de {product} não terá fase extra. Inscreveu-se antecipadamente, mas não tem nada a pagar.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

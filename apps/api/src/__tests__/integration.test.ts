@@ -1896,14 +1896,22 @@ describeDb('API integration', () => {
     const t0 = Date.now();
     await db.update(shops).set({ closedAt: new Date() }).where(eq(shops.id, shopId));
     try {
-      // Fees 30: M&P is covered, 40 missing for Endo. Not before the time to give ends.
-      expect((await signUp(a, 2000)).status).toBe(409);
+      // Fees 30: M&P is covered, 40 missing for Endo. One can sign up early, before it opens.
+      expect((await signUp(a, 2000)).status).toBe(200);
+      const early = ((await (await request(`/api/products/${tested}/testings`, { headers: a.headers })).json()) as Array<{
+        extra: unknown;
+        extraPre: { stage: string; mine: { cap: number } | null } | null;
+      }>)[0];
+      expect(early).toMatchObject({ extra: null, extraPre: { stage: 'pre', mine: { cap: 2000 } } });
       await db.update(testings).set({ status: 'closed' }).where(eq(testings.id, testingId));
       const shopRow = (await db.query.shops.findFirst({ where: eq(shops.id, shopId) }))!;
       await openDonationWindows(db, testEnv, shopRow, new Date(t0));
       await closeDonationWindows(db, testEnv, new Date(t0 + 2 * 3600_000));
       const [started] = await db.select().from(testings).where(eq(testings.id, testingId));
       expect(started?.extra).toMatchObject({ stage: 'signup' });
+      // Signed up early: in already.
+      const kept = await db.select().from(testingExtraMembers).where(eq(testingExtraMembers.testingId, testingId));
+      expect(kept.map((m) => [m.orderId, m.cap])).toEqual([[a.orderId, 2000]]);
 
       // The cap must be at least the fee.
       expect((await signUp(a, 500)).status).toBe(400);
