@@ -473,7 +473,8 @@ export async function closeDonationWindows(db: Database, env: Env, now = new Dat
     if (!claimed) continue;
     await dropUnpaidDonations(db, [claimed]);
     // After closing: parts not paid in time drop out too.
-    if (claimed.posterior) await dropUnpaidTesting(db, claimed.shopId);
+    // Its time to join is over: parts still unpaid come off (made before closing or after).
+    await dropUnpaidTesting(db, claimed.shopId);
     // From outside and not paid in time: their order goes.
     await dropUnpaidExternal(db, claimed.id);
     // Tests still missing: the extra round starts (when it is on).
