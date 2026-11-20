@@ -5,6 +5,7 @@ import { awaitsPayment, type Product, type Testing } from '@tma-shop/shared';
 import { Input } from '../components/Field.js';
 import { UnpaidOrdersBanner } from '../components/UnpaidOrdersBanner.js';
 import { ClosingNotice, closingDate, closingSoon } from '../components/ClosingNotice.js';
+import { TestingEntry } from '../components/TestingEntry.js';
 import { api } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useCart } from '../providers/CartProvider.js';
@@ -170,14 +171,8 @@ export function CatalogPage(): React.JSX.Element {
         )}
       </Section>
       <ClosingNotice shop={shop} />
-      {/* Closed, but a testing still takes people and gifts: from «My orders». */}
-      {shop.isClosed && openTestings.length > 0 && (
-        <Section>
-          <Cell multiline onClick={() => navigate(to('/orders'))} after="›">
-            {t('testing.liveBanner', { count: openTestings.length })}
-          </Cell>
-        </Section>
-      )}
+      {/* The testings: those one is in and those one can join, on their own screen. */}
+      {shop.testingEnabled && <TestingEntry onOpen={() => navigate(to('/testing'))} />}
       <UnpaidOrdersBanner orders={unpaid} />
       {/* The two places a customer comes back to, always in sight. */}
       <div className="gb-tiles">

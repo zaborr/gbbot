@@ -11,7 +11,7 @@ import { ErrorView } from '../components/ErrorView.js';
 import { useShopPath } from '../providers/ShopProvider.js';
 import { t, tn } from '../i18n/index.js';
 import { OrderStatusChip } from '../components/OrderStatus.js';
-import { TestingsInProgress } from '../components/TestingsInProgress.js';
+import { TestingEntry } from '../components/TestingEntry.js';
 
 /** Customers can delete orders with nothing paid or under verification. */
 const DELETABLE: OrderStatus[] = ['pending', 'cancelled'];
@@ -20,7 +20,9 @@ export function OrdersPage(): React.JSX.Element {
   const navigate = useNavigate();
   const to = useShopPath();
   const [reloadKey, setReloadKey] = useState(0);
-  const { data: orders, loading, error } = useAsync(() => api.getOrders(), [reloadKey]);
+  const { data: all, loading, error } = useAsync(() => api.getOrders(), [reloadKey]);
+  // Orders from outside are only a testing's: they live on the testing screen.
+  const orders = all ? all.filter((o) => !o.external) : null;
   const [armed, setArmed] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   // Statuses change while away (payment confirmed, shipped…): refresh on return.
@@ -51,11 +53,7 @@ export function OrdersPage(): React.JSX.Element {
     return (
       <List>
         {/* Bought elsewhere: they can still join a testing open to people from outside. */}
-        <TestingsInProgress
-          orders={[]}
-          onOrder={(id, joined) => navigate(to(`/orders/${id}`), joined ? { state: { joined } } : undefined)}
-          onChanged={() => setReloadKey((k) => k + 1)}
-        />
+        <TestingEntry onOpen={() => navigate(to('/testing'))} />
         <Placeholder header={t('orders.empty')} description={t('orders.emptyHint')}>
           <span style={{ fontSize: 48 }}>📦</span>
         </Placeholder>
@@ -72,11 +70,7 @@ export function OrdersPage(): React.JSX.Element {
           </Cell>
         </div>
       )}
-      <TestingsInProgress
-        orders={orders}
-        onOrder={(id, joined) => navigate(to(`/orders/${id}`), joined ? { state: { joined } } : undefined)}
-        onChanged={() => setReloadKey((k) => k + 1)}
-      />
+      <TestingEntry onOpen={() => navigate(to('/testing'))} />
       <Section header={t('orders.title')}>
         {orders.map((order) => (
           <Cell

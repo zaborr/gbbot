@@ -397,8 +397,8 @@ function TestingActions({
           })}
         </Cell>
         <div style={{ padding: '4px 16px 16px' }}>
-          <Button stretched mode="bezeled" onClick={() => navigate(to('/orders'))}>
-            {t('testing.goToOrders')}
+          <Button stretched mode="bezeled" onClick={() => navigate(to('/testing'))}>
+            {t('testing.goToTesting')}
           </Button>
         </div>
       </>

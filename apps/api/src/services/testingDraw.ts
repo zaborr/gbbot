@@ -15,7 +15,10 @@ import { variantLabel } from '../db/mappers.js';
 import { tr } from '../i18n/messages.js';
 import { ApiError } from '../lib/errors.js';
 import { withoutBlocked } from './blacklist.js';
-import { notifyUsers } from './notifications.js';
+import { notifyUsersWithButton } from './notifications.js';
+import { TelegramApi } from '../telegram/api.js';
+import { miniAppUrl } from './bot.js';
+import { testingLink } from './reminders.js';
 import type { ShopRow } from './shop.js';
 import { botToken } from './activeBot.js';
 import { donationsOpen, reachedTiers, takesPart, vialPrices, vialShare } from './testing.js';
@@ -259,7 +262,7 @@ export async function launchDraw(
     candidates.map((c) => c.orderId),
   );
   const refs = candidates.map((c) => `#${c.ref}${c.volunteer ? ' 🙋' : ''}`).join(', ');
-  await notifyUsers(db, botToken(env), ids, (lang: Lang) =>
+  await notifyTesting(db, env, shop, ids, (lang: Lang) =>
     tr(lang, 'testing.drawAnnounced', {
       shop: shop.name,
       product: what,
@@ -352,9 +355,10 @@ export async function finishDraw(
   // From outside: no package to take it from, they send it.
   const outsideIds = new Set(await audience(db, env, shop, await externalOf(db, donorOrders)));
   const link = `https://mempool.space/block/${hash}`;
-  await notifyUsers(
+  await notifyTesting(
     db,
-    botToken(env),
+    env,
+    shop,
     ids.filter((id) => !donorIds.has(id)),
     (lang) =>
       tr(lang, 'testing.drawResult', {
@@ -367,9 +371,10 @@ export async function finishDraw(
       }),
   );
   for (const outside of [false, true]) {
-    await notifyUsers(
+    await notifyTesting(
       db,
-      botToken(env),
+      env,
+      shop,
       [...donorIds].filter((id) => outsideIds.has(id) === outside),
       (lang) =>
         tr(lang, outside ? 'testing.drawDonorExternal' : 'testing.drawDonor', {
@@ -463,7 +468,7 @@ export async function substituteDonor(
     const ids = await audience(db, env, shop, [inn.orderId]);
     const link = `https://mempool.space/block/${draw.hash}`;
     const outside = (await externalOf(db, [inn.orderId])).length > 0;
-    await notifyUsers(db, botToken(env), ids, (lang) =>
+    await notifyTesting(db, env, shop, ids, (lang) =>
       tr(lang, outside ? 'testing.drawDonorExternal' : 'testing.drawDonor', {
         shop: shop.name,
         product: what,
@@ -517,7 +522,7 @@ export async function cancelDrawsOnReopen(db: Database, env: Env, shop: ShopRow)
       shop,
       draw.candidates.map((c) => c.orderId),
     );
-    await notifyUsers(db, botToken(env), ids, (lang) =>
+    await notifyTesting(db, env, shop, ids, (lang) =>
       tr(lang, 'testing.drawCancelled', { shop: shop.name, product: what }),
     );
   }
@@ -539,4 +544,31 @@ async function externalOf(db: Database, orderIds: readonly string[]): Promise<st
       ),
     );
   return rows.map((r) => r.id);
+}
+
+/**
+ * A message about a testing, with a button that opens the GB's testing
+ * screen (where everything about it is: joining, giving, vials, extra round).
+ */
+export async function notifyTesting(
+  db: Database,
+  env: Env,
+  shop: ShopRow,
+  ids: number[],
+  build: (lang: Lang) => string,
+): Promise<void> {
+  const telegram = new TelegramApi(botToken(env));
+  const appUrl = await miniAppUrl(telegram).catch(() => null);
+  await notifyUsersWithButton(
+    db,
+    botToken(env),
+    ids,
+    build,
+    appUrl
+      ? (lang) => ({
+          inline_keyboard: [[{ text: tr(lang, 'testing.openButton'), web_app: { url: testingLink(appUrl, shop.slug) } }]],
+        })
+      : undefined,
+    telegram,
+  );
 }

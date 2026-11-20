@@ -3,7 +3,7 @@ import { RATE_SCALE, convertAmount, userLang, type Lang, type Order, type OrderS
 import type { Database } from '../db/client.js';
 import { users } from '../db/schema.js';
 import { tr } from '../i18n/messages.js';
-import { TelegramApi } from '../telegram/api.js';
+import { TelegramApi, type InlineKeyboard } from '../telegram/api.js';
 
 export function money(amount: number, currency: string): string {
   return `${(amount / 100).toFixed(2)} ${currency}`;
@@ -217,6 +217,31 @@ export async function notifyUsers(
     telegramIds.map((id) =>
       notifyChats(botToken, [id], build(langs.get(id) ?? 'en'), telegram),
     ),
+  );
+}
+
+/** Like `notifyUsers`, with a button under each message (in each person's language). */
+export async function notifyUsersWithButton(
+  db: Database,
+  botToken: string,
+  telegramIds: number[],
+  build: (lang: Lang) => string,
+  button: ((lang: Lang) => InlineKeyboard) | undefined,
+  telegram = new TelegramApi(botToken),
+): Promise<void> {
+  if (!button) return notifyUsers(db, botToken, telegramIds, build, telegram);
+  const langs = await languagesOf(db, telegramIds);
+  await Promise.all(
+    telegramIds.map(async (id) => {
+      const lang = langs.get(id) ?? 'en';
+      const text = build(lang);
+      if (!text) return;
+      try {
+        await telegram.sendMessage(id, text, button(lang));
+      } catch (error) {
+        console.error(`Failed to notify chat ${id}:`, error);
+      }
+    }),
   );
 }
 

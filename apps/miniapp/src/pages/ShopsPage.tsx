@@ -39,6 +39,8 @@ function takeStartPath(): string | null {
     if (shop && order && SLUG_RE.test(shop) && UUID_RE.test(order)) {
       return shopPath(shop, `/orders/${order}`);
     }
+    // The bot's testing messages: the GB's testing screen.
+    if (shop && SLUG_RE.test(shop) && query.get('view') === 'testing') return shopPath(shop, '/testing');
     // `?shop=<slug>` alone: a message from the organiser ("Open the GB").
     if (shop && SLUG_RE.test(shop)) return shopPath(shop);
   } catch {
@@ -109,7 +111,11 @@ export function ShopsPage(): React.JSX.Element {
               shop={shop}
               onOpen={() =>
                 navigate(
-                  shopPath(shop.slug, shop.isClosed && !shop.canManage ? '/orders' : '/'),
+                  shopPath(
+                    shop.slug,
+                    // Closed: to the orders, or to the testing while one is going on.
+                    shop.isClosed && !shop.canManage ? ((shop.testing?.count ?? 0) > 0 ? '/testing' : '/orders') : '/',
+                  ),
                 )
               }
             />

@@ -13,12 +13,10 @@ import type { Database } from '../db/client.js';
 import { orderItems, orders, testingEntries, testingExtraMembers, testings } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 import { tr } from '../i18n/messages.js';
-import { notifyUsers } from './notifications.js';
 import { notifyShopTeam } from './webNotices.js';
 import { getOrder } from './orders.js';
 import type { ShopRow } from './shop.js';
-import { botToken } from './activeBot.js';
-import { audience, testedLabel } from './testingDraw.js';
+import { notifyTesting, audience, testedLabel } from './testingDraw.js';
 import { feeExempt, stepsOf, takesPart, testingTotals, vialPrices } from './testing.js';
 import { dropUnpaidDonations, giversOf, takeOff } from './testingDonations.js';
 
@@ -72,7 +70,7 @@ export async function startExtra(db: Database, env: Env, row: TestingRow, now = 
     .map((step, i) => `${step.tier.name}: ${formatMoney(step.missing - (missing[i - 1]?.missing ?? 0), row.currency)}`)
     .join('\n');
   const ids = await giversOf(db, env, shop, row);
-  await notifyUsers(db, botToken(env), ids, (lang: Lang) =>
+  await notifyTesting(db, env, shop, ids, (lang: Lang) =>
     tr(lang, 'testing.extraOpen', {
       shop: shop.name,
       product: what,
@@ -239,7 +237,7 @@ async function shareOutExtra(db: Database, env: Env, shop: ShopRow, row: Testing
       shop,
       members.map((m) => m.orderId),
     );
-    await notifyUsers(db, botToken(env), ids, (lang) => tr(lang, 'testing.extraNone', { shop: shop.name, product: what }));
+    await notifyTesting(db, env, shop, ids, (lang) => tr(lang, 'testing.extraNone', { shop: shop.name, product: what }));
     return;
   }
   const target = missing.slice(0, plan.count).map((s) => s.tier.id);
@@ -305,7 +303,7 @@ async function shareOutExtra(db: Database, env: Env, shop: ShopRow, row: Testing
   const outOrders = members.filter((m) => !plan.keys.includes(m.id)).map((m) => m.orderId);
   // Each one their own amount.
   for (const member of byCap) {
-    await notifyUsers(db, botToken(env), await audience(db, env, shop, [member.orderId]), (lang) =>
+    await notifyTesting(db, env, shop, await audience(db, env, shop, [member.orderId]), (lang) =>
       tr(lang, 'testing.extraPay', {
         shop: shop.name,
         product: what,
@@ -315,7 +313,7 @@ async function shareOutExtra(db: Database, env: Env, shop: ShopRow, row: Testing
       }),
     );
   }
-  await notifyUsers(db, botToken(env), await audience(db, env, shop, outOrders), (lang) =>
+  await notifyTesting(db, env, shop, await audience(db, env, shop, outOrders), (lang) =>
     tr(lang, 'testing.extraOut', { shop: shop.name, product: what, amount: formatMoney(plan.share, row.currency) }),
   );
 }
@@ -416,7 +414,7 @@ async function settleExtra(db: Database, env: Env, shop: ShopRow, row: TestingRo
     })
     .where(eq(testings.id, row.id));
   const paidOrders = members.filter((m) => paidIds.includes(m.member.id)).map((m) => m.order.id);
-  await notifyUsers(db, botToken(env), await audience(db, env, shop, paidOrders), (lang) =>
+  await notifyTesting(db, env, shop, await audience(db, env, shop, paidOrders), (lang) =>
     tr(lang, 'testing.extraRound', {
       shop: shop.name,
       product: what,
@@ -550,7 +548,7 @@ async function endRound(db: Database, env: Env, shop: ShopRow, row: TestingRow, 
       .where(eq(testings.id, row.id));
   });
   for (const { member } of able) {
-    await notifyUsers(db, botToken(env), await audience(db, env, shop, [member.orderId]), (lang) =>
+    await notifyTesting(db, env, shop, await audience(db, env, shop, [member.orderId]), (lang) =>
       tr(lang, 'testing.extraTopup', {
         shop: shop.name,
         product: what,
@@ -656,9 +654,10 @@ async function finishExtra(db: Database, env: Env, shop: ShopRow, row: TestingRo
 
   const what = await testedLabel(db, row);
   const names = row.tiers.filter((t) => tiersDone.includes(t.id)).map((t) => t.name).join(', ');
-  await notifyUsers(
+  await notifyTesting(
     db,
-    botToken(env),
+    env,
+    shop,
     await audience(
       db,
       env,
@@ -695,7 +694,7 @@ async function remindExtra(db: Database, env: Env, shop: ShopRow, row: TestingRo
     );
   const what = await testedLabel(db, row);
   for (const u of unpaid) {
-    await notifyUsers(db, botToken(env), await audience(db, env, shop, [u.id]), (lang) =>
+    await notifyTesting(db, env, shop, await audience(db, env, shop, [u.id]), (lang) =>
       tr(lang, 'testing.extraRemind', { shop: shop.name, product: what, amount: formatMoney(u.share, row.currency) }),
     );
   }

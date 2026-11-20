@@ -29,6 +29,15 @@ export function shopLink(appUrl: string, shopSlug: string): string {
   return url.toString();
 }
 
+/** The Mini App URL that opens straight on a GB's testing screen. */
+export function testingLink(appUrl: string, shopSlug: string): string {
+  const url = new URL(appUrl);
+  url.searchParams.set('shop', shopSlug);
+  url.searchParams.set('view', 'testing');
+  url.hash = '';
+  return url.toString();
+}
+
 /** Hours until an unpaid order is cancelled automatically, or null if it never is. */
 export function hoursLeft(
   order: { amountPaid: number; updatedAt: Date },

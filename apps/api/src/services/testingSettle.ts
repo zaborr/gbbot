@@ -6,9 +6,9 @@ import { orderItems, orders, testingEntries, testings } from '../db/schema.js';
 import { tr } from '../i18n/messages.js';
 import { ApiError } from '../lib/errors.js';
 import { TelegramApi } from '../telegram/api.js';
-import { languagesOf, notifyUsers } from './notifications.js';
+import { languagesOf } from './notifications.js';
 import type { ShopRow } from './shop.js';
-import { audience, testedLabel, vialLabel } from './testingDraw.js';
+import { notifyTesting, audience, testedLabel, vialLabel } from './testingDraw.js';
 import { botToken } from './activeBot.js';
 import { takesPart, reachedTiers } from './testing.js';
 import { refundDonations } from './testingDonations.js';
@@ -98,7 +98,7 @@ export async function settleTesting(db: Database, env: Env, shop: ShopRow, id: s
   for (const donor of donors) {
     const [chat] = await audience(db, env, shop, [donor.orderId]);
     if (chat === undefined || donor.vialPrice <= 0) continue;
-    await notifyUsers(db, botToken(env), [chat], (lang: Lang) =>
+    await notifyTesting(db, env, shop, [chat], (lang: Lang) =>
       tr(lang, 'testing.vialRefund', {
         shop: shop.name,
         product: what,
@@ -180,7 +180,7 @@ export async function cancelTesting(db: Database, env: Env, shop: ShopRow, id: s
     shop,
     rows.map((r) => r.order.id),
   );
-  await notifyUsers(db, botToken(env), ids, (lang) => tr(lang, 'testing.cancelled', { shop: shop.name, product: what }));
+  await notifyTesting(db, env, shop, ids, (lang) => tr(lang, 'testing.cancelled', { shop: shop.name, product: what }));
   return row;
 }
 

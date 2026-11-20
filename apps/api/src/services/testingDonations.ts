@@ -5,12 +5,10 @@ import type { Database } from '../db/client.js';
 import { orderItems, orders, testingEntries, testings } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 import { tr } from '../i18n/messages.js';
-import { notifyUsers } from './notifications.js';
 import { notifyShopTeam } from './webNotices.js';
 import { getOrder } from './orders.js';
 import type { ShopRow } from './shop.js';
-import { botToken } from './activeBot.js';
-import { audience, testedLabel } from './testingDraw.js';
+import { notifyTesting, audience, testedLabel } from './testingDraw.js';
 import { cancelExtra, startExtra } from './testingExtra.js';
 import {
   dropUnpaidExternal,
@@ -324,7 +322,7 @@ export async function openDonationWindows(db: Database, env: Env, shop: ShopRow,
     if (!next || row.donationHours === 0) continue;
     const what = await testedLabel(db, row);
     const ids = await giversOf(db, env, shop, row);
-    await notifyUsers(db, botToken(env), ids, (lang: Lang) =>
+    await notifyTesting(db, env, shop, ids, (lang: Lang) =>
       [
         tr(lang, next.unitsLeft !== null ? 'testing.donationsOpen' : 'testing.donationsOpenShare', {
           shop: shop.name,
@@ -370,7 +368,7 @@ async function remindDonations(db: Database, env: Env, now: Date): Promise<void>
     const what = await testedLabel(db, row);
     const hours = Math.max(Math.round((claimed.donationsUntil.getTime() - now.getTime()) / 3600_000), 1);
     const ids = await giversOf(db, env, shop, row);
-    await notifyUsers(db, botToken(env), ids, (lang: Lang) =>
+    await notifyTesting(db, env, shop, ids, (lang: Lang) =>
       [
         tr(lang, 'testing.donationsReminder', { shop: shop.name, product: what, hours }),
         progressText(lang, steps, true),
@@ -426,7 +424,7 @@ export async function announceNewTesting(
   const what = await testedLabel(db, row);
   const totals = (await testingTotals(db, [row.id])).get(row.id);
   const steps = totals ? stepsOf(row, totals, (await vialPrices(db, [row])).get(row.id) ?? 0) : [];
-  await notifyUsers(db, botToken(env), ids, (lang: Lang) =>
+  await notifyTesting(db, env, shop, ids, (lang: Lang) =>
     [
       tr(
         lang,
@@ -606,7 +604,7 @@ export async function tellJoined(
   const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
   const what = await testedLabel(db, row);
   const owes = order ? order.total - order.amountPaid : 0;
-  await notifyUsers(db, botToken(env), [userId], (lang: Lang) =>
+  await notifyTesting(db, env, shop, [userId], (lang: Lang) =>
     [
       tr(lang, 'testing.joinedNotice', { shop: shop.name, product: what }),
       owes > 0 ? tr(lang, 'testing.joinedPay', { amount: formatMoney(owes, row.currency) }) : null,

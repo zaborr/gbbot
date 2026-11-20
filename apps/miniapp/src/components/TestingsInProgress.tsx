@@ -9,32 +9,33 @@ import { useSession } from '../providers/SessionProvider.js';
 import { TestingBar } from './TestingCard.js';
 import { t } from '../i18n/index.js';
 
-/** Its extra round asks something of those in (signing up, paying, going on). */
-const extraLive = (x: Testing): boolean => Boolean(x.extra && x.extra.stage !== 'done');
-
 type Action =
-  | { kind: 'in'; orderId: string }
   | { kind: 'order'; orderId: string }
   | { kind: 'see'; orderId: string }
   | { kind: 'outside' };
 
 /**
- * The testings going on, at the top of «My orders» (where a closed GB opens):
- * how far each is and, for each person, what they can do: join with the
- * order they bought it in, join from outside, or go to the order they are in
- * with (to give, or for the extra round).
+ * The testings one can still join, on the testing screen: how far each is
+ * and how to join (with the order they bought it in, or from outside), with
+ * a vial offered or not for each one's draw.
  */
 export function TestingsInProgress({
   orders,
+  testings: given,
   onOrder,
+  onJoined,
   onChanged,
 }: {
   orders: readonly Order[];
-  /** To the order; `joined` names the testing just joined, to say so there. */
-  onOrder: (orderId: string, joined?: string) => void;
+  /** The testings, when already loaded (the testing screen). */
+  testings?: Testing[];
+  /** To an order (one that cannot join yet, e.g. a payment being checked). */
+  onOrder: (orderId: string) => void;
+  /** Joined: names the testing, to say so. */
+  onJoined: (name: string) => void;
   onChanged: () => void;
 }): React.JSX.Element | null {
-  const testings = useAsync(() => api.getTestings(), []);
+  const testings = useAsync(() => (given ? Promise.resolve(given) : api.getTestings()), [given]);
   const { user } = useSession();
   // Each testing has its own draw: offering a vial is per testing.
   const [volunteer, setVolunteer] = useState<Record<string, boolean>>({});
@@ -47,15 +48,7 @@ export function TestingsInProgress({
         o.status !== 'cancelled' &&
         o.items.some((i) => i.productId === x.productId && (x.variantId === null || i.variantId === x.variantId)),
     );
-  /** The order they took part with: from outside, or one with the product. */
-  const inWith = (x: Testing): Order | undefined =>
-    withProduct(x)[0] ?? orders.find((o) => o.externalTestingId === x.id && o.status !== 'cancelled');
-
   const actionOf = (x: Testing): Action | null => {
-    if (x.joined) {
-      const order = inWith(x);
-      return order ? { kind: 'in', orderId: order.id } : null;
-    }
     if (!joinable(x) || x.exempt) return null;
     const mine = withProduct(x);
     if (mine.length > 0) {
@@ -73,7 +66,7 @@ export function TestingsInProgress({
   };
 
   const rows = (testings.data ?? [])
-    .filter((x) => joinable(x) || (x.joined && extraLive(x)))
+    .filter((x) => !x.joined && joinable(x))
     .map((x) => ({ x, action: actionOf(x) }))
     .filter((r): r is { x: Testing; action: Action } => r.action !== null);
   if (rows.length === 0) return null;
@@ -83,9 +76,9 @@ export function TestingsInProgress({
     setBusy(x.id);
     setError(null);
     void act()
-      .then((orderId) => {
+      .then(() => {
         onChanged();
-        onOrder(orderId, nameOf(x));
+        onJoined(nameOf(x));
       })
       .catch((err: unknown) => setError(err instanceof ApiClientError ? err.message : t('error.title')))
       .finally(() => setBusy(null));
@@ -98,12 +91,6 @@ export function TestingsInProgress({
 
   const button = (x: Testing, action: Action): React.JSX.Element => {
     switch (action.kind) {
-      case 'in':
-        return (
-          <Button size="s" mode="bezeled" onClick={() => onOrder(action.orderId)}>
-            {extraLive(x) ? t('testing.liveExtra') : t('testing.liveIn')}
-          </Button>
-        );
       case 'see':
         return (
           <Button size="s" mode="bezeled" onClick={() => onOrder(action.orderId)}>
@@ -145,7 +132,7 @@ export function TestingsInProgress({
 
   return (
     <Section
-      header={t('testing.liveTitle')}
+      header={t('testing.canJoinTitle')}
       footer={rows.some((r) => r.action.kind === 'outside') ? t('testing.externalFooter') : undefined}
     >
       {rows.map(({ x, action }) => {
