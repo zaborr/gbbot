@@ -55,7 +55,7 @@ function stepOf(testing: Testing): Step | null {
 }
 
 /** What comes, step by step, with the one it is at marked. */
-function TestingSteps({ testing }: { testing: Testing }): React.JSX.Element | null {
+export function TestingSteps({ testing }: { testing: Testing }): React.JSX.Element | null {
   const now = stepOf(testing);
   if (!now) return null;
   const until = testing.donationsUntil ? formatDateTime(testing.donationsUntil) : null;
@@ -92,9 +92,12 @@ function TestingSteps({ testing }: { testing: Testing }): React.JSX.Element | nu
 export function TestingCard({
   testing,
   preview = false,
+  title: named,
   children,
 }: {
   testing: Testing;
+  /** Instead of «Testing of this product» (the testing screen names the product). */
+  title?: string;
   /** How it will look (while setting it up). */
   preview?: boolean;
   /** What the customer can do (pay the fee, offer a vial…), at the end. */
@@ -102,9 +105,11 @@ export function TestingCard({
 }): React.JSX.Element {
   const money = (amount: number): string => formatPrice(amount, testing.currency);
   const { next } = testingState(testing);
-  const title = testing.variantLabel
-    ? t('testing.cardTitleVariant', { variant: testing.variantLabel })
-    : t('testing.cardTitle');
+  const title =
+    named ??
+    (testing.variantLabel
+      ? t('testing.cardTitleVariant', { variant: testing.variantLabel })
+      : t('testing.cardTitle'));
 
   return (
     <Section

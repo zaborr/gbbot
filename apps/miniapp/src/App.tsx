@@ -13,6 +13,7 @@ import { ProductPage } from './pages/ProductPage.js';
 import { CartPage } from './pages/CartPage.js';
 import { OrdersPage } from './pages/OrdersPage.js';
 import { PaymentPage } from './pages/PaymentPage.js';
+import { TestingHubPage } from './pages/TestingHubPage.js';
 import { AdminHomePage } from './pages/admin/AdminHomePage.js';
 import { AdminCatalogPage } from './pages/admin/AdminCatalogPage.js';
 import { AdminProductPage } from './pages/admin/AdminProductPage.js';
@@ -127,6 +128,7 @@ function Shell(): React.JSX.Element {
         <Route path="cart" element={customer(<CartPage />)} />
         <Route path="orders" element={customer(<OrdersPage />)} />
         <Route path="orders/:id" element={customer(<PaymentPage />)} />
+        <Route path="testing" element={customer(<TestingHubPage />)} />
         <Route path="admin" element={<AdminHomePage />} />
         <Route path="admin/catalog" element={<AdminCatalogPage />} />
         <Route path="admin/products/:id" element={<AdminProductPage />} />

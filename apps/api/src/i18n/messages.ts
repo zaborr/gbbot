@@ -212,6 +212,7 @@ const en = {
   'testing.joinedPay': 'Pay {amount} from your order to stay in.',
   'testing.joinedVolunteer': 'You offer a vial for its draw; you can change it from your order until the draw.',
   'testing.joinedNoVolunteer': 'If you want to offer a vial for its draw, you can do it from your order until the draw.',
+  'testing.openButton': 'Open testing',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -416,6 +417,7 @@ const es: Record<BotMessageKey, string> = {
   'testing.joinedPay': 'Paga {amount} desde tu pedido para quedar dentro.',
   'testing.joinedVolunteer': 'Te ofreces a donar un vial en su sorteo; puedes cambiarlo desde tu pedido hasta el sorteo.',
   'testing.joinedNoVolunteer': 'Si quieres ofrecer un vial para su sorteo, puedes hacerlo desde tu pedido hasta el sorteo.',
+  'testing.openButton': 'Ver testing',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -618,6 +620,7 @@ const it: Record<BotMessageKey, string> = {
   'testing.joinedPay': 'Paga {amount} dal tuo ordine per restare dentro.',
   'testing.joinedVolunteer': 'Ti offri di donare una fiala nel suo sorteggio; puoi cambiarlo dal tuo ordine fino al sorteggio.',
   'testing.joinedNoVolunteer': 'Se vuoi offrire una fiala per il suo sorteggio, puoi farlo dal tuo ordine fino al sorteggio.',
+  'testing.openButton': 'Apri testing',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -820,6 +823,7 @@ const pt: Record<BotMessageKey, string> = {
   'testing.joinedPay': 'Pague {amount} a partir da sua encomenda para ficar dentro.',
   'testing.joinedVolunteer': 'Oferece-se para doar um frasco no seu sorteio; pode mudar isso na sua encomenda até ao sorteio.',
   'testing.joinedNoVolunteer': 'Se quiser oferecer um frasco para o seu sorteio, pode fazê-lo na sua encomenda até ao sorteio.',
+  'testing.openButton': 'Ver testing',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };
