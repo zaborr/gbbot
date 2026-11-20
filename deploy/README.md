@@ -54,7 +54,7 @@ Lo instala el mismo `install.sh` (vuelve a ejecutarlo si ya tenías /update). **
 - **Copia ahora**: ejecuta `backup.sh` (y la subida a B2).
 - **Reiniciar el bot**: reinicia la API, la Mini App y el servicio de creación, sin reconstruir. La base de datos no se toca.
 - **Liberar disco**: imágenes viejas y caché de construcción de Docker (más de 3 días), caché de apt y registros del sistema de más de 14 días.
-- **Reiniciar servidor**: espera a que no se esté instalando nada, para Docker en orden (la base de datos se cierra limpia y los contenedores arrancan solos al volver) y reinicia sin esperar a cada servicio, que es donde se puede quedar colgado en máquinas virtuales. Avisa cuando el servidor vuelve.
+- **Reiniciar servidor**: espera a que no se esté instalando nada, para Docker en orden (la base de datos se cierra limpia y los contenedores arrancan solos al volver) y reinicia sin esperar a cada servicio. Con `kexec-tools` instalado (`apt install kexec-tools`, respondiendo *No* a si debe encargarse de los reinicios) arranca directamente el kernel más nuevo, sin pasar por el reinicio de la máquina virtual, que en algunos proveedores se cuelga; sin él, reinicio normal. Si el servidor no se reinicia, Docker vuelve a arrancar y el bot avisa. Avisa también cuando el servidor vuelve.
 
 Actualizar sistema, Reiniciar el bot y Reiniciar servidor piden confirmación. Nunca hay dos tareas a la vez, ni durante un /update. El registro de la última queda en `deploy/runtime/last-task.log`.
 

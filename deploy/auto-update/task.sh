@@ -85,10 +85,20 @@ case "$ACTION" in
     # start again on boot (they were not stopped by hand).
     systemctl stop docker.socket docker >>"$LOG" 2>&1
     sync
-    # Without waiting for every service to stop (where a reboot can hang on
-    # some virtual machines); processes are still ended and disks unmounted.
+    # Without waiting for every service to stop; processes are still ended
+    # and disks unmounted. With kexec (kexec-tools) the newest kernel installed
+    # starts straight away, without the virtual machine's own restart, which
+    # hangs on some servers; otherwise, a normal restart.
     rm -f "$DIR/task-running"
-    systemctl reboot --force >>"$LOG" 2>&1 || systemctl reboot --force --force >>"$LOG" 2>&1
+    kernel=$(ls -v /boot/vmlinuz-* 2>/dev/null | tail -n 1)
+    initrd=/boot/initrd.img-${kernel#/boot/vmlinuz-}
+    if command -v kexec >/dev/null && [ -n "$kernel" ] && [ -f "$initrd" ] &&
+      kexec -l "$kernel" --initrd="$initrd" --reuse-cmdline >>"$LOG" 2>&1 &&
+      systemctl kexec --force >>"$LOG" 2>&1; then
+      :
+    else
+      systemctl reboot --force >>"$LOG" 2>&1 || systemctl reboot --force --force >>"$LOG" 2>&1
+    fi
     # Still here after two minutes: it did not restart. Back as it was, and say so.
     sleep 120
     echo "The server did not restart." >>"$LOG"
