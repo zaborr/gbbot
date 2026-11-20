@@ -56,6 +56,10 @@ const FEE_MODES: TestingFeeMode[] = ['mandatory', 'mandatory_non_vip', 'optional
 const hoursField = (text: string): boolean =>
   /^\d+$/.test(text.trim()) && Number(text) >= 1 && Number(text) <= MAX_DONATION_HOURS;
 
+/** Sign-up hours of the extra round: 0 (one time with the gifts) is fine. */
+const signupField = (text: string): boolean =>
+  /^\d+$/.test(text.trim()) && Number(text) >= 0 && Number(text) <= MAX_DONATION_HOURS;
+
 /** `/admin/testings/new` (optionally `?product=…&variant=…`) or `/admin/testings/:id`. */
 type TestingTab = 'config' | 'state' | 'draw';
 const TABS: TestingTab[] = ['state', 'config', 'draw'];
@@ -139,7 +143,8 @@ function TestingForm({
   const [extraEnabled, setExtraEnabled] = useState(testing?.extraEnabled ?? false);
   const [allowExternal, setAllowExternal] = useState(testing?.allowExternal ?? false);
   const [extraMinText, setExtraMinText] = useState(testing && testing.extraMin > 0 ? toMajor(testing.extraMin) : '');
-  const [signupHours, setSignupHours] = useState(String(testing?.extraSignupHours ?? 24));
+  // 0: one time for giving and setting caps; the extra round is shared out when it ends.
+  const [signupHours, setSignupHours] = useState(String(testing?.extraSignupHours ?? 0));
   const [payHours, setPayHours] = useState(String(testing?.extraPayHours ?? 48));
   const [tiers, setTiers] = useState<TierDraft[]>(
     money
@@ -228,7 +233,7 @@ function TestingForm({
             ? t('testing.badDonationHours', { max: MAX_DONATION_HOURS })
             : !vialsOk
               ? t('testing.badVialsPerUnit')
-              : extraEnabled && (!hoursField(signupHours) || !hoursField(payHours))
+              : extraEnabled && (!signupField(signupHours) || !hoursField(payHours))
                 ? t('testing.badExtraHours', { max: MAX_DONATION_HOURS })
                 : extraEnabled && cents(contribution) === 0 && extraMinCents === 0
                   ? t('testing.needExtraMin')
@@ -247,7 +252,7 @@ function TestingForm({
         vialsPerUnit: vialsNumber,
         extraEnabled,
         extraMin: extraMinCents,
-        extraSignupHours: Number(signupHours) || 24,
+        extraSignupHours: Number(signupHours) || 0,
         extraPayHours: Number(payHours) || 48,
         allowExternal,
       };
@@ -330,7 +335,7 @@ function TestingForm({
           vialsPerUnit: vialsNumber,
           extraEnabled,
           extraMin: 0,
-          extraSignupHours: 24,
+          extraSignupHours: Number(signupHours) || 0,
           extraPayHours: 48,
           extra: testing?.extra ?? null,
           extraPre: testing?.extraPre ?? null,
@@ -680,8 +685,8 @@ function TestingForm({
                 header={t('testing.extraSignupHours')}
                 type="text"
                 inputMode="numeric"
-                placeholder="24"
-                status={hoursField(signupHours) ? 'default' : 'error'}
+                placeholder="0"
+                status={signupField(signupHours) ? 'default' : 'error'}
                 value={signupHours}
                 disabled={!editable || Boolean(testing?.extra)}
                 onChange={(e) => setSignupHours(e.target.value)}
@@ -743,6 +748,7 @@ function TestingForm({
               <Cell after={String(testing.extraPre.signed)}>{t('testing.extraPreSigned')}</Cell>
             </Section>
           )}
+          <WindowSection testing={testing} onChange={onChange} />
           <ReopenSection testing={testing} onChange={onChange} />
           <Participants testing={testing} />
         </>
@@ -1140,6 +1146,48 @@ function SettleSection({ testing, onChange }: { testing: Testing; onChange: () =
  * The time to join and give opens again: on a closed testing before the draw
  * and the extra round, or on one settled with nothing reached.
  */
+/**
+ * The open time to join and give (the GB closed): it decides the extra round
+ * and the draw, so it can end later, sooner, or now.
+ */
+function WindowSection({ testing, onChange }: { testing: Testing; onChange: () => void }): React.JSX.Element | null {
+  const actions = useAdminActions(onChange);
+  const [hours, setHours] = useState('24');
+  if (testing.status !== 'closed' || !testing.donationsOpen || testing.extra !== null || !testing.donationsUntil) {
+    return null;
+  }
+  const valid = /^\d+$/.test(hours) && Number(hours) >= 1 && Number(hours) <= MAX_DONATION_HOURS;
+  return (
+    <Section header={t('testing.windowTitle')} footer={t('testing.windowFooter')}>
+      <ErrorBanner message={actions.error} />
+      <Cell multiline>{t('testing.windowUntil', { date: formatDateTime(testing.donationsUntil) })}</Cell>
+      <Input
+        header={t('testing.windowHours')}
+        inputMode="numeric"
+        value={hours}
+        status={valid ? 'default' : 'error'}
+        onChange={(e) => setHours(e.target.value)}
+      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
+        <Button
+          stretched
+          disabled={!valid}
+          onClick={() => void actions.twoTap('window', () => api.adminMoveTestingWindow(testing.id, Number(hours)))}
+        >
+          {actions.tapLabel('window', t('testing.windowMove'))}
+        </Button>
+        <Button
+          stretched
+          mode="bezeled"
+          onClick={() => void actions.twoTap('windowNow', () => api.adminMoveTestingWindow(testing.id, 0))}
+        >
+          {actions.tapLabel('windowNow', t('testing.windowCloseNow'))}
+        </Button>
+      </div>
+    </Section>
+  );
+}
+
 function ReopenSection({ testing, onChange }: { testing: Testing; onChange: () => void }): React.JSX.Element | null {
   const actions = useAdminActions(onChange);
   const [hours, setHours] = useState(String(testing.donationHours > 0 ? testing.donationHours : 24));

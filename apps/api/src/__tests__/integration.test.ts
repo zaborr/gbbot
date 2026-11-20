@@ -1857,6 +1857,7 @@ describeDb('API integration', () => {
         donationHours: 1,
         extraEnabled: true,
         extraMin: 0,
+        extraSignupHours: 24,
         tiers: [
           { id: 'mp', name: 'M&P', cost: 1000, vials: 0 },
           { id: 'endo', name: 'Endo', cost: 6000, vials: 0 },
@@ -1959,6 +1960,112 @@ describeDb('API integration', () => {
     }
   });
 
+  it('shares the extra round out as soon as the time to give ends when it has no sign-up of its own', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const [seed] = await db.select().from(products).where(eq(products.id, productId));
+    const [own] = await db
+      .insert(products)
+      .values({
+        shopId,
+        categoryId: seed!.categoryId,
+        slug: 'kukicha-unified',
+        title: 'Kukicha',
+        description: '',
+        price: 150,
+        currency: 'USDC',
+        stock: 10,
+        isActive: true,
+      })
+      .returning();
+    const tested = own!.id;
+    const created = await request('/api/admin/testings', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({
+        productId: tested,
+        variantId: null,
+        lab: 'Lab',
+        contribution: 1000,
+        perUnit: 0,
+        feeMode: 'mandatory',
+        donationHours: 1,
+        extraEnabled: true,
+        extraMin: 0,
+        extraSignupHours: 0,
+        tiers: [
+          { id: 'mp', name: 'M&P', cost: 1000, vials: 0 },
+          { id: 'endo', name: 'Endo', cost: 6000, vials: 0 },
+        ],
+      }),
+    });
+    const testing = (await created.json()) as { id: string; donationProductId: string };
+    const testingId = testing.id;
+    const [row0] = await db.select().from(testings).where(eq(testings.id, testingId));
+    const people: Array<{ orderId: string; headers: Record<string, string> }> = [];
+    for (const [userId, name] of [
+      [555003001, 'Uma'],
+      [555003002, 'Ugo'],
+      [555003003, 'Ula'],
+    ] as const) {
+      const headers = { Authorization: `Bearer ${await authToken(userId, name)}`, 'content-type': 'application/json' };
+      await db.delete(carts).where(eq(carts.userId, userId));
+      await request('/api/cart/items', { method: 'POST', headers, body: JSON.stringify({ productId: tested, quantity: 1 }) });
+      const placed = await request('/api/orders', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ contactUsername: `@${name.toLowerCase()}_test` }),
+      });
+      const { orderId } = (await placed.json()) as { orderId: string };
+      await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+      people.push({ orderId, headers });
+    }
+    const [a, b, c] = people as [(typeof people)[0], (typeof people)[0], (typeof people)[0]];
+    const signUp = (who: typeof a, cap: number): Promise<Response> =>
+      Promise.resolve(
+        request(`/api/orders/${who.orderId}/extra`, {
+          method: 'POST',
+          headers: who.headers,
+          body: JSON.stringify({ testingId, cap }),
+        }),
+      );
+    const t0 = Date.now();
+    await db.update(shops).set({ closedAt: new Date() }).where(eq(shops.id, shopId));
+    try {
+      // Caps set during the time to give; when it ends it is shared out at once.
+      expect((await signUp(a, 2000)).status).toBe(200);
+      expect((await signUp(b, 2000)).status).toBe(200);
+      expect((await signUp(c, 1000)).status).toBe(200);
+      await db.update(testings).set({ status: 'closed' }).where(eq(testings.id, testingId));
+      const shopRow = (await db.query.shops.findFirst({ where: eq(shops.id, shopId) }))!;
+      await openDonationWindows(db, testEnv, shopRow, new Date(t0));
+      await closeDonationWindows(db, testEnv, new Date(t0 + 2 * 3600_000));
+      const [started] = await db.select().from(testings).where(eq(testings.id, testingId));
+      expect(started?.extra).toMatchObject({ stage: 'pay', share: 2000 });
+      const members = await db.select().from(testingExtraMembers).where(eq(testingExtraMembers.testingId, testingId));
+      expect(members.map((m) => [m.orderId, m.state, m.share]).sort()).toEqual(
+        [
+          [a.orderId, 'in', 2000],
+          [b.orderId, 'in', 2000],
+          [c.orderId, 'out', 0],
+        ].sort(),
+      );
+    } finally {
+      await db.update(shops).set({ closedAt: null }).where(eq(shops.id, shopId));
+      const ids = people.map((p) => p.orderId);
+      await db.delete(orderItems).where(inArray(orderItems.orderId, ids));
+      await db.delete(orders).where(inArray(orders.id, ids));
+      await db.delete(testings).where(eq(testings.id, testingId));
+      await db
+        .delete(products)
+        .where(inArray(products.id, [tested, testing.donationProductId, ...(row0?.extraProductId ? [row0.extraProductId] : [])]));
+      await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
+    }
+  });
+
   it('asks the payers whether they go on when someone does not pay the extra round', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
@@ -1994,6 +2101,7 @@ describeDb('API integration', () => {
         donationHours: 1,
         extraEnabled: true,
         extraMin: 0,
+        extraSignupHours: 24,
         tiers: [
           { id: 'mp', name: 'M&P', cost: 1000, vials: 0 },
           { id: 'endo', name: 'Endo', cost: 6000, vials: 0 },

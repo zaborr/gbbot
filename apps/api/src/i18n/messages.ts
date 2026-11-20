@@ -216,6 +216,7 @@ const en = {
   'testing.extraOpenSigned': '🧪 {shop}: the extra round of {product} is open. You\'re in with your cap of {cap}; you never pay more. What is missing:\n{list}\nYou can change it or leave within {hours} h, then it is shared out.',
   'testing.extraNotNeeded': '🧪 {shop}: the testing of {product} needs no extra round: gifts covered it. You signed up early, but you have nothing to pay.',
   'testing.extraOff': '🧪 {shop}: the testing of {product} will have no extra round. You signed up early, but you have nothing to pay.',
+  'testing.reminderCap': 'If money is still missing at the end, it is shared out among those who set a cap. Set yours now on the Testing screen: you never pay more, and nothing if it is not needed.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -424,6 +425,7 @@ const es: Record<BotMessageKey, string> = {
   'testing.extraOpenSigned': '🧪 {shop}: se abre la fase extra de {product}. Estás dentro con tu máximo de {cap}; nunca pagarás más. Lo que falta:\n{list}\nPuedes cambiarlo o borrarte en las próximas {hours} h; después se reparte.',
   'testing.extraNotNeeded': '🧪 {shop}: el testing de {product} no necesita fase extra: las donaciones lo han cubierto. Te apuntaste por adelantado, pero no tienes nada que pagar.',
   'testing.extraOff': '🧪 {shop}: el testing de {product} no tendrá fase extra. Te apuntaste por adelantado, pero no tienes nada que pagar.',
+  'testing.reminderCap': 'Si al final falta dinero, se reparte entre quienes hayan puesto su máximo. Pon el tuyo ya en la pantalla Testing: nunca pagarás más, y nada si no hace falta.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -630,6 +632,7 @@ const it: Record<BotMessageKey, string> = {
   'testing.extraOpenSigned': '🧪 {shop}: si apre la fase extra di {product}. Sei dentro con il tuo massimo di {cap}; non pagherai mai di più. Cosa manca:\n{list}\nPuoi cambiarlo o ritirarti entro {hours} h; poi si ripartisce.',
   'testing.extraNotNeeded': '🧪 {shop}: il testing di {product} non ha bisogno della fase extra: le donazioni l\'hanno coperto. Ti eri iscritto in anticipo, ma non devi pagare nulla.',
   'testing.extraOff': '🧪 {shop}: il testing di {product} non avrà fase extra. Ti eri iscritto in anticipo, ma non devi pagare nulla.',
+  'testing.reminderCap': 'Se alla fine mancano soldi, si ripartisce tra chi ha messo il suo massimo. Metti il tuo ora nella schermata Testing: non pagherai mai di più, e nulla se non serve.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -836,6 +839,7 @@ const pt: Record<BotMessageKey, string> = {
   'testing.extraOpenSigned': '🧪 {shop}: abre a fase extra de {product}. Está dentro com o seu máximo de {cap}; nunca pagará mais. O que falta:\n{list}\nPode mudar ou sair nas próximas {hours} h; depois divide-se.',
   'testing.extraNotNeeded': '🧪 {shop}: o testing de {product} não precisa de fase extra: as doações cobriram-no. Inscreveu-se antecipadamente, mas não tem nada a pagar.',
   'testing.extraOff': '🧪 {shop}: o testing de {product} não terá fase extra. Inscreveu-se antecipadamente, mas não tem nada a pagar.',
+  'testing.reminderCap': 'Se no fim faltar dinheiro, divide-se entre quem pôs o seu máximo. Ponha o seu já no ecrã Testing: nunca pagará mais, e nada se não for preciso.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

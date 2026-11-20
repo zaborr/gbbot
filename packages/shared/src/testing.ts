@@ -84,7 +84,8 @@ export const createTestingRequest = z.object({
   /** The extra round after the time to give, and the lowest cap to sign up (0: the fee). */
   extraEnabled: z.boolean().default(false),
   extraMin: z.number().int().min(0).max(100_000_000).default(0),
-  extraSignupHours: z.number().int().min(1).max(MAX_DONATION_HOURS).default(24),
+  /** 0: no sign-up of its own, it is shared out as soon as the time to give ends (caps are set during it). */
+  extraSignupHours: z.number().int().min(0).max(MAX_DONATION_HOURS).default(0),
   extraPayHours: z.number().int().min(1).max(MAX_DONATION_HOURS).default(48),
   /** People who bought elsewhere can join from the GB, paying the same fee. */
   allowExternal: z.boolean().default(false),

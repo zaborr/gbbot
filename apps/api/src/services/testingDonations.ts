@@ -372,7 +372,11 @@ async function remindDonations(db: Database, env: Env, now: Date): Promise<void>
       [
         tr(lang, 'testing.donationsReminder', { shop: shop.name, product: what, hours }),
         progressText(lang, steps, true),
-      ].join('\n\n'),
+        // The extra round is decided at the end: setting a cap is now.
+        claimed.extraEnabled && claimed.extra === null ? tr(lang, 'testing.reminderCap') : null,
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
     );
   }
 }
@@ -614,4 +618,28 @@ export async function tellJoined(
       .filter(Boolean)
       .join('\n'),
   );
+}
+
+/**
+ * The open time to join and give, moved: to end some hours from now (longer
+ * or shorter), or now (0). It decides everything after (the extra round, the
+ * draw), so the organiser can stretch it or close it early.
+ */
+export async function moveTestingWindow(db: Database, shop: ShopRow, id: string, hours: number): Promise<void> {
+  if (hours < 0 || hours > MAX_DONATION_HOURS) throw ApiError.badRequest('bad_hours', 'Hours out of range');
+  const row = await db.query.testings.findFirst({ where: and(eq(testings.shopId, shop.id), eq(testings.id, id)) });
+  if (!row) throw ApiError.notFound('Testing not found');
+  if (row.status !== 'closed' || row.donationsDone || !row.donationsUntil || row.extra !== null) {
+    throw ApiError.conflict('testing_window_closed', 'Its time to join is not open');
+  }
+  const until = new Date(Date.now() + hours * 3600_000);
+  await db
+    .update(testings)
+    .set({
+      donationsUntil: until,
+      // Further than a day away: the reminder a day before comes again.
+      ...(hours > 24 ? { donationsReminded: false } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(testings.id, row.id));
 }
