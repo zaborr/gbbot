@@ -60,6 +60,7 @@ import type {
   CreateTestingRequest,
   Testing,
   TestingReportView,
+  LabProgressRequest,
   TestingParticipant,
   UpdateTestingRequest,
 } from '@tma-shop/shared';
@@ -678,6 +679,11 @@ export class ApiClient {
   /** Closes a drawn testing: donors get their vial's price back. */
   adminSettleTesting(id: string): Promise<{ ok: boolean }> {
     return this.request<{ ok: boolean }>(`/admin/testings/${id}/settle`, { method: 'POST' });
+  }
+
+  /** After the draw: vials sent to the lab, received there, or the day results are expected. */
+  adminTestingLab(id: string, step: LabProgressRequest): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/testings/${id}/lab`, { method: 'POST', body: JSON.stringify(step) });
   }
 
   /** The open time to join and give ends some hours from now, or now (0). */

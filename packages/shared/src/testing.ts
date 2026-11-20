@@ -169,6 +169,8 @@ export const testing = z.object({
   draw: z.custom<TestingDraw>().nullable(),
   /** When the lab report was sent (and the extra round's one). */
   reportSentAt: z.string().nullable(),
+  /** After the draw: vials sent to the lab, received there, results expected. */
+  labProgress: z.custom<LabProgress>().nullable(),
   extraReportSentAt: z.string().nullable(),
   /** Hours to give once the GB closes, until when (set at closing), and whether one can give now. */
   donationHours: z.number().int(),
@@ -480,3 +482,18 @@ export interface TestingReportView {
   /** A copy is kept (it can be opened here); else only through Telegram. */
   hasCopy: boolean;
 }
+
+/** Where the vials are after the draw (dates as ISO strings; `expected` a day, YYYY-MM-DD). */
+export interface LabProgress {
+  sentAt?: string;
+  receivedAt?: string;
+  expected?: string;
+}
+
+/** What the organiser marks: vials sent, vials received, or the day results are expected. */
+export const labProgressRequest = z.discriminatedUnion('step', [
+  z.object({ step: z.literal('sent') }),
+  z.object({ step: z.literal('received') }),
+  z.object({ step: z.literal('expected'), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }),
+]);
+export type LabProgressRequest = z.infer<typeof labProgressRequest>;

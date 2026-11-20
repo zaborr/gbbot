@@ -2,10 +2,10 @@ import { announceNewTesting, moveTestingWindow, reopenTesting } from '../service
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { createTestingRequest, langFrom, MAX_DONATION_HOURS, updateTestingRequest } from '@tma-shop/shared';
+import { createTestingRequest, labProgressRequest, langFrom, MAX_DONATION_HOURS, updateTestingRequest } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { drawBlocker, launchDraw, substituteDonor } from '../services/testingDraw.js';
-import { cancelTesting, requestReport, settleTesting } from '../services/testingSettle.js';
+import { cancelTesting, markLabProgress, requestReport, settleTesting } from '../services/testingSettle.js';
 import { languagesOf } from '../services/notifications.js';
 import { ApiError } from '../lib/errors.js';
 import {
@@ -59,6 +59,12 @@ export function testingAdminRoutes(): Hono<AppBindings> {
   );
   // Settling the money, cancelling, and asking (through the bot) for the lab report.
   // Closing it: donors get their vial's price back on their order.
+  // After the draw: vials sent to the lab, received there, or the day results are expected.
+  app.post('/:id/lab', zValidator('param', idParam), zValidator('json', labProgressRequest), async (c) => {
+    await markLabProgress(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('param').id, c.req.valid('json'));
+    return c.json({ ok: true });
+  });
+
   app.post('/:id/settle', zValidator('param', idParam), async (c) => {
     await settleTesting(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('param').id);
     return c.json({ ok: true });
