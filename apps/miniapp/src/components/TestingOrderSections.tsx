@@ -352,11 +352,15 @@ export function VolunteerSection({
   only,
   testings: given,
   inCard = false,
+  onChanged,
 }: SectionProps & {
   /** Inside the testing's own card: just its switch, no section of its own. */
   inCard?: boolean;
+  onChanged?: () => void;
 }): React.JSX.Element | null {
   const [reloadKey, setReloadKey] = useState(0);
+  // What was just saved: the testings handed in stay as they were until reloaded.
+  const [offered, setOffered] = useState<Record<string, boolean>>({});
   const testings = useAsync(() => (given ? Promise.resolve(given) : api.getTestings()), [given, order.id, order.testing, reloadKey]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -378,7 +382,11 @@ export function VolunteerSection({
     setError(null);
     void api
       .setTestingVolunteer(order.id, testingId, volunteer)
-      .then(() => setReloadKey((k) => k + 1))
+      .then(() => {
+        setOffered((current) => ({ ...current, [testingId]: volunteer }));
+        setReloadKey((k) => k + 1);
+        onChanged?.();
+      })
       .catch((err: unknown) => setError(err instanceof ApiClientError ? err.message : t('error.title')))
       .finally(() => setBusy(null));
   };
@@ -393,7 +401,7 @@ export function VolunteerSection({
           subtitle={sendsOwn(order) ? t('testing.externalVolunteerHint') : t('testing.volunteerHint')}
           after={
             <Switch
-              checked={x.volunteer}
+              checked={offered[x.id] ?? x.volunteer}
               disabled={busy === x.id}
               onChange={(e) => change(x.id, e.target.checked)}
             />
