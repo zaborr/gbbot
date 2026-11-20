@@ -312,7 +312,7 @@ export async function setVolunteer(
     where: and(eq(testings.shopId, shopId), eq(testings.id, testingId)),
   });
   if (!testing) throw ApiError.notFound('Testing not found');
-  if (testing.draw !== null || FINISHED.includes(testing.status)) {
+  if (testing.draw !== null || testing.status === 'settled' || testing.status === 'cancelled') {
     throw ApiError.conflict('testing_drawn', 'The draw is done: it cannot change');
   }
   const [entry] = await db
@@ -383,6 +383,8 @@ function toTestingDTO(
     status: row.status as TestingStatus,
     participants: t.payers,
     joined,
+    // Filled by the listing, for the person asking.
+    volunteer: false,
     exempt: feeExempt(row, isVip),
     // Customers see who was drawn, not the orders behind them nor what they paid.
     draw: row.draw
