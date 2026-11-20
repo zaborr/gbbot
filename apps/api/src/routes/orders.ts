@@ -45,8 +45,8 @@ import { eq } from 'drizzle-orm';
 import { users } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 import { assertOpen } from '../services/closing.js';
-import { joinTestingExternal, joinTestingWithOrder } from '../services/testing.js';
-import { addDonation, removeDonation } from '../services/testingDonations.js';
+import { joinTestingExternal, joinTestingWithOrder, setVolunteer } from '../services/testing.js';
+import { addDonation, removeDonation, tellJoined } from '../services/testingDonations.js';
 import { leaveExtra, answerRound, signUpExtra } from '../services/testingExtra.js';
 
 const idParam = z.object({ id: z.uuid() });
@@ -79,7 +79,11 @@ export function orderRoutes(): Hono<AppBindings> {
   // Joining a testing from outside (bought elsewhere): an order of only the fee.
   app.post('/external-testing/:id', zValidator('param', idParam), zValidator('json', joinExternalRequest), async (c) => {
     const { sub } = c.get('claims');
-    const orderId = await joinTestingExternal(c.get('db'), c.get('shop'), sub, c.req.valid('param').id, c.req.valid('json'));
+    const testingId = c.req.valid('param').id;
+    const orderId = await joinTestingExternal(c.get('db'), c.get('shop'), sub, testingId, c.req.valid('json'));
+    void tellJoined(c.get('db'), c.get('env'), c.get('shop'), sub, orderId, testingId).catch((error: unknown) =>
+      console.error('Joined notice failed:', error),
+    );
     const response: CreateOrderResponse = { orderId };
     return c.json(response, 201);
   });
@@ -264,10 +268,25 @@ export function orderRoutes(): Hono<AppBindings> {
     const { testingId, volunteer } = c.req.valid('json');
     // An open testing (open GB), or one made after closing while its time lasts: checked there.
     await joinTestingWithOrder(c.get('db'), c.get('shop'), sub, id, testingId, volunteer);
+    void tellJoined(c.get('db'), c.get('env'), c.get('shop'), sub, id, testingId).catch((error: unknown) =>
+      console.error('Joined notice failed:', error),
+    );
     const order = await getOrder(c.get('db'), c.get('shopId'), id, sub);
     if (!order) throw ApiError.notFound('Order not found');
     return c.json(order);
   });
+
+  // Offering a vial in one testing (or not), until its draw.
+  app.put(
+    '/:id/testings/:testingId/volunteer',
+    zValidator('param', z.object({ id: z.uuid(), testingId: z.uuid() })),
+    zValidator('json', z.object({ volunteer: z.boolean() })),
+    async (c) => {
+      const { id, testingId } = c.req.valid('param');
+      await setVolunteer(c.get('db'), c.get('shopId'), c.get('claims').sub, id, testingId, c.req.valid('json').volunteer);
+      return c.json({ ok: true });
+    },
+  );
 
   // Customer adds details (email, phone, notes) to an order not sent yet: they
   // never replace what it had, and the organiser is told.

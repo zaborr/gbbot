@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { formatDateTime } from '../../lib/format.js';
 import { useState } from 'react';
 import { Cell, List, Section, Switch } from '@telegram-apps/telegram-ui';
 import type { Testing } from '@tma-shop/shared';
@@ -29,7 +30,7 @@ export function TestingStatusChip({
   if (testing.status === 'closed' && testing.donationsOpen && testing.donationsUntil) {
     return (
       <span className="gb-chip gb-chip--info">
-        {t('testing.status.windowOpen', { date: new Date(testing.donationsUntil).toLocaleString() })}
+        {t('testing.status.windowOpen', { date: formatDateTime(testing.donationsUntil) })}
       </span>
     );
   }

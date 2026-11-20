@@ -1,5 +1,5 @@
 import { fiatCurrencyOf } from '@tma-shop/shared';
-import { lang } from '../i18n/index.js';
+import { lang, locale } from '../i18n/index.js';
 
 /** Formats a money amount stored in cents of the token: "12.90 USDC". */
 export function formatPrice(amount: number, currency: string): string {
@@ -35,4 +35,15 @@ export function formatFiat(amount: number, token: string): string {
   } catch {
     return `${(amount / 100).toFixed(2)} ${currency}`;
   }
+}
+
+/** A date and time in the app's language, without seconds ("21/11/2026, 11:15"). */
+export function formatDateTime(value: string | Date): string {
+  return new Date(value).toLocaleString(locale(), {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }

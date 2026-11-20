@@ -274,6 +274,61 @@ async function joinedBy(db: Executor, userId: number | undefined, testingIds: re
   return new Set(rows.map((r) => r.testingId));
 }
 
+/** Of those, the testings this person offers a vial in. */
+async function volunteeredBy(
+  db: Executor,
+  userId: number | undefined,
+  testingIds: readonly string[],
+): Promise<Set<string>> {
+  if (userId === undefined || testingIds.length === 0) return new Set();
+  const rows = await db
+    .select({ testingId: testingEntries.testingId })
+    .from(testingEntries)
+    .innerJoin(orders, eq(testingEntries.orderId, orders.id))
+    .where(
+      and(
+        inArray(testingEntries.testingId, [...testingIds]),
+        eq(testingEntries.userId, userId),
+        eq(testingEntries.volunteer, true),
+        ne(orders.status, 'cancelled'),
+      ),
+    );
+  return new Set(rows.map((r) => r.testingId));
+}
+
+/**
+ * Offering a vial in one testing (or not any more), until its draw.
+ * Each testing has its own draw with its own volunteers.
+ */
+export async function setVolunteer(
+  db: Database,
+  shopId: string,
+  userId: number,
+  orderId: string,
+  testingId: string,
+  volunteer: boolean,
+): Promise<void> {
+  const testing = await db.query.testings.findFirst({
+    where: and(eq(testings.shopId, shopId), eq(testings.id, testingId)),
+  });
+  if (!testing) throw ApiError.notFound('Testing not found');
+  if (testing.draw !== null || FINISHED.includes(testing.status)) {
+    throw ApiError.conflict('testing_drawn', 'The draw is done: it cannot change');
+  }
+  const [entry] = await db
+    .update(testingEntries)
+    .set({ volunteer })
+    .where(
+      and(
+        eq(testingEntries.testingId, testing.id),
+        eq(testingEntries.orderId, orderId),
+        eq(testingEntries.userId, userId),
+      ),
+    )
+    .returning({ id: testingEntries.id });
+  if (!entry) throw ApiError.notFound('You do not take part with this order');
+}
+
 /** Testings still running: they keep the product, variant and switch as they are. */
 const FINISHED: TestingStatus[] = ['settled', 'cancelled'];
 
@@ -402,10 +457,11 @@ async function withLabels(
 ): Promise<Testing[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
-  const [totals, joined, prices] = await Promise.all([
+  const [totals, joined, prices, offered] = await Promise.all([
     testingTotals(db, ids),
     joinedBy(db, options.userId, ids),
     vialPrices(db, rows),
+    volunteeredBy(db, options.userId, ids),
   ]);
   const productIds = [...new Set(rows.map((r) => r.productId))];
   const variantIds = rows.flatMap((r) => (r.variantId ? [r.variantId] : []));
@@ -433,6 +489,7 @@ async function withLabels(
       options.admin,
     ),
     extra: extras.get(row.id) ?? null,
+    volunteer: offered.has(row.id),
   }));
 }
 
