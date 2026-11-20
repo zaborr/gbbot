@@ -47,6 +47,7 @@ import { testingAdminRoutes } from './testing.js';
 import { announceTestingTiers, listTestings, setTestingEnabled } from '../services/testing.js';
 import { unpaidExtras } from '../services/testingExtra.js';
 import { createLab, deleteLab, listLabs, updateLab } from '../services/labs.js';
+import { pendingRefunds } from '../services/refunds.js';
 import { findReport, listReports, reportCaption, reportFile, sendReportTo } from '../services/testingReports.js';
 import {
   createCategory,
@@ -892,6 +893,9 @@ export function adminRoutes(): Hono<AppBindings> {
     const order = await getOrder(db, c.get('shopId'), row.id);
     return c.json(order);
   });
+
+  // Everything owed back to customers, order by order, with why.
+  app.get('/refunds', async (c) => c.json(await pendingRefunds(c.get('db'), c.get('shopId'))));
 
   // The admin sent the overpaid difference back to the customer.
   app.post('/orders/:id/refund', zValidator('param', idParam), async (c) =>

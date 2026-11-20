@@ -183,6 +183,9 @@ function AdminHome(): React.JSX.Element {
       </Section>
 
       <Section header={t('adminHome.payments')}>
+        <Cell onClick={go('/admin/refunds')} subtitle={t('refunds.menuHint')}>
+          {t('refunds.title')}
+        </Cell>
         <Cell
           onClick={go('/admin/wallets')}
           subtitle={

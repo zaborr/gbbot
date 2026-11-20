@@ -1885,6 +1885,46 @@ describeDb('API integration', () => {
     expect((await request(`/api/admin/labs/${lab.id}`, { method: 'DELETE', headers: admin })).status).toBe(404);
   });
 
+  it('lists what is owed back, with why, until it is marked as sent', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const headers = { Authorization: `Bearer ${await authToken(555005001, 'Rui')}`, 'content-type': 'application/json' };
+    await db.delete(carts).where(eq(carts.userId, 555005001));
+    await request('/api/cart/items', { method: 'POST', headers, body: JSON.stringify({ productId, quantity: 1 }) });
+    const placed = await request('/api/orders', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ contactUsername: '@rui_test' }),
+    });
+    const { orderId } = (await placed.json()) as { orderId: string };
+    try {
+      await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+      await request(`/api/admin/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: admin,
+        body: JSON.stringify({ status: 'cancelled' }),
+      });
+      const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+      const owed = (await (await request('/api/admin/refunds', { headers: admin })).json()) as Array<{
+        orderId: string;
+        amount: number;
+        reasons: string[];
+      }>;
+      expect(owed.find((r) => r.orderId === orderId)).toMatchObject({
+        amount: order!.amountPaid,
+        reasons: ['cancelled'],
+      });
+      expect((await request(`/api/admin/orders/${orderId}/refund`, { method: 'POST', headers: admin })).status).toBe(200);
+      const after = (await (await request('/api/admin/refunds', { headers: admin })).json()) as Array<{ orderId: string }>;
+      expect(after.some((r) => r.orderId === orderId)).toBe(false);
+    } finally {
+      await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
+      await db.delete(orders).where(eq(orders.id, orderId));
+    }
+  });
+
   it('runs the extra round: equal shares within caps, only for the tests still missing', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
