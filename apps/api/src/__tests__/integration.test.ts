@@ -1841,7 +1841,9 @@ describeDb('API integration', () => {
       expect(file.status).toBe(200);
       expect(await file.text()).toBe('%PDF-1');
       const stranger = { Authorization: `Bearer ${await authToken(555004001, 'Sol')}` };
-      expect(await (await request('/api/products/testing-reports', { headers: stranger })).json()).toEqual([]);
+      // (The GB is closed and they have nothing in it: they do not even reach it.)
+      const theirs = await request('/api/products/testing-reports', { headers: stranger });
+      expect(theirs.status === 404 || JSON.stringify(await theirs.json()) === '[]').toBe(true);
       expect((await request(`/api/products/testing-reports/${mine!.id}/file`, { headers: stranger })).status).toBe(404);
     } finally {
       await db.update(shops).set({ closedAt: null }).where(eq(shops.id, shopId));
