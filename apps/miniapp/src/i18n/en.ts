@@ -1265,6 +1265,7 @@ export const en = {
   'testing.extraSignupHours': 'Hours to sign up',
   'testing.extraStage.done': '✅ Over',
   'testing.extraStage.pay': '💳 Paying the shares',
+  'testing.extraStage.pre': 'Not open yet: people sign up early',
   'testing.extraStage.round': '🔁 Second round: payers say whether they go on',
   'testing.extraStage.signup': '📝 Signing up',
   'testing.extraStage.topup': '💳 Second round: those who go on pay the difference',

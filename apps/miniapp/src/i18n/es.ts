@@ -1267,6 +1267,7 @@ export const es: Record<MessageKey, string> = {
   'testing.extraSignupHours': 'Horas para apuntarse',
   'testing.extraStage.done': '✅ Terminada',
   'testing.extraStage.pay': '💳 Pagando las partes',
+  'testing.extraStage.pre': 'Aún no abierta: se apuntan por adelantado',
   'testing.extraStage.round': '🔁 Segunda ronda: los que pagaron dicen si siguen',
   'testing.extraStage.signup': '📝 Inscripción abierta',
   'testing.extraStage.topup': '💳 Segunda ronda: los que siguen pagan la diferencia',
