@@ -119,7 +119,7 @@ import { closePreview, closeShop, reopenShop, scheduleClosing } from '../service
 import { announceGoalMilestones, updateGoal } from '../services/goal.js';
 import { getShopTeam, notifySuperAdmins } from '../services/team.js';
 import { restoreSnapshot, takeSnapshot } from '../services/snapshot.js';
-import { audienceIds, listBroadcasts, startBroadcast } from '../services/broadcast.js';
+import { audienceIds, checkReach, listBroadcasts, startBroadcast } from '../services/broadcast.js';
 import { getDisclaimerAdmin, updateDisclaimer } from '../services/disclaimer.js';
 import { deleteLater } from '../services/expiringMessages.js';
 import {
@@ -302,6 +302,20 @@ export function adminRoutes(): Hono<AppBindings> {
     },
   );
   app.get('/broadcasts', async (c) => c.json(await listBroadcasts(c.get('db'), c.get('shopId'))));
+  // Who in an audience the bot cannot write to (nothing is sent); the bot tells the result.
+  app.post(
+    '/broadcasts/reach',
+    zValidator('json', z.object({ audience: broadcastAudience, testingId: z.uuid().nullable().optional() })),
+    async (c) => {
+      const { audience, testingId } = c.req.valid('json');
+      return c.json(
+        await checkReach(c.get('db'), c.get('env'), c.get('shop'), c.get('claims').sub, audience, {
+          testingId: testingId ?? null,
+        }),
+        202,
+      );
+    },
+  );
   app.post('/broadcasts', zValidator('json', sendBroadcastRequest), async (c) => {
     const { audience, text, testingId } = c.req.valid('json');
     return c.json(

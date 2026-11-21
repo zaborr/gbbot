@@ -291,6 +291,10 @@ const en = {
   'testing.digest.unpaid': '{n} not paid yet (the draw waits)',
   'testing.digest.vials': 'mark when the vials go to the lab',
   'testing.remindUnpaid': 'Reminder: your order {ref} is not paid yet ({amount}). You are in the testing of {what}, and the draw of donors waits until everyone has paid.',
+  'broadcast.unreachedOrder': '{name} (no username, order #{ref})',
+  'broadcast.unreachedMore': 'and {count} more (full list in the app → Message to buyers).',
+  'broadcast.reachDone': '🔍 Of the {total} buyers of {shop} checked, {count} cannot get messages from the bot.',
+  'broadcast.reachHint': 'They never pressed Start in this bot, or blocked it. Write to them and send them the bot\'s link so they press Start.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -574,6 +578,10 @@ const es: Record<BotMessageKey, string> = {
   'testing.digest.unpaid': '{n} sin pagar (el sorteo espera)',
   'testing.digest.vials': 'marca cuándo se envían los viales al laboratorio',
   'testing.remindUnpaid': 'Recordatorio: tu pedido {ref} aún no está pagado ({amount}). Participas en el testing de {what} y el sorteo de donantes espera a que todos hayan pagado.',
+  'broadcast.unreachedOrder': '{name} (sin usuario, pedido #{ref})',
+  'broadcast.unreachedMore': 'y {count} más (lista completa en la app → Mensaje a compradores).',
+  'broadcast.reachDone': '🔍 De los {total} compradores de {shop} comprobados, {count} no pueden recibir mensajes del bot.',
+  'broadcast.reachHint': 'Nunca pulsaron Start en este bot, o lo bloquearon. Escríbeles y pásales el enlace del bot para que pulsen Start.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -855,6 +863,10 @@ const it: Record<BotMessageKey, string> = {
   'testing.digest.unpaid': '{n} non pagati (l\'estrazione aspetta)',
   'testing.digest.vials': 'segna quando le fiale partono per il laboratorio',
   'testing.remindUnpaid': 'Promemoria: il tuo ordine {ref} non è ancora pagato ({amount}). Partecipi al testing di {what} e l\'estrazione dei donatori aspetta che tutti abbiano pagato.',
+  'broadcast.unreachedOrder': '{name} (senza username, ordine #{ref})',
+  'broadcast.unreachedMore': 'e altri {count} (elenco completo nell\'app → Messaggio agli acquirenti).',
+  'broadcast.reachDone': '🔍 Dei {total} acquirenti di {shop} controllati, {count} non possono ricevere messaggi dal bot.',
+  'broadcast.reachHint': 'Non hanno mai premuto Start in questo bot, o l\'hanno bloccato. Scrivi loro e manda il link del bot perché premano Start.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -1136,6 +1148,10 @@ const pt: Record<BotMessageKey, string> = {
   'testing.digest.unpaid': '{n} por pagar (o sorteio espera)',
   'testing.digest.vials': 'marque quando os frascos seguem para o laboratório',
   'testing.remindUnpaid': 'Lembrete: o seu pedido {ref} ainda não está pago ({amount}). Participa no testing de {what} e o sorteio dos doadores espera que todos tenham pago.',
+  'broadcast.unreachedOrder': '{name} (sem utilizador, pedido #{ref})',
+  'broadcast.unreachedMore': 'e mais {count} (lista completa na app → Mensagem aos compradores).',
+  'broadcast.reachDone': '🔍 Dos {total} compradores de {shop} verificados, {count} não podem receber mensagens do bot.',
+  'broadcast.reachHint': 'Nunca carregaram em Start neste bot, ou bloquearam-no. Escreva-lhes e envie o link do bot para carregarem em Start.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

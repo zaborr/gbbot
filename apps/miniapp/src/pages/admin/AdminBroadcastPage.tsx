@@ -5,7 +5,9 @@ import {
   broadcastAudience,
   TESTING_AUDIENCES,
   type BroadcastAudience,
+  type UnreachedPerson,
 } from '@tma-shop/shared';
+import { copyText } from '../../lib/clipboard.js';
 import { Textarea } from '../../components/Field.js';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
@@ -43,6 +45,8 @@ function Broadcast(): React.JSX.Element {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [checking, setChecking] = useState<number | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const actions = useAdminActions(() => setReloadKey((k) => k + 1));
   const count = useAsync(
     () =>
@@ -111,6 +115,21 @@ function Broadcast(): React.JSX.Element {
             </div>
           ))}
         <Cell after={count.loading ? '…' : String(recipients)}>{t('broadcast.people')}</Cell>
+        {recipients > 0 && (
+          <div style={{ padding: '0 16px 12px' }}>
+            <Button
+              size="s"
+              mode="bezeled"
+              disabled={checking !== null}
+              onClick={() =>
+                void actions.run(async () => setChecking((await api.adminCheckReach(audience, chosen)).checking))
+              }
+            >
+              {t('broadcast.reach')}
+            </Button>
+          </div>
+        )}
+        {checking !== null && <Cell multiline>{t('broadcast.reachStarted', { count: checking })}</Cell>}
       </Section>
 
       <Section
@@ -161,9 +180,31 @@ function Broadcast(): React.JSX.Element {
                 b.sender,
               ].join(' · ')}
               description={
-                b.status === 'sending'
-                  ? t('broadcast.inProgress', { sent: b.sent, total: b.recipients })
-                  : t('broadcast.result', { sent: b.sent, total: b.recipients, failed: b.failed })
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span>
+                    {b.status === 'sending'
+                      ? t('broadcast.inProgress', { sent: b.sent, total: b.recipients })
+                      : t('broadcast.result', { sent: b.sent, total: b.recipients, failed: b.failed })}
+                  </span>
+                  {b.status === 'done' && b.unreached.length > 0 && (
+                    <>
+                      <span>{t('broadcast.unreached', { list: b.unreached.map(personLabel).join(', ') })}</span>
+                      <span>
+                        <Button
+                          size="s"
+                          mode="bezeled"
+                          onClick={() =>
+                            void copyText(b.unreached.map(personLabel).join('\n')).then((ok) =>
+                              setCopiedId(ok ? b.id : null),
+                            )
+                          }
+                        >
+                          {copiedId === b.id ? t('sheet.copied') : t('broadcast.copyUnreached')}
+                        </Button>
+                      </span>
+                    </>
+                  )}
+                </span>
               }
             >
               {b.text.length > 140 ? `${b.text.slice(0, 140)}…` : b.text}
@@ -173,4 +214,10 @@ function Broadcast(): React.JSX.Element {
       )}
     </List>
   );
+}
+
+/** "@ana", or "Ana (no username, order #1a2b3c4d)". */
+function personLabel(person: UnreachedPerson): string {
+  if (person.username) return `@${person.username}`;
+  return person.orderRef ? t('broadcast.unreachedOrder', { name: person.name, ref: person.orderRef }) : person.name;
 }

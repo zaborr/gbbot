@@ -878,6 +878,13 @@ export class ApiClient {
     return this.request<BroadcastView[]>('/admin/broadcasts');
   }
 
+  adminCheckReach(audience: BroadcastAudience, testingId: string | null): Promise<{ checking: number }> {
+    return this.request<{ checking: number }>('/admin/broadcasts/reach', {
+      method: 'POST',
+      body: JSON.stringify({ audience, testingId }),
+    });
+  }
+
   /** Sends a message to the GB's buyers through the bot (in the background). */
   adminSendBroadcast(audience: BroadcastAudience, text: string, testingId: string | null = null): Promise<BroadcastView> {
     return this.request<BroadcastView>('/admin/broadcasts', {
