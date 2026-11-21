@@ -1,5 +1,6 @@
 import { announceNewTesting, moveTestingWindow, reopenTesting } from '../services/testingDonations.js';
 import { Hono } from 'hono';
+import { withNext } from '../services/testingNext.js';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { createTestingRequest, labProgressRequest, langFrom, MAX_DONATION_HOURS, updateTestingRequest } from '@tma-shop/shared';
@@ -22,7 +23,10 @@ const idParam = z.object({ id: z.uuid() });
 export function testingAdminRoutes(): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
 
-  app.get('/', async (c) => c.json(await listTestings(c.get('db'), c.get('shopId'))));
+  // Each with where it is and what comes next (the organisers' panel).
+  app.get('/', async (c) =>
+    c.json(await withNext(c.get('db'), c.get('shop'), await listTestings(c.get('db'), c.get('shopId')))),
+  );
   app.post('/', zValidator('json', createTestingRequest), async (c) => {
     const created = await createTesting(c.get('db'), c.get('shop'), c.req.valid('json'));
     // Those who already bought it hear about it (in the background).
