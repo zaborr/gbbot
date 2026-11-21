@@ -3,6 +3,7 @@ import { and, asc, eq, inArray, isNull, ne, notInArray, sql } from 'drizzle-orm'
 import { DONATION_UNIT, textBar, tierSteps, unitValue, type Lang, type TierStep } from '@tma-shop/shared';
 import type {
   CartTesting,
+  Order,
   TestingParticipant,
   CreateTestingRequest,
   ShopAdminView,
@@ -1414,11 +1415,7 @@ export async function shopsOpenToOutside(db: Executor, shopIds: readonly string[
 }
 
 /** The organisers' order list: each order with the testings it takes part in (from outside too). */
-export async function markTestings<O extends { id: string; testings?: Array<{ id: string; label: string }> }>(
-  db: Database,
-  shopId: string,
-  list: O[],
-): Promise<O[]> {
+export async function markTestings(db: Database, shopId: string, list: Order[]): Promise<Order[]> {
   if (list.length === 0) return list;
   const rows = await db
     .select({ orderId: testingEntries.orderId, testingId: testingEntries.testingId })
