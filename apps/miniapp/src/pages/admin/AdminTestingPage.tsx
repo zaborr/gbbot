@@ -19,6 +19,7 @@ import { ErrorView } from '../../components/ErrorView.js';
 import { PageTitle } from '../../components/PageTitle.js';
 import { Input } from '../../components/Field.js';
 import { TestingOrders } from '../../components/TestingOrders.js';
+import { TestingTimeline } from '../../components/TestingTimeline.js';
 import { TestingCard } from '../../components/TestingCard.js';
 import { TestingReports } from '../../components/TestingReports.js';
 import { productTitle } from '../../lib/localize.js';
@@ -763,6 +764,7 @@ function TestingForm({
 
       {testing && on('state') && (
         <>
+          <TestingTimeline testing={testing} />
           {preview && <TestingCard testing={preview} preview />}
           {money && <PotSection testing={testing} steps={steps} />}
           {testing.extra && <ExtraStatus testing={testing} />}
