@@ -10,7 +10,9 @@ import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { PageTitle } from '../../components/PageTitle.js';
 import { AdminOnly, ErrorBanner, useAdminActions } from './common.js';
-import { t, type MessageKey } from '../../i18n/index.js';
+import { t, tn, type MessageKey } from '../../i18n/index.js';
+import { TestingBar } from '../../components/TestingCard.js';
+import { potLine, TestingNextLine } from '../../components/TestingNext.js';
 
 const STATUS: Record<Testing['status'], { key: MessageKey; chip: string }> = {
   open: { key: 'testing.status.open', chip: 'gb-chip--info' },
@@ -51,6 +53,14 @@ function AdminTestings(): React.JSX.Element {
   const navigate = useNavigate();
   const { shop, to } = useShop();
   const list = useAsync(() => api.adminGetTestings(), [shop.testingEnabled]);
+  const all = list.data ?? [];
+  // Those that need the organisers first, then the ones going on, then the finished.
+  const finished = (x: Testing): boolean => x.status === 'settled' || x.status === 'cancelled';
+  const groups: Array<{ key: string; header: MessageKey; items: Testing[] }> = [
+    { key: 'action', header: 'testing.panel.action', items: all.filter((x) => !finished(x) && x.next?.action) },
+    { key: 'going', header: 'testing.panel.going', items: all.filter((x) => !finished(x) && !x.next?.action) },
+    { key: 'done', header: 'testing.panel.done', items: all.filter(finished).reverse() },
+  ];
 
   return (
     <List>
@@ -62,41 +72,73 @@ function AdminTestings(): React.JSX.Element {
         ) : list.error ? (
           <ErrorView message={list.error} />
         ) : (
-          <Section footer={t('testing.listFooter')}>
-            {(list.data ?? []).length === 0 && <Cell multiline>{t('testing.none')}</Cell>}
-            {(list.data ?? []).map((testing) => (
-              <Cell
-                key={testing.id}
-                onClick={() => navigate(to(`/admin/testings/${testing.id}`))}
-                subtitle={
-                  <span className="gb-chips" style={{ marginTop: 4 }}>
-                    <TestingStatusChip testing={testing} />
-                    <span className="gb-chip">
-                      {t('testing.tiersOf', {
-                        reached: testing.tiers.filter((tier) => tier.reached).length,
-                        count: testing.tiers.length,
-                      })}
-                    </span>
-                  </span>
-                }
-                after="›"
-                multiline
-              >
-                {testing.variantLabel
-                  ? `${testing.productTitle} · ${testing.variantLabel}`
-                  : testing.productTitle}
+          <>
+            {all.length === 0 && (
+              <Section>
+                <Cell multiline>{t('testing.none')}</Cell>
+              </Section>
+            )}
+            {groups
+              .filter((group) => group.items.length > 0)
+              .map((group) => (
+                <Section key={group.key} header={t(group.header)}>
+                  {group.items.map((testing) => (
+                    <TestingPanelCell
+                      key={testing.id}
+                      testing={testing}
+                      onOpen={() => navigate(to(`/admin/testings/${testing.id}`))}
+                    />
+                  ))}
+                </Section>
+              ))}
+            <Section footer={t('testing.listFooter')}>
+              <Cell onClick={() => navigate(to('/admin/testings/new'))}>{t('testing.new')}</Cell>
+              <Cell onClick={() => navigate(to('/admin/testing-reports'))} after="›">
+                {t('reports.title')}
               </Cell>
-            ))}
-            <Cell onClick={() => navigate(to('/admin/testings/new'))}>{t('testing.new')}</Cell>
-            <Cell onClick={() => navigate(to('/admin/testing-reports'))} after="›">
-              {t('reports.title')}
-            </Cell>
-            <Cell onClick={() => navigate(to('/admin/labs'))} after="›">
-              {t('labs.title')}
-            </Cell>
-          </Section>
+              <Cell onClick={() => navigate(to('/admin/labs'))} after="›">
+                {t('labs.title')}
+              </Cell>
+            </Section>
+          </>
         ))}
     </List>
+  );
+}
+
+/** One testing in the panel: what comes next, how far the pot is, who paid. */
+function TestingPanelCell({ testing, onOpen }: { testing: Testing; onOpen: () => void }): React.JSX.Element {
+  const live = testing.status !== 'settled' && testing.status !== 'cancelled';
+  const unpaid = testing.next?.unpaid ?? 0;
+  const pot = live ? potLine(testing) : null;
+  return (
+    <Cell
+      onClick={onOpen}
+      after="›"
+      multiline
+      subtitle={testing.next && live ? <TestingNextLine next={testing.next} /> : undefined}
+      description={
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+          {live && <TestingBar testing={testing} />}
+          {pot && <span>{pot}</span>}
+          <span className="gb-chips">
+            <TestingStatusChip testing={testing} />
+            <span className="gb-chip">
+              {t('testing.tiersOf', {
+                reached: testing.tiers.filter((tier) => tier.reached).length,
+                count: testing.tiers.length,
+              })}
+            </span>
+            {live && <span className="gb-chip">{tn(testing.participants, 'testing.panel.paid.one', 'testing.panel.paid.other')}</span>}
+            {live && unpaid > 0 && (
+              <span className="gb-chip gb-chip--warn">{tn(unpaid, 'testing.panel.unpaid.one', 'testing.panel.unpaid.other')}</span>
+            )}
+          </span>
+        </span>
+      }
+    >
+      {testing.variantLabel ? `${testing.productTitle} · ${testing.variantLabel}` : testing.productTitle}
+    </Cell>
   );
 }
 

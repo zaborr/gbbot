@@ -145,6 +145,35 @@ export interface TestingMoney {
   balance: number;
 }
 
+/** Where a testing is, for its organisers. */
+export type TestingPhase = 'open' | 'window' | 'extra' | 'draw' | 'drawing' | 'lab' | 'done' | 'cancelled';
+/**
+ * What comes next: waiting for something (the GB to close, the time to give,
+ * the extra round, the block, the lab) or something the organisers do.
+ */
+export type TestingStep =
+  | 'wait_gb'
+  | 'wait_window'
+  | 'wait_extra'
+  | 'unpaid'
+  | 'draw'
+  | 'wait_block'
+  | 'vials'
+  | 'wait_lab'
+  | 'wait_report'
+  | 'report'
+  | 'settle';
+export interface TestingNext {
+  phase: TestingPhase;
+  step: TestingStep | null;
+  /** It needs the organisers now. */
+  action: boolean;
+  /** When what it waits for ends (ISO), if known. */
+  until: string | null;
+  /** People in it whose order is not paid yet. */
+  unpaid: number;
+}
+
 export const testing = z.object({
   id: z.string(),
   productId: z.string(),
@@ -201,6 +230,8 @@ export const testing = z.object({
   donationProductId: z.string().nullable(),
   /** Only for the organiser. */
   money: z.custom<TestingMoney>().nullable(),
+  /** For the organisers' list: where it is and what comes next. */
+  next: z.custom<TestingNext>().optional(),
 });
 export type Testing = z.infer<typeof testing>;
 
