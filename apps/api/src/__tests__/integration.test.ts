@@ -4414,6 +4414,14 @@ describeDb('API integration', () => {
         interval: 100,
       });
       expect(typing).toHaveBeenCalledWith(CUSTOMER_ID);
+      // The app follows it too (for those on the web, who get no bot message).
+      const { id } = (await res.json()) as { id: string };
+      const status = (await (await request(`/api/admin/broadcasts/reach/${id}`, { headers })).json()) as {
+        done: boolean;
+        unreached: Array<{ telegramId: number }>;
+      };
+      expect(status.done).toBe(true);
+      expect(status.unreached.map((p) => p.telegramId)).toContain(CUSTOMER_ID);
       expect(send).not.toHaveBeenCalledWith(CUSTOMER_ID, expect.anything(), expect.anything());
     } finally {
       send.mockRestore();

@@ -45,6 +45,7 @@ import type {
   GbBackupPreview,
   ImportGbRequest,
   BroadcastAudience,
+  ReachResult,
   BroadcastView,
   DisclaimerAdminView,
   WebAuthRequest,
@@ -878,8 +879,12 @@ export class ApiClient {
     return this.request<BroadcastView[]>('/admin/broadcasts');
   }
 
-  adminCheckReach(audience: BroadcastAudience, testingId: string | null): Promise<{ checking: number }> {
-    return this.request<{ checking: number }>('/admin/broadcasts/reach', {
+  adminReachStatus(id: string): Promise<ReachResult> {
+    return this.request<ReachResult>(`/admin/broadcasts/reach/${id}`);
+  }
+
+  adminCheckReach(audience: BroadcastAudience, testingId: string | null): Promise<{ id: string; checking: number }> {
+    return this.request<{ id: string; checking: number }>('/admin/broadcasts/reach', {
       method: 'POST',
       body: JSON.stringify({ audience, testingId }),
     });

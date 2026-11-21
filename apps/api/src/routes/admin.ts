@@ -119,7 +119,7 @@ import { closePreview, closeShop, reopenShop, scheduleClosing } from '../service
 import { announceGoalMilestones, updateGoal } from '../services/goal.js';
 import { getShopTeam, notifySuperAdmins } from '../services/team.js';
 import { restoreSnapshot, takeSnapshot } from '../services/snapshot.js';
-import { audienceIds, checkReach, listBroadcasts, startBroadcast } from '../services/broadcast.js';
+import { audienceIds, checkReach, listBroadcasts, reachStatus, startBroadcast } from '../services/broadcast.js';
 import { getDisclaimerAdmin, updateDisclaimer } from '../services/disclaimer.js';
 import { deleteLater } from '../services/expiringMessages.js';
 import {
@@ -316,6 +316,11 @@ export function adminRoutes(): Hono<AppBindings> {
       );
     },
   );
+  app.get('/broadcasts/reach/:id', zValidator('param', z.object({ id: z.uuid() })), async (c) => {
+    const result = await reachStatus(c.get('db'), c.get('shopId'), c.req.valid('param').id);
+    if (!result) throw ApiError.notFound('Check not found');
+    return c.json(result);
+  });
   app.post('/broadcasts', zValidator('json', sendBroadcastRequest), async (c) => {
     const { audience, text, testingId } = c.req.valid('json');
     return c.json(
