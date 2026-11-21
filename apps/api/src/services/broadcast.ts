@@ -1,5 +1,5 @@
 import { and, desc, eq, gt, inArray, isNotNull, lt, ne, sql } from 'drizzle-orm';
-import { TESTING_AUDIENCES, type BroadcastAudience, type BroadcastView, type Lang, type UnreachedPerson } from '@tma-shop/shared';
+import { TESTING_AUDIENCES, type BroadcastAudience, type BroadcastView, type Lang, type ReachResult, type UnreachedPerson } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { broadcasts, cartItems, carts, orders, testingEntries, testings } from '../db/schema.js';
@@ -12,6 +12,7 @@ import { languagesOf } from './notifications.js';
 import { shopLink } from './reminders.js';
 import type { ShopRow } from './shop.js';
 import { describeUser, loadPeople } from './team.js';
+import { isWebAdminId } from './webAdmins.js';
 import { withoutBlocked } from './blacklist.js';
 import { botToken } from './activeBot.js';
 
@@ -259,11 +260,22 @@ export async function startBroadcast(
   return toView(db, row);
 }
 
+/** A check of who can get messages, while it runs and for an hour after. */
+interface ReachCheck {
+  shopId: string;
+  total: number;
+  checked: number;
+  unreached: number[];
+  done: boolean;
+  startedAt: number;
+}
+const reachChecks = new Map<string, ReachCheck>();
+
 /**
  * Who in an audience the bot cannot write to, without sending them anything:
  * "typing…" for a moment, refused by Telegram for those who never pressed
- * Start or blocked the bot. Runs in the background; the bot tells the one who
- * asked.
+ * Start or blocked the bot. Runs in the background: the app follows it, and
+ * the bot tells the one who asked (not when they use the web).
  */
 export async function checkReach(
   db: Database,
@@ -272,36 +284,62 @@ export async function checkReach(
   requesterId: number,
   audience: BroadcastAudience,
   options: { telegram?: TelegramApi; gapMs?: number; wait?: boolean; testingId?: string | null } = {},
-): Promise<{ checking: number }> {
+): Promise<{ id: string; checking: number }> {
   const testingId = TESTING_AUDIENCES.includes(audience) ? (options.testingId ?? null) : null;
   const ids = await audienceIds(db, env, shop, audience, testingId);
   const telegram = options.telegram ?? new TelegramApi(botToken(env));
   const gapMs = options.gapMs ?? SEND_GAP_MS;
+  // Old ones go.
+  for (const [key, old] of reachChecks) if (Date.now() - old.startedAt > 3_600_000) reachChecks.delete(key);
+  const id = crypto.randomUUID();
+  const check: ReachCheck = { shopId: shop.id, total: ids.length, checked: 0, unreached: [], done: false, startedAt: Date.now() };
+  reachChecks.set(id, check);
   const run = (async () => {
-    const unreached: number[] = [];
     for (const chatId of ids) {
       try {
         await telegram.sendChatAction(chatId);
       } catch (error) {
         const wait = retryAfterMs(error);
-        if (wait === null) unreached.push(chatId);
+        if (wait === null) check.unreached.push(chatId);
         else {
           await sleep(wait);
-          await telegram.sendChatAction(chatId).catch(() => unreached.push(chatId));
+          await telegram.sendChatAction(chatId).catch(() => check.unreached.push(chatId));
         }
       }
+      check.checked++;
       if (gapMs > 0) await sleep(gapMs);
     }
+    check.done = true;
+    if (isWebAdminId(requesterId)) return;
     const lang = (await languagesOf(db, [requesterId])).get(requesterId) ?? 'en';
-    const lines = [tr(lang, 'broadcast.reachDone', { shop: shop.name, count: unreached.length, total: ids.length })];
-    if (unreached.length > 0) {
-      lines.push(unreachedList(lang, await describeUnreached(db, shop.id, unreached)));
+    const lines = [tr(lang, 'broadcast.reachDone', { shop: shop.name, count: check.unreached.length, total: ids.length })];
+    if (check.unreached.length > 0) {
+      lines.push(unreachedList(lang, await describeUnreached(db, shop.id, check.unreached)));
       lines.push('', tr(lang, 'broadcast.reachHint'));
     }
     await telegram.sendMessage(requesterId, lines.join('\n'));
-  })().catch((error: unknown) => console.error('Reach check failed:', error));
+  })().catch((error: unknown) => {
+    check.done = true;
+    console.error('Reach check failed:', error);
+  });
   if (options.wait) await run;
-  return { checking: ids.length };
+  return { id, checking: ids.length };
+}
+
+/** How a check goes, and who it found so far; null when it is not this GB's or is gone. */
+export async function reachStatus(
+  db: Database,
+  shopId: string,
+  id: string,
+): Promise<ReachResult | null> {
+  const check = reachChecks.get(id);
+  if (!check || check.shopId !== shopId) return null;
+  return {
+    total: check.total,
+    checked: check.checked,
+    done: check.done,
+    unreached: check.done ? await describeUnreached(db, shopId, check.unreached) : [],
+  };
 }
 
 /** A send cut short by a restart: closed so it does not show as "sending" for ever. */

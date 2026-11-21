@@ -37,6 +37,14 @@ export const unreachedPerson = z.object({
 });
 export type UnreachedPerson = z.infer<typeof unreachedPerson>;
 
+/** A check of who cannot get messages from the bot: how far it is, and who (once done). */
+export interface ReachResult {
+  total: number;
+  checked: number;
+  done: boolean;
+  unreached: UnreachedPerson[];
+}
+
 export const broadcastView = z.object({
   id: z.string(),
   audience: broadcastAudience,

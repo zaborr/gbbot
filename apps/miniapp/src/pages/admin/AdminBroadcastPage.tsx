@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import {
   BROADCAST_MAX_LENGTH,
   broadcastAudience,
   TESTING_AUDIENCES,
   type BroadcastAudience,
+  type ReachResult,
   type UnreachedPerson,
 } from '@tma-shop/shared';
 import { copyText } from '../../lib/clipboard.js';
@@ -45,7 +46,19 @@ function Broadcast(): React.JSX.Element {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const [checking, setChecking] = useState<number | null>(null);
+  const [check, setCheck] = useState<{ id: string; result: ReachResult | null } | null>(null);
+  const [checkCopied, setCheckCopied] = useState(false);
+  // Follow the check until it is done.
+  useEffect(() => {
+    if (!check || check.result?.done) return;
+    const timer = setTimeout(() => {
+      api
+        .adminReachStatus(check.id)
+        .then((result) => setCheck((now) => (now?.id === check.id ? { id: check.id, result } : now)))
+        .catch(() => setCheck(null));
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [check]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const actions = useAdminActions(() => setReloadKey((k) => k + 1));
   const count = useAsync(
@@ -120,16 +133,49 @@ function Broadcast(): React.JSX.Element {
             <Button
               size="s"
               mode="bezeled"
-              disabled={checking !== null}
+              disabled={check !== null && !check.result?.done}
               onClick={() =>
-                void actions.run(async () => setChecking((await api.adminCheckReach(audience, chosen)).checking))
+                void actions.run(async () => {
+                  const started = await api.adminCheckReach(audience, chosen);
+                  setCheckCopied(false);
+                  setCheck({ id: started.id, result: { total: started.checking, checked: 0, done: false, unreached: [] } });
+                })
               }
             >
               {t('broadcast.reach')}
             </Button>
           </div>
         )}
-        {checking !== null && <Cell multiline>{t('broadcast.reachStarted', { count: checking })}</Cell>}
+        {check?.result && !check.result.done && (
+          <Cell multiline>{t('broadcast.reachProgress', { checked: check.result.checked, total: check.result.total })}</Cell>
+        )}
+        {check?.result?.done && (
+          <Cell
+            multiline
+            description={
+              check.result.unreached.length > 0 ? (
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                  <span>{check.result.unreached.map(personLabel).join(', ')}</span>
+                  <span>
+                    <Button
+                      size="s"
+                      mode="bezeled"
+                      onClick={() =>
+                        void copyText((check.result?.unreached ?? []).map(personLabel).join('\n')).then(setCheckCopied)
+                      }
+                    >
+                      {checkCopied ? t('sheet.copied') : t('broadcast.copyUnreached')}
+                    </Button>
+                  </span>
+                </span>
+              ) : undefined
+            }
+          >
+            {check.result.unreached.length > 0
+              ? t('broadcast.reachResult', { count: check.result.unreached.length, total: check.result.total })
+              : t('broadcast.reachAll', { total: check.result.total })}
+          </Cell>
+        )}
       </Section>
 
       <Section
