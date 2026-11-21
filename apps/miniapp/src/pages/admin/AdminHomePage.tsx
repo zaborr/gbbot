@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Badge, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import { api } from '../../api/client.js';
+import type { Testing } from '@tma-shop/shared';
 import { useAsync } from '../../hooks/useAsync.js';
 import { AdminOnly, isSale, needsAttention, toMajor } from './common.js';
 import { useShop, useShopPath } from '../../providers/ShopProvider.js';
@@ -30,6 +31,11 @@ function AdminHome(): React.JSX.Element {
   const orders = useAsync(() => api.adminGetOrders(), []);
   const products = useAsync(() => api.adminGetProducts(), []);
   const { shop: config } = useShop();
+  const testings = useAsync(
+    () => (config.testingEnabled ? api.adminGetTestings() : Promise.resolve([])),
+    [config.testingEnabled],
+  );
+  const testingSummary = summarizeTestings(testings.data ?? []);
   const go = (path: string) => () => navigate(to(path));
 
   const all = orders.data ?? [];
@@ -174,12 +180,33 @@ function AdminHome(): React.JSX.Element {
           {t('adminHome.catalog')}
         </Cell>
         <Cell onClick={go('/admin/products/new')}>{t('adminHome.newProduct')}</Cell>
+      </Section>
+
+      <Section header={t('testing.title')}>
         <Cell
           onClick={go('/admin/testings')}
-          subtitle={config.testingEnabled ? t('testing.menuHint') : t('testing.menuOff')}
+          subtitle={
+            !config.testingEnabled ? (
+              t('testing.menuOff')
+            ) : testingSummary ? (
+              <span style={testingSummary.action > 0 ? warning : undefined}>{testingSummary.text}</span>
+            ) : (
+              t('testing.menuHint')
+            )
+          }
+          multiline
         >
-          {t('testing.title')}
+          {t('adminHome.testings')}
         </Cell>
+        {config.testingEnabled && (
+          <>
+            <Cell onClick={go('/admin/labs')}>{t('labs.title')}</Cell>
+            <Cell onClick={go('/admin/testing-reports')}>{t('reports.title')}</Cell>
+            <Cell onClick={go('/admin/refunds')} subtitle={t('refunds.menuHint')}>
+              {t('refunds.title')}
+            </Cell>
+          </>
+        )}
       </Section>
 
       <Section header={t('adminHome.payments')}>
@@ -290,4 +317,16 @@ function AdminHome(): React.JSX.Element {
       )}
     </List>
   );
+}
+
+/** "2 going on · 4 not paid · 1 needs you", or null when there is none going on. */
+function summarizeTestings(list: readonly Testing[]): { text: string; action: number } | null {
+  const going = list.filter((x) => x.status !== 'settled' && x.status !== 'cancelled');
+  if (going.length === 0) return null;
+  const unpaid = going.reduce((sum, x) => sum + (x.next?.unpaid ?? 0), 0);
+  const action = going.filter((x) => x.next?.action).length;
+  const parts = [tn(going.length, 'adminHome.testingsGoing.one', 'adminHome.testingsGoing.other')];
+  if (unpaid > 0) parts.push(tn(unpaid, 'testing.panel.unpaid.one', 'testing.panel.unpaid.other'));
+  if (action > 0) parts.push(tn(action, 'adminHome.testingsAction.one', 'adminHome.testingsAction.other'));
+  return { text: parts.join(' · '), action };
 }
