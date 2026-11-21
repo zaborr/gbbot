@@ -18,6 +18,7 @@ import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { PageTitle } from '../../components/PageTitle.js';
 import { Input } from '../../components/Field.js';
+import { TestingOrders } from '../../components/TestingOrders.js';
 import { TestingCard } from '../../components/TestingCard.js';
 import { TestingReports } from '../../components/TestingReports.js';
 import { productTitle } from '../../lib/localize.js';
@@ -63,8 +64,8 @@ const signupField = (text: string): boolean =>
   /^\d+$/.test(text.trim()) && Number(text) >= 0 && Number(text) <= MAX_DONATION_HOURS;
 
 /** `/admin/testings/new` (optionally `?product=…&variant=…`) or `/admin/testings/:id`. */
-type TestingTab = 'config' | 'state' | 'draw';
-const TABS: TestingTab[] = ['state', 'config', 'draw'];
+type TestingTab = 'config' | 'state' | 'orders' | 'draw';
+const TABS: TestingTab[] = ['state', 'orders', 'draw', 'config'];
 
 export function AdminTestingPage(): React.JSX.Element {
   return (
@@ -772,9 +773,10 @@ function TestingForm({
           )}
           <WindowSection testing={testing} onChange={onChange} />
           <ReopenSection testing={testing} onChange={onChange} />
-          <Participants testing={testing} />
         </>
       )}
+
+      {testing && on('orders') && <TestingOrders testing={testing} />}
 
       {testing && on('draw') && (
         <>
@@ -961,44 +963,6 @@ function Simulator({
           ))}
         </>
       )}
-    </Section>
-  );
-}
-
-/** Who takes part: paid first, then those still to pay; tap one to see the order. */
-function Participants({ testing }: { testing: Testing }): React.JSX.Element | null {
-  const navigate = useNavigate();
-  const { to } = useShop();
-  const list = useAsync(() => api.adminGetTestingParticipants(testing.id), [testing.id]);
-  if (!list.data) return null;
-  const fmt = (amount: number): string => formatPrice(amount, testing.currency);
-  const volunteers = list.data.filter((p) => p.volunteer).length;
-  const perUnit = testing.money?.perUnit ?? 0;
-  return (
-    <Section
-      header={t('testing.participants', { count: list.data.length })}
-      footer={t('testing.participantsMoneyFooter', { payers: testing.participants, volunteers })}
-    >
-      {list.data.length === 0 && <Cell multiline>{t('testing.noParticipants')}</Cell>}
-      {list.data.map((p) => (
-        <Cell
-          key={p.orderId}
-          onClick={() => navigate(to(`/admin/orders/${p.orderId}`))}
-          subtitle={[
-            units(p.units),
-            p.extra > 0 ? t('testing.participantExtra', { amount: fmt(p.extra) }) : null,
-            perUnit > 0 ? t('testing.participantHidden', { amount: fmt(perUnit * p.units) }) : null,
-            p.paid ? t('testing.paid') : t('testing.unpaid'),
-            p.volunteer ? t('testing.volunteerChip') : null,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-          after={p.exempt ? t('testing.exemptChip') : fmt(p.amount)}
-          multiline
-        >
-          {p.contact ? `${p.name} · @${p.contact}` : p.name}
-        </Cell>
-      ))}
     </Section>
   );
 }

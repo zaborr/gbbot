@@ -960,8 +960,12 @@ export async function listParticipants(
     items
       .filter((i) => i.orderId === orderId && (testing.variantId === null || i.variantId === testing.variantId))
       .reduce((sum, i) => sum + i.quantity, 0);
+  const donors = new Set(testing.draw?.donors ?? []);
   const list = rows.map(({ entry, order, user }) => ({
     orderId: order.id,
+    ref: order.id.slice(0, 8),
+    external: order.external,
+    donor: donors.has(order.id.slice(0, 8)),
     name: user?.firstName ?? '—',
     contact: order.contactUsername ?? user?.username ?? null,
     amount: entry.amount,
