@@ -283,6 +283,13 @@ const en = {
   'server.warn.security': '🔐 Server: {n} security updates are waiting.',
   'server.warn.reboot': '🔁 Server: it needs a restart ({pkgs}).',
   'server.warn.footer': 'See and fix it with /server.',
+  'testing.digest.draw': 'ready to launch the draw',
+  'testing.digest.footer': 'See them in the GB panel → Testing.',
+  'testing.digest.report': 'results were expected on {date}: send the report',
+  'testing.digest.settle': 'ready to close',
+  'testing.digest.title': '🧪 Testings of {shop} that need you:',
+  'testing.digest.unpaid': '{n} not paid yet (the draw waits)',
+  'testing.digest.vials': 'mark when the vials go to the lab',
   'testing.remindUnpaid': 'Reminder: your order {ref} is not paid yet ({amount}). You are in the testing of {what}, and the draw of donors waits until everyone has paid.',
 } as const;
 
@@ -559,6 +566,13 @@ const es: Record<BotMessageKey, string> = {
   'server.warn.security': '🔐 Servidor: hay {n} actualizaciones de seguridad pendientes.',
   'server.warn.reboot': '🔁 Servidor: necesita reiniciarse ({pkgs}).',
   'server.warn.footer': 'Míralo y resuélvelo con /server.',
+  'testing.digest.draw': 'listo para lanzar el sorteo',
+  'testing.digest.footer': 'Míralos en el panel del GB → Testing.',
+  'testing.digest.report': 'los resultados se esperaban el {date}: envía el informe',
+  'testing.digest.settle': 'listo para cerrar',
+  'testing.digest.title': '🧪 Testings de {shop} que necesitan algo de ti:',
+  'testing.digest.unpaid': '{n} sin pagar (el sorteo espera)',
+  'testing.digest.vials': 'marca cuándo se envían los viales al laboratorio',
   'testing.remindUnpaid': 'Recordatorio: tu pedido {ref} aún no está pagado ({amount}). Participas en el testing de {what} y el sorteo de donantes espera a que todos hayan pagado.',
 };
 
@@ -833,6 +847,13 @@ const it: Record<BotMessageKey, string> = {
   'server.warn.security': '🔐 Server: ci sono {n} aggiornamenti di sicurezza in attesa.',
   'server.warn.reboot': '🔁 Server: serve un riavvio ({pkgs}).',
   'server.warn.footer': 'Guardalo e risolvilo con /server.',
+  'testing.digest.draw': 'pronto per lanciare l\'estrazione',
+  'testing.digest.footer': 'Guardali nel pannello del GB → Testing.',
+  'testing.digest.report': 'i risultati erano previsti il {date}: invia il rapporto',
+  'testing.digest.settle': 'pronto da chiudere',
+  'testing.digest.title': '🧪 Testing di {shop} che hanno bisogno di te:',
+  'testing.digest.unpaid': '{n} non pagati (l\'estrazione aspetta)',
+  'testing.digest.vials': 'segna quando le fiale partono per il laboratorio',
   'testing.remindUnpaid': 'Promemoria: il tuo ordine {ref} non è ancora pagato ({amount}). Partecipi al testing di {what} e l\'estrazione dei donatori aspetta che tutti abbiano pagato.',
 };
 
@@ -1107,6 +1128,13 @@ const pt: Record<BotMessageKey, string> = {
   'server.warn.security': '🔐 Servidor: há {n} atualizações de segurança pendentes.',
   'server.warn.reboot': '🔁 Servidor: precisa de reiniciar ({pkgs}).',
   'server.warn.footer': 'Veja e resolva com /server.',
+  'testing.digest.draw': 'pronto para lançar o sorteio',
+  'testing.digest.footer': 'Veja-os no painel do GB → Testing.',
+  'testing.digest.report': 'os resultados eram esperados a {date}: envie o relatório',
+  'testing.digest.settle': 'pronto para fechar',
+  'testing.digest.title': '🧪 Testings de {shop} que precisam de si:',
+  'testing.digest.unpaid': '{n} por pagar (o sorteio espera)',
+  'testing.digest.vials': 'marque quando os frascos seguem para o laboratório',
   'testing.remindUnpaid': 'Lembrete: o seu pedido {ref} ainda não está pago ({amount}). Participa no testing de {what} e o sorteio dos doadores espera que todos tenham pago.',
 };
 

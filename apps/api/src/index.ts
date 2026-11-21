@@ -12,6 +12,7 @@ import { scheduleDrawWatcher } from './services/testingDraw.js';
 import { resumePaymentChecks } from './services/paymentCheck.js';
 import { scheduleOutbox } from './services/serverOutbox.js';
 import { scheduleServerWarnings } from './services/serverTasks.js';
+import { scheduleTestingDigests } from './services/testingDigest.js';
 
 // A stray failed background task must not take the whole API down.
 process.on('unhandledRejection', (reason) => {
@@ -45,6 +46,8 @@ scheduleBotWatch(db, env);
 scheduleOutbox(env);
 // Every 15 minutes: does the server need its administrators (disk, backups, updates)?
 scheduleServerWarnings(db, env);
+// Every morning: what each GB's testings need from its team.
+scheduleTestingDigests(db, env);
 
 // Payment checks that were running before a restart.
 resumePaymentChecks(db, env).catch((error: unknown) => {
