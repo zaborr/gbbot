@@ -238,6 +238,12 @@ export type Testing = z.infer<typeof testing>;
 /** Someone taking part, for the organiser. */
 export interface TestingParticipant {
   orderId: string;
+  /** The order's short id (as the draw publishes it). */
+  ref: string;
+  /** Bought elsewhere: an order of only the fee. */
+  external: boolean;
+  /** Drawn to give a vial. */
+  donor: boolean;
   name: string;
   /** Telegram @ given on the order (or their username). */
   contact: string | null;

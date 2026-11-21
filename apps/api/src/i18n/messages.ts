@@ -283,6 +283,7 @@ const en = {
   'server.warn.security': '🔐 Server: {n} security updates are waiting.',
   'server.warn.reboot': '🔁 Server: it needs a restart ({pkgs}).',
   'server.warn.footer': 'See and fix it with /server.',
+  'testing.remindUnpaid': 'Reminder: your order {ref} is not paid yet ({amount}). You are in the testing of {what}, and the draw of donors waits until everyone has paid.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -558,6 +559,7 @@ const es: Record<BotMessageKey, string> = {
   'server.warn.security': '🔐 Servidor: hay {n} actualizaciones de seguridad pendientes.',
   'server.warn.reboot': '🔁 Servidor: necesita reiniciarse ({pkgs}).',
   'server.warn.footer': 'Míralo y resuélvelo con /server.',
+  'testing.remindUnpaid': 'Recordatorio: tu pedido {ref} aún no está pagado ({amount}). Participas en el testing de {what} y el sorteo de donantes espera a que todos hayan pagado.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -831,6 +833,7 @@ const it: Record<BotMessageKey, string> = {
   'server.warn.security': '🔐 Server: ci sono {n} aggiornamenti di sicurezza in attesa.',
   'server.warn.reboot': '🔁 Server: serve un riavvio ({pkgs}).',
   'server.warn.footer': 'Guardalo e risolvilo con /server.',
+  'testing.remindUnpaid': 'Promemoria: il tuo ordine {ref} non è ancora pagato ({amount}). Partecipi al testing di {what} e l\'estrazione dei donatori aspetta che tutti abbiano pagato.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -1104,6 +1107,7 @@ const pt: Record<BotMessageKey, string> = {
   'server.warn.security': '🔐 Servidor: há {n} atualizações de segurança pendentes.',
   'server.warn.reboot': '🔁 Servidor: precisa de reiniciar ({pkgs}).',
   'server.warn.footer': 'Veja e resolva com /server.',
+  'testing.remindUnpaid': 'Lembrete: o seu pedido {ref} ainda não está pago ({amount}). Participa no testing de {what} e o sorteio dos doadores espera que todos tenham pago.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

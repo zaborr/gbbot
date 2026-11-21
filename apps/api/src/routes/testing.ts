@@ -1,6 +1,7 @@
 import { announceNewTesting, moveTestingWindow, reopenTesting } from '../services/testingDonations.js';
 import { Hono } from 'hono';
 import { withNext } from '../services/testingNext.js';
+import { remindUnpaid } from '../services/testingRemind.js';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { createTestingRequest, labProgressRequest, langFrom, MAX_DONATION_HOURS, updateTestingRequest } from '@tma-shop/shared';
@@ -107,6 +108,10 @@ export function testingAdminRoutes(): Hono<AppBindings> {
   });
   app.get('/:id/participants', zValidator('param', idParam), async (c) =>
     c.json(await listParticipants(c.get('db'), c.get('shopId'), c.req.valid('param').id)),
+  );
+  // A message through the bot to those whose order is not paid yet, with a button to it.
+  app.post('/:id/remind', zValidator('param', idParam), async (c) =>
+    c.json(await remindUnpaid(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('param').id)),
   );
   app.delete('/:id', zValidator('param', idParam), async (c) => {
     await deleteTesting(c.get('db'), c.get('shopId'), c.req.valid('param').id);
