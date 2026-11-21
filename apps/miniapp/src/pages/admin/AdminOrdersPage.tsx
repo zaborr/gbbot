@@ -15,7 +15,7 @@ import { useShopPath } from '../../providers/ShopProvider.js';
 import { CopyOrders } from '../../components/CopyOrders.js';
 import { t, tn, type MessageKey } from '../../i18n/index.js';
 
-type FilterKey = 'all' | 'attention' | 'unpaid' | 'paid' | 'shipped' | 'fulfilled' | 'cancelled';
+type FilterKey = 'all' | 'attention' | 'unpaid' | 'paid' | 'shipped' | 'fulfilled' | 'cancelled' | 'testing';
 
 const FILTERS: Record<FilterKey, { label: MessageKey; match: (order: Order) => boolean }> = {
   all: { label: 'catalog.all', match: () => true },
@@ -26,6 +26,8 @@ const FILTERS: Record<FilterKey, { label: MessageKey; match: (order: Order) => b
   shipped: { label: 'orderStatus.shipped', match: (o) => o.status === 'shipped' },
   fulfilled: { label: 'orderStatus.fulfilled', match: (o) => o.status === 'fulfilled' },
   cancelled: { label: 'orderStatus.cancelled', match: (o) => o.status === 'cancelled' },
+  // Taking part in a testing (from outside too).
+  testing: { label: 'testing.title', match: (o) => (o.testings?.length ?? 0) > 0 || o.external },
 };
 
 function isFilterKey(value: string | null): value is FilterKey {
@@ -77,6 +79,8 @@ function AdminOrders(): React.JSX.Element {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: 12 }}>
           {(Object.keys(FILTERS) as FilterKey[]).map((key) => {
             const count = all.filter(FILTERS[key].match).length;
+            // Testing only in GBs with some.
+            if (key === 'testing' && count === 0 && filter !== 'testing') return null;
             return (
               <Button
                 key={key}
@@ -112,6 +116,9 @@ function AdminOrders(): React.JSX.Element {
                   {order.customerBlocked && (
                     <span className="gb-chip gb-chip--warn">{t('blacklist.badge')}</span>
                   )}
+                  {(order.testings ?? []).map((x) => (
+                    <span key={x.id} className="gb-chip gb-chip--info">{`🧪 ${x.label}`}</span>
+                  ))}
                 </span>
               </span>
             }
