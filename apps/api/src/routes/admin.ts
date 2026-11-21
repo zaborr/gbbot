@@ -44,7 +44,7 @@ import type { Context } from 'hono';
 import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth, requireOwner } from '../auth/middleware.js';
 import { testingAdminRoutes } from './testing.js';
-import { announceTestingTiers, listTestings, setTestingEnabled } from '../services/testing.js';
+import { announceTestingTiers, listTestings, markTestings, setTestingEnabled } from '../services/testing.js';
 import { unpaidExtras } from '../services/testingExtra.js';
 import { createLab, deleteLab, listLabs, updateLab } from '../services/labs.js';
 import { pendingRefunds } from '../services/refunds.js';
@@ -698,7 +698,9 @@ export function adminRoutes(): Hono<AppBindings> {
     );
   };
   app.get('/orders', async (c) =>
-    c.json(await markBlocked(c, await listAllOrders(c.get('db'), c.get('shopId')))),
+    c.json(
+      await markTestings(c.get('db'), c.get('shopId'), await markBlocked(c, await listAllOrders(c.get('db'), c.get('shopId')))),
+    ),
   );
   app.get('/orders/:id', zValidator('param', idParam), async (c) => {
     const order = await getOrder(c.get('db'), c.get('shopId'), c.req.valid('param').id);

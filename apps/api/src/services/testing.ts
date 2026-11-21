@@ -1412,3 +1412,31 @@ export async function shopsOpenToOutside(db: Executor, shopIds: readonly string[
     );
   return new Set(rows.map((r) => r.shopId));
 }
+
+/** The organisers' order list: each order with the testings it takes part in (from outside too). */
+export async function markTestings<O extends { id: string; testings?: Array<{ id: string; label: string }> }>(
+  db: Database,
+  shopId: string,
+  list: O[],
+): Promise<O[]> {
+  if (list.length === 0) return list;
+  const rows = await db
+    .select({ orderId: testingEntries.orderId, testingId: testingEntries.testingId })
+    .from(testingEntries)
+    .innerJoin(testings, eq(testingEntries.testingId, testings.id))
+    .where(eq(testings.shopId, shopId));
+  if (rows.length === 0) return list;
+  const views = await listTestings(db, shopId);
+  const label = new Map(
+    views.map((x) => [x.id, x.variantLabel ? `${x.productTitle} · ${x.variantLabel}` : x.productTitle]),
+  );
+  const byOrder = new Map<string, Array<{ id: string; label: string }>>();
+  for (const row of rows) {
+    const name = label.get(row.testingId);
+    if (!name) continue;
+    const mine = byOrder.get(row.orderId) ?? [];
+    if (!mine.some((x) => x.id === row.testingId)) mine.push({ id: row.testingId, label: name });
+    byOrder.set(row.orderId, mine);
+  }
+  return list.map((o) => (byOrder.has(o.id) ? { ...o, testings: byOrder.get(o.id) } : o));
+}

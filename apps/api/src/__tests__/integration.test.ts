@@ -1134,6 +1134,12 @@ describeDb('API integration', () => {
     // Everyone paid: nobody to remind.
     const reminded = await request(`/api/admin/testings/${testingId}/remind`, { method: 'POST', headers: admin });
     expect(await reminded.json()).toEqual({ sent: 0 });
+    // The organisers' order list says which testing the order is in.
+    const listedOrders = (await (await request('/api/admin/orders', { headers: admin })).json()) as Array<{
+      id: string;
+      testings?: Array<{ id: string; label: string }>;
+    }>;
+    expect(listedOrders.find((o) => o.id === orderId)?.testings).toEqual([{ id: testingId, label: expect.any(String) }]);
     // Taken part in: it cannot be deleted, nor its tiers changed.
     expect((await request(`/api/admin/testings/${testingId}`, { method: 'DELETE', headers: admin })).status).toBe(409);
 

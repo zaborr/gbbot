@@ -88,6 +88,8 @@ export const order = z.object({
   shopId: id,
   /** Team views: the customer is blacklisted (the GB does not exist for them). */
   customerBlocked: z.boolean().optional(),
+  /** For the organisers' list: the testings it takes part in (what each tests). */
+  testings: z.array(z.object({ id: z.string(), label: z.string() })).optional(),
   /** Team views: what was tested in extra rounds whose share this customer did not pay. */
   extraUnpaid: z.array(z.string()).optional(),
   /** Customer; null once the order is anonymized (data retention). */
