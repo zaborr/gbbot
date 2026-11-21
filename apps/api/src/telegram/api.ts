@@ -108,6 +108,11 @@ export class TelegramApi {
   }
 
   /** Sends a plain-text message. The user must have started the bot first. */
+  /** "typing…" for a moment: fails for those who never started the bot, or blocked it. */
+  sendChatAction(chatId: number, action: 'typing' = 'typing'): Promise<unknown> {
+    return this.call<unknown>('sendChatAction', { chat_id: chatId, action });
+  }
+
   sendMessage(chatId: number, text: string, replyMarkup?: InlineKeyboard): Promise<unknown> {
     return this.call<unknown>('sendMessage', {
       chat_id: chatId,

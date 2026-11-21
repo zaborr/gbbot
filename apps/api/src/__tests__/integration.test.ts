@@ -4368,6 +4368,61 @@ describeDb('API integration', () => {
     resetMiniAppUrlCache();
   });
 
+  it('says who a message did not reach, and checks who cannot get messages without sending any', async () => {
+    const menu = vi
+      .spyOn(TelegramApi.prototype, 'getChatMenuButton')
+      .mockResolvedValue({ type: 'web_app', web_app: { url: 'https://app.example' } });
+    // The customer never pressed Start: Telegram refuses.
+    const refuse = (chatId: number): Promise<unknown> =>
+      chatId === CUSTOMER_ID ? Promise.reject(new Error('Forbidden: bot can\'t initiate conversation')) : Promise.resolve(true);
+    const send = vi.spyOn(TelegramApi.prototype, 'sendMessage').mockImplementation(refuse);
+    const typing = vi.spyOn(TelegramApi.prototype, 'sendChatAction').mockImplementation(refuse);
+    const headers = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Ivan')}`, 'content-type': 'application/json' };
+    const token = await authToken(CUSTOMER_ID, 'Alice');
+    await request('/api/cart/items', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ productId, quantity: 1 }),
+    });
+    try {
+      await request('/api/admin/broadcasts', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ audience: 'cart', text: 'Unreached?' }),
+      });
+      await vi.waitFor(
+        async () => {
+          const list = (await (await request('/api/admin/broadcasts', { headers })).json()) as Array<{
+            status: string;
+            unreached: Array<{ telegramId: number }>;
+          }>;
+          expect(list[0]?.status).toBe('done');
+          expect(list[0]?.unreached.map((p) => p.telegramId)).toContain(CUSTOMER_ID);
+        },
+        { timeout: 5000, interval: 100 },
+      );
+      // Nothing is sent to check: only "typing…", and the result to whoever asked.
+      send.mockClear();
+      const res = await request('/api/admin/broadcasts/reach', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ audience: 'cart' }),
+      });
+      expect(res.status).toBe(202);
+      await vi.waitFor(() => expect(send).toHaveBeenCalledWith(ADMIN_ID, expect.stringContaining('cannot get messages')), {
+        timeout: 5000,
+        interval: 100,
+      });
+      expect(typing).toHaveBeenCalledWith(CUSTOMER_ID);
+      expect(send).not.toHaveBeenCalledWith(CUSTOMER_ID, expect.anything(), expect.anything());
+    } finally {
+      send.mockRestore();
+      typing.mockRestore();
+      menu.mockRestore();
+      resetMiniAppUrlCache();
+    }
+  });
+
   it('asks customers to accept the GB disclaimer before anything else', async () => {
     const admin = await authToken(ADMIN_ID, 'Ivan');
     const adminHeaders = { Authorization: `Bearer ${admin}`, 'content-type': 'application/json' };

@@ -27,6 +27,16 @@ export const sendBroadcastRequest = z.object({
 export type SendBroadcastRequest = z.infer<typeof sendBroadcastRequest>;
 
 /** A message sent to buyers, as listed in the GB's history. */
+/** Someone the bot cannot write to: never pressed Start, or blocked it. */
+export const unreachedPerson = z.object({
+  telegramId: z.number().int(),
+  name: z.string(),
+  username: z.string().nullable(),
+  /** Their last order in the GB (its short id), to find them without a username. */
+  orderRef: z.string().nullable(),
+});
+export type UnreachedPerson = z.infer<typeof unreachedPerson>;
+
 export const broadcastView = z.object({
   id: z.string(),
   audience: broadcastAudience,
@@ -39,6 +49,8 @@ export const broadcastView = z.object({
   sent: z.number().int().nonnegative(),
   /** People the bot could not reach (they never pressed Start, or blocked it). */
   failed: z.number().int().nonnegative(),
+  /** Who those are, so the organisers can write to them themselves. */
+  unreached: z.array(unreachedPerson),
   status: z.enum(['sending', 'done']),
   createdAt: z.string(),
 });

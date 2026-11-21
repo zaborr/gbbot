@@ -1,5 +1,5 @@
 import { and, desc, eq, gt, inArray, isNotNull, lt, ne, sql } from 'drizzle-orm';
-import { TESTING_AUDIENCES, type BroadcastAudience, type BroadcastView } from '@tma-shop/shared';
+import { TESTING_AUDIENCES, type BroadcastAudience, type BroadcastView, type Lang, type UnreachedPerson } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { broadcasts, cartItems, carts, orders, testingEntries, testings } from '../db/schema.js';
@@ -11,7 +11,7 @@ import { miniAppUrl } from './bot.js';
 import { languagesOf } from './notifications.js';
 import { shopLink } from './reminders.js';
 import type { ShopRow } from './shop.js';
-import { describeUser } from './team.js';
+import { describeUser, loadPeople } from './team.js';
 import { withoutBlocked } from './blacklist.js';
 import { botToken } from './activeBot.js';
 
@@ -94,6 +94,44 @@ async function testingAudience(
   return rows.flatMap((r) => (r.id === null ? [] : [r.id]));
 }
 
+/** Who the bot could not reach: their name, @user and last order in the GB. */
+export async function describeUnreached(
+  db: Database,
+  shopId: string,
+  ids: readonly number[],
+): Promise<UnreachedPerson[]> {
+  if (ids.length === 0) return [];
+  const people = await loadPeople(db, ids);
+  const last = await db
+    .selectDistinctOn([orders.userId], { userId: orders.userId, id: orders.id })
+    .from(orders)
+    .where(and(eq(orders.shopId, shopId), inArray(orders.userId, [...ids])))
+    .orderBy(orders.userId, desc(orders.createdAt));
+  const refs = new Map(last.map((o) => [o.userId, o.id.slice(0, 8)]));
+  return ids.map((id) => {
+    const info = people.get(id);
+    return {
+      telegramId: id,
+      name: info?.firstName ?? String(id),
+      username: info?.username ?? null,
+      orderRef: refs.get(id) ?? null,
+    };
+  });
+}
+
+/** "@ana", or "Ana (order #1a2b3c4d)" for those without a username. */
+export function unreachedLabel(lang: Lang, person: UnreachedPerson): string {
+  if (person.username) return `@${person.username}`;
+  return person.orderRef ? tr(lang, 'broadcast.unreachedOrder', { name: person.name, ref: person.orderRef }) : person.name;
+}
+
+/** The list for a bot message: the first 40, then how many more. */
+function unreachedList(lang: Lang, people: readonly UnreachedPerson[]): string {
+  const shown = people.slice(0, 40).map((p) => unreachedLabel(lang, p));
+  const more = people.length - shown.length;
+  return more > 0 ? `${shown.join(', ')} ${tr(lang, 'broadcast.unreachedMore', { count: more })}` : shown.join(', ');
+}
+
 async function toView(db: Database, row: BroadcastRow): Promise<BroadcastView> {
   const testing = row.testingId
     ? await db.query.testings.findFirst({ where: eq(testings.id, row.testingId) })
@@ -107,6 +145,7 @@ async function toView(db: Database, row: BroadcastRow): Promise<BroadcastView> {
     recipients: row.recipients,
     sent: row.sent,
     failed: row.failed,
+    unreached: await describeUnreached(db, row.shopId, row.failedIds),
     status: row.status,
     createdAt: row.createdAt.toISOString(),
   };
@@ -144,7 +183,7 @@ async function deliver(
   const appUrl = await miniAppUrl(telegram);
   const langs = await languagesOf(db, [...ids, row.senderId]);
   let sent = 0;
-  let failed = 0;
+  const failedIds: number[] = [];
   for (const [index, chatId] of ids.entries()) {
     const lang = langs.get(chatId) ?? 'en';
     const text = `${tr(lang, 'broadcast.header', { shop: shop.name })}\n\n${row.text}`;
@@ -162,25 +201,28 @@ async function deliver(
           await telegram.sendMessage(chatId, text, keyboard);
           sent++;
         } catch {
-          failed++;
+          failedIds.push(chatId);
         }
       } else {
-        failed++;
+        failedIds.push(chatId);
       }
     }
     if ((index + 1) % 25 === 0) {
-      await db.update(broadcasts).set({ sent, failed }).where(eq(broadcasts.id, row.id));
+      await db.update(broadcasts).set({ sent, failed: failedIds.length, failedIds }).where(eq(broadcasts.id, row.id));
     }
     if (gapMs > 0) await sleep(gapMs);
   }
   await db
     .update(broadcasts)
-    .set({ sent, failed, status: 'done', finishedAt: new Date() })
+    .set({ sent, failed: failedIds.length, failedIds, status: 'done', finishedAt: new Date() })
     .where(eq(broadcasts.id, row.id));
 
   const lang = langs.get(row.senderId) ?? 'en';
   const lines = [tr(lang, 'broadcast.done', { shop: shop.name, sent, total: ids.length })];
-  if (failed > 0) lines.push(tr(lang, 'broadcast.failedHint', { failed }));
+  if (failedIds.length > 0) {
+    lines.push(tr(lang, 'broadcast.failedHint', { failed: failedIds.length }));
+    lines.push(unreachedList(lang, await describeUnreached(db, shop.id, failedIds)));
+  }
   try {
     await telegram.sendMessage(row.senderId, lines.join('\n'));
   } catch (error) {
@@ -215,6 +257,51 @@ export async function startBroadcast(
   ).catch((error: unknown) => console.error(`Broadcast ${row.id} crashed:`, error));
   if (options.wait) await run;
   return toView(db, row);
+}
+
+/**
+ * Who in an audience the bot cannot write to, without sending them anything:
+ * "typing…" for a moment, refused by Telegram for those who never pressed
+ * Start or blocked the bot. Runs in the background; the bot tells the one who
+ * asked.
+ */
+export async function checkReach(
+  db: Database,
+  env: Env,
+  shop: ShopRow,
+  requesterId: number,
+  audience: BroadcastAudience,
+  options: { telegram?: TelegramApi; gapMs?: number; wait?: boolean; testingId?: string | null } = {},
+): Promise<{ checking: number }> {
+  const testingId = TESTING_AUDIENCES.includes(audience) ? (options.testingId ?? null) : null;
+  const ids = await audienceIds(db, env, shop, audience, testingId);
+  const telegram = options.telegram ?? new TelegramApi(botToken(env));
+  const gapMs = options.gapMs ?? SEND_GAP_MS;
+  const run = (async () => {
+    const unreached: number[] = [];
+    for (const chatId of ids) {
+      try {
+        await telegram.sendChatAction(chatId);
+      } catch (error) {
+        const wait = retryAfterMs(error);
+        if (wait === null) unreached.push(chatId);
+        else {
+          await sleep(wait);
+          await telegram.sendChatAction(chatId).catch(() => unreached.push(chatId));
+        }
+      }
+      if (gapMs > 0) await sleep(gapMs);
+    }
+    const lang = (await languagesOf(db, [requesterId])).get(requesterId) ?? 'en';
+    const lines = [tr(lang, 'broadcast.reachDone', { shop: shop.name, count: unreached.length, total: ids.length })];
+    if (unreached.length > 0) {
+      lines.push(unreachedList(lang, await describeUnreached(db, shop.id, unreached)));
+      lines.push('', tr(lang, 'broadcast.reachHint'));
+    }
+    await telegram.sendMessage(requesterId, lines.join('\n'));
+  })().catch((error: unknown) => console.error('Reach check failed:', error));
+  if (options.wait) await run;
+  return { checking: ids.length };
 }
 
 /** A send cut short by a restart: closed so it does not show as "sending" for ever. */

@@ -643,6 +643,8 @@ export const broadcasts = pgTable(
     recipients: integer('recipients').notNull().default(0),
     sent: integer('sent').notNull().default(0),
     failed: integer('failed').notNull().default(0),
+    /** Who it could not reach (Telegram ids), so the organisers can write to them. */
+    failedIds: jsonb('failed_ids').$type<number[]>().notNull().default([]),
     status: text('status').$type<'sending' | 'done'>().notNull().default('sending'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
