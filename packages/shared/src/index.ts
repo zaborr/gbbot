@@ -13,5 +13,6 @@ export * from './clone.js';
 export * from './backup.js';
 export * from './csv.js';
 export * from './broadcast.js';
+export * from './buyers.js';
 export * from './testing.js';
 export * from './bots.js';

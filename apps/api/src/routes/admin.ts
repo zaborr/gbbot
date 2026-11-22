@@ -30,6 +30,7 @@ import {
   ownerSettingsInput,
   duplicateShopRequest,
   productsCsvRequest,
+  BROADCAST_MAX_LENGTH,
   broadcastAudience,
   labRequest,
   sendBroadcastRequest,
@@ -119,6 +120,7 @@ import { closePreview, closeShop, reopenShop, scheduleClosing } from '../service
 import { announceGoalMilestones, updateGoal } from '../services/goal.js';
 import { getShopTeam, notifySuperAdmins } from '../services/team.js';
 import { restoreSnapshot, takeSnapshot } from '../services/snapshot.js';
+import { buyerReachable, getBuyer, listBuyers, messageBuyer } from '../services/buyers.js';
 import { audienceIds, checkReach, listBroadcasts, reachStatus, startBroadcast } from '../services/broadcast.js';
 import { getDisclaimerAdmin, updateDisclaimer } from '../services/disclaimer.js';
 import { deleteLater } from '../services/expiringMessages.js';
@@ -287,6 +289,27 @@ export function adminRoutes(): Hono<AppBindings> {
       const messageId = (sent as { message_id?: number } | null)?.message_id;
       if (typeof messageId === 'number') await deleteLater(c.get('db'), sub, messageId);
       return c.json({ sent: true });
+    },
+  );
+
+  // The GB's buyers, one per person: what each has across their orders, cart and testings.
+  app.get('/buyers', async (c) => c.json(await listBuyers(c.get('db'), c.get('env'), c.get('shop'))));
+  const buyerParam = z.object({ userId: z.coerce.number().int().positive() });
+  app.get('/buyers/:userId', zValidator('param', buyerParam), async (c) =>
+    c.json(await getBuyer(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('param').userId)),
+  );
+  app.post('/buyers/:userId/reach', zValidator('param', buyerParam), async (c) =>
+    c.json({ reachable: await buyerReachable(c.get('env'), c.req.valid('param').userId) }),
+  );
+  app.post(
+    '/buyers/:userId/message',
+    zValidator('param', buyerParam),
+    zValidator('json', z.object({ text: z.string().trim().min(1).max(BROADCAST_MAX_LENGTH) })),
+    async (c) => {
+      const { userId } = c.req.valid('param');
+      // Only to someone who bought or has a cart here.
+      await getBuyer(c.get('db'), c.get('env'), c.get('shop'), userId);
+      return c.json(await messageBuyer(c.get('db'), c.get('env'), c.get('shop'), userId, c.req.valid('json').text));
     },
   );
 
