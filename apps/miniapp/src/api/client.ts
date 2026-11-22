@@ -45,6 +45,8 @@ import type {
   GbBackupPreview,
   ImportGbRequest,
   BroadcastAudience,
+  BuyerDetail,
+  BuyerSummary,
   ReachResult,
   BroadcastView,
   DisclaimerAdminView,
@@ -873,6 +875,25 @@ export class ApiClient {
     return this.request(
       `/admin/broadcasts/count?audience=${audience}${testingId ? `&testingId=${testingId}` : ''}`,
     );
+  }
+
+  adminGetBuyers(): Promise<BuyerSummary[]> {
+    return this.request<BuyerSummary[]>('/admin/buyers');
+  }
+
+  adminGetBuyer(userId: number): Promise<BuyerDetail> {
+    return this.request<BuyerDetail>(`/admin/buyers/${userId}`);
+  }
+
+  adminBuyerReach(userId: number): Promise<{ reachable: boolean }> {
+    return this.request<{ reachable: boolean }>(`/admin/buyers/${userId}/reach`, { method: 'POST' });
+  }
+
+  adminMessageBuyer(userId: number, text: string): Promise<{ sent: boolean }> {
+    return this.request<{ sent: boolean }>(`/admin/buyers/${userId}/message`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
   }
 
   adminListBroadcasts(): Promise<BroadcastView[]> {

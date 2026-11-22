@@ -129,6 +129,11 @@ function AdminOrder(): React.JSX.Element {
         >
           {t('adminOrder.telegramId')}
         </Cell>
+        {o.userId !== null && (
+          <Cell onClick={() => navigate(to(`/admin/buyers/${o.userId}`))} after="›" subtitle={t('buyers.fromOrderHint')}>
+            {t('buyers.fromOrder')}
+          </Cell>
+        )}
         {o.anonymizedAt && (
           <Cell multiline subtitle={t('adminOrder.since', { date: formatDate(o.anonymizedAt) })}>
             {t('adminOrder.anonymized')}

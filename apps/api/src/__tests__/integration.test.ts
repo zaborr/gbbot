@@ -4368,6 +4368,47 @@ describeDb('API integration', () => {
     resetMiniAppUrlCache();
   });
 
+  it('lists the buyers one per person, with everything each has, and writes to one', async () => {
+    const menu = vi
+      .spyOn(TelegramApi.prototype, 'getChatMenuButton')
+      .mockResolvedValue({ type: 'web_app', web_app: { url: 'https://app.example' } });
+    const send = vi.spyOn(TelegramApi.prototype, 'sendMessage').mockResolvedValue(true);
+    const headers = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Ivan')}`, 'content-type': 'application/json' };
+    const token = await authToken(CUSTOMER_ID, 'Alice');
+    await request('/api/cart/items', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ productId, quantity: 2 }),
+    });
+    try {
+      const list = (await (await request('/api/admin/buyers', { headers })).json()) as Array<{
+        telegramId: number;
+        cartUnits: number;
+      }>;
+      const alice = list.find((b) => b.telegramId === CUSTOMER_ID);
+      expect(alice?.cartUnits).toBeGreaterThanOrEqual(2);
+      const detail = (await (await request(`/api/admin/buyers/${CUSTOMER_ID}`, { headers })).json()) as {
+        cart: Array<{ quantity: number }>;
+        orderList: unknown[];
+      };
+      expect(detail.cart.length).toBeGreaterThan(0);
+      expect((await request('/api/admin/buyers/555000999', { headers })).status).toBe(404);
+      const res = await request(`/api/admin/buyers/${CUSTOMER_ID}/message`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ text: 'Your parcel is ready' }),
+      });
+      expect(await res.json()).toEqual({ sent: true });
+      expect(send).toHaveBeenCalledWith(CUSTOMER_ID, expect.stringContaining('Your parcel is ready'), expect.anything());
+      // Not for customers.
+      expect((await request('/api/admin/buyers', { headers: { Authorization: `Bearer ${token}` } })).status).toBe(403);
+    } finally {
+      send.mockRestore();
+      menu.mockRestore();
+      resetMiniAppUrlCache();
+    }
+  });
+
   it('says who a message did not reach, and checks who cannot get messages without sending any', async () => {
     const menu = vi
       .spyOn(TelegramApi.prototype, 'getChatMenuButton')

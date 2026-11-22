@@ -126,6 +126,9 @@ function AdminHome(): React.JSX.Element {
         >
           {t('adminHome.allOrders')}
         </Cell>
+        <Cell onClick={go('/admin/buyers')} subtitle={t('buyers.menuHint')}>
+          {t('buyers.title')}
+        </Cell>
         <Cell
           onClick={go('/admin/summary')}
           subtitle={orders.data ? tn(sales, 'count.paidOrders.one', 'count.paidOrders.other') : t('common.loading')}
