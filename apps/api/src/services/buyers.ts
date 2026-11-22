@@ -15,6 +15,7 @@ import { shopLink } from './reminders.js';
 import type { ShopRow } from './shop.js';
 import { loadPeople } from './team.js';
 import { listTestings } from './testing.js';
+import { vipsAmong } from './vip.js';
 
 /** Where an order's units are: not paid yet, paid to send, or sent. */
 function placeOf(order: Order): keyof Pick<BuyerProduct, 'unpaid' | 'paid' | 'shipped'> | null {
@@ -43,6 +44,7 @@ function summarize(
   cartUnits: number,
   blocked: boolean,
   inTesting: boolean,
+  vip: boolean,
 ): BuyerSummary {
   const lines = new Map<string, BuyerProduct>();
   let units = 0;
@@ -78,7 +80,7 @@ function summarize(
     toShip: live.some((o) => o.status === 'paid' && !o.external),
     testing: inTesting,
     cartUnits,
-    vip: live.some((o) => o.isVip),
+    vip,
     blocked,
     products: [...lines.values()].sort((a, b) => a.title.localeCompare(b.title)),
   };
@@ -108,10 +110,22 @@ export async function listBuyers(db: Database, env: Env, shop: ShopRow): Promise
   }
   for (const userId of carted.keys()) if (!byUser.has(userId)) byUser.set(userId, []);
   const ids = [...byUser.keys()];
-  const [people, blocked] = await Promise.all([loadPeople(db, ids), blockedAmong(db, env, shop, ids)]);
+  const [people, blocked, vips] = await Promise.all([
+    loadPeople(db, ids),
+    blockedAmong(db, env, shop, ids),
+    vipsAmong(db, env, shop, ids),
+  ]);
   return ids
     .map((id) =>
-      summarize(id, byUser.get(id) ?? [], people.get(id), carted.get(id) ?? 0, blocked.has(id), tested.has(id)),
+      summarize(
+        id,
+        byUser.get(id) ?? [],
+        people.get(id),
+        carted.get(id) ?? 0,
+        blocked.has(id),
+        tested.has(id),
+        vips.has(id),
+      ),
     )
     .sort((a, b) => b.units - a.units || a.name.localeCompare(b.name));
 }
@@ -161,10 +175,14 @@ export async function getBuyer(db: Database, env: Env, shop: ShopRow, userId: nu
     ];
   });
 
-  const [people, blocked] = await Promise.all([loadPeople(db, [userId]), blockedAmong(db, env, shop, [userId])]);
+  const [people, blocked, vips] = await Promise.all([
+    loadPeople(db, [userId]),
+    blockedAmong(db, env, shop, [userId]),
+    vipsAmong(db, env, shop, [userId]),
+  ]);
   const cartUnits = cartRows.reduce((sum, row) => sum + row.quantity, 0);
   return {
-    ...summarize(userId, mine, people.get(userId), cartUnits, blocked.has(userId), testingList.length > 0),
+    ...summarize(userId, mine, people.get(userId), cartUnits, blocked.has(userId), testingList.length > 0, vips.has(userId)),
     cart: cartRows.map((row) => ({
       title: row.title,
       variantLabel: row.options ? row.options.join(' / ') : null,
