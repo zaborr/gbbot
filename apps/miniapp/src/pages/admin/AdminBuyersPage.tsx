@@ -25,9 +25,9 @@ const FILTERS: Array<{ key: Filter; label: MessageKey; match: (b: BuyerSummary) 
   { key: 'cart', label: 'buyers.withCart', match: (b) => b.cartUnits > 0 },
 ];
 
-/** "@ana" or the name. */
-export const buyerName = (b: Pick<BuyerSummary, 'name' | 'username'>): string =>
-  b.username ? `${b.name} · @${b.username}` : b.name;
+/** "Ana · @ana", or "Ana · id 123456789" without a username. */
+export const buyerName = (b: Pick<BuyerSummary, 'name' | 'username' | 'telegramId'>): string =>
+  b.username ? `${b.name} · @${b.username}` : `${b.name} · id ${b.telegramId}`;
 
 /** The GB's buyers, one per person, with what each has across their orders. */
 export function AdminBuyersPage(): React.JSX.Element {
