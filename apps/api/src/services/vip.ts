@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import {
   EMPTY_VIP_CLUB,
   type ShopVipClub,
@@ -200,6 +200,51 @@ export function createVipChecker(
   telegram = new TelegramApi(botToken(env)),
 ): (shop: ShopRow) => Promise<boolean> {
   return createClubChecker(db, env, userId, 'vip', telegram);
+}
+
+/**
+ * Which of these users are VIPs of the GB now: the hand-made lists first,
+ * then the VIP groups (a few at a time; Telegram's answers are cached).
+ */
+export async function vipsAmong(
+  db: Database,
+  env: Env,
+  shop: ShopRow,
+  ids: readonly number[],
+  telegram = new TelegramApi(botToken(env)),
+): Promise<Set<number>> {
+  const result = new Set<number>();
+  if (ids.length === 0) return result;
+  const own = ownClub(shop, 'vip');
+  const usesPlatform = usesPlatformClub(shop, 'vip');
+  const platform = usesPlatform ? await getPlatformClub(db, 'vip') : null;
+  const rows = await db
+    .select({ id: users.telegramId, username: users.username })
+    .from(users)
+    .where(inArray(users.telegramId, [...ids]));
+  const usernames = new Map(rows.map((r) => [r.id, r.username]));
+  const chatIds = [...new Set([...own.groups, ...(platform?.groups ?? [])].map((g) => g.chatId))];
+  const rest: number[] = [];
+  for (const id of ids) {
+    const username = usernames.get(id) ?? null;
+    if (listMatch(own, id, username) || (platform && listMatch(platform, id, username))) result.add(id);
+    else rest.push(id);
+  }
+  if (chatIds.length === 0) return result;
+  // A few at a time, not to flood Telegram.
+  for (let i = 0; i < rest.length; i += 8) {
+    await Promise.all(
+      rest.slice(i, i + 8).map(async (id) => {
+        for (const chatId of chatIds) {
+          if (await isGroupMember(telegram, chatId, id)) {
+            result.add(id);
+            return;
+          }
+        }
+      }),
+    );
+  }
+  return result;
 }
 
 /** One-off check (e.g. when opening a single shop). */

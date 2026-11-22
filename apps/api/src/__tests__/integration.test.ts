@@ -4387,6 +4387,18 @@ describeDb('API integration', () => {
       }>;
       const alice = list.find((b) => b.telegramId === CUSTOMER_ID);
       expect(alice?.cartUnits).toBeGreaterThanOrEqual(2);
+      // VIP is whether they are one now, not whether an order was placed as one.
+      const [before] = await db.select().from(shops).where(eq(shops.id, shopId));
+      await db
+        .update(shops)
+        .set({ vipClub: { groups: [], usernames: [], userIds: [CUSTOMER_ID] } })
+        .where(eq(shops.id, shopId));
+      const vipList = (await (await request('/api/admin/buyers', { headers })).json()) as Array<{
+        telegramId: number;
+        vip: boolean;
+      }>;
+      expect(vipList.find((b) => b.telegramId === CUSTOMER_ID)?.vip).toBe(true);
+      await db.update(shops).set({ vipClub: before!.vipClub }).where(eq(shops.id, shopId));
       const detail = (await (await request(`/api/admin/buyers/${CUSTOMER_ID}`, { headers })).json()) as {
         cart: Array<{ quantity: number }>;
         orderList: unknown[];

@@ -35,7 +35,7 @@ export interface BuyerSummary {
   testing: boolean;
   /** Units in their cart, not ordered yet. */
   cartUnits: number;
-  /** Some order placed as a VIP. */
+  /** A VIP of the GB now (its lists or VIP groups). */
   vip: boolean;
   /** In the GB's or the platform's blacklist. */
   blocked: boolean;
