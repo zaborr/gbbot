@@ -368,7 +368,7 @@ export const pt: Record<MessageKey, string> = {
   'buyers.send': 'Enviar',
   'buyers.sent': '✅ Enviado.',
   'buyers.shipped': '{count} enviadas',
-  'buyers.title': 'Compradores',
+  'buyers.title': '👥 Compradores',
   'buyers.units.one': '{count} unidade',
   'buyers.units.other': '{count} unidades',
   'buyers.unpaidUnits': '{count} por pagar',

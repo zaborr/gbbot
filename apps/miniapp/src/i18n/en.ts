@@ -366,7 +366,7 @@ export const en = {
   'buyers.send': 'Send',
   'buyers.sent': '✅ Sent.',
   'buyers.shipped': '{count} sent',
-  'buyers.title': 'Buyers',
+  'buyers.title': '👥 Buyers',
   'buyers.units.one': '{count} unit',
   'buyers.units.other': '{count} units',
   'buyers.unpaidUnits': '{count} not paid',
