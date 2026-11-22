@@ -58,11 +58,10 @@ function AdminBuyer(): React.JSX.Element {
             .filter(Boolean)
             .join(' · ')}
           after={
-            b.username ? (
-              <a href={`https://t.me/${b.username}`} target="_blank" rel="noreferrer">
-                {t('buyers.openChat')}
-              </a>
-            ) : undefined
+            // Without a @username, the id still opens a chat in Telegram.
+            <a href={b.username ? `https://t.me/${b.username}` : `tg://user?id=${b.telegramId}`} target="_blank" rel="noreferrer">
+              {t('buyers.openChat')}
+            </a>
           }
         >
           <strong>{b.name}</strong>
