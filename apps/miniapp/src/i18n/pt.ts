@@ -789,7 +789,7 @@ export const pt: Record<MessageKey, string> = {
   'fee.vipHint': 'Para os membros do clube VIP deste GB (e do geral, se estiver ativado). Aplica-se aos novos pedidos.',
   'fee.vipNoFee': 'Os VIP não pagam a comissão',
   'fee.vipNoFeeHint': 'Para os membros do clube VIP deste GB (e do geral, se estiver ativado). Aplica-se aos novos pedidos.',
-  'fee.vipNone': 'Sem comissão',
+  'fee.vipNone': 'Nenhuma',
   'fee.vipReduced': 'Reduzida',
   'fee.vipSame': 'Igual',
   'fee.vipTitle': 'Comissão para os VIP',
