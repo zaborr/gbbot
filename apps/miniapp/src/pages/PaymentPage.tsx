@@ -726,8 +726,11 @@ function ChangeEditor({
   onCancel: () => void;
   onRequested: () => void;
 }): React.JSX.Element {
+  // A testing's lines (what was given, extra shares) stay as they are.
+  const fixed = order.items.filter((item) => item.testing);
+  const fixedTotal = fixed.reduce((sum, item) => sum + item.subtotal, 0);
   const [lines, setLines] = useState<DraftLine[]>(() =>
-    order.items.map((item) => ({
+    order.items.filter((item) => !item.testing).map((item) => ({
       productId: item.productId,
       variantId: item.variantId,
       variantLabel: item.variantLabel,
@@ -784,7 +787,7 @@ function ChangeEditor({
   const zone = direct ? zones.find((z) => z.name === order.shippingZoneName) : undefined;
   const shipping = zone ? shippingCost(zone, itemsTotal, vipFreeShipping) : order.shipping;
   // Testings stay while the order holds what they test (the server drops the others).
-  const total = itemsTotal + order.fee + shipping + order.testing;
+  const total = itemsTotal + fixedTotal + order.fee + shipping + order.testing;
   const diff = total - coveredAmount(order);
   // One addable entry per product, or per variant for products with options.
   const addable: DraftLine[] = (catalog.data?.items ?? [])
@@ -875,6 +878,16 @@ function ChangeEditor({
             }
           >
             {customerItemName(line)}
+          </Cell>
+        ))}
+        {fixed.map((item) => (
+          <Cell
+            key={itemKey(item)}
+            after={formatPrice(item.subtotal, order.currency)}
+            subtitle={t('change.testingLine')}
+            multiline
+          >
+            <span style={{ opacity: 0.6 }}>{customerItemName(item)}</span>
           </Cell>
         ))}
         {order.fee > 0 && (

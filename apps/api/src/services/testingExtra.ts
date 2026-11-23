@@ -352,6 +352,7 @@ async function shareOutExtra(db: Database, env: Env, shop: ShopRow, row: Testing
         quantity: 1,
         subtotal: amount,
         donationUnpaid: 1,
+        testing: true,
       });
       const sent = order.status === 'shipped' || order.status === 'fulfilled';
       await tx
@@ -602,6 +603,7 @@ async function endRound(db: Database, env: Env, shop: ShopRow, row: TestingRow, 
         quantity: 1,
         subtotal: amount,
         donationUnpaid: 1,
+        testing: true,
       });
       const sent = order.status === 'shipped' || order.status === 'fulfilled';
       await tx

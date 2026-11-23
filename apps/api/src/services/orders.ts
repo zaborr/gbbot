@@ -314,7 +314,7 @@ export async function createOrderFromCart(
 
     return toOrderDTO(
       order,
-      draft.items.map((item) => ({ ...item, id: '', orderId: order.id, donationUnpaid: 0 })),
+      draft.items.map((item) => ({ ...item, id: '', orderId: order.id, donationUnpaid: 0, testing: false })),
     );
   });
 }
@@ -1333,6 +1333,9 @@ export async function reduceOrder(
           unitPrice: item.unitPrice,
           quantity: item.quantity,
           subtotal: item.subtotal,
+          // A testing's line keeps what is still unpaid of it.
+          donationUnpaid: Math.min(item.donationUnpaid, item.quantity),
+          testing: item.testing,
         })),
       )
       .returning();
