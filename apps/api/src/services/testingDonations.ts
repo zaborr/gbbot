@@ -120,6 +120,7 @@ export async function addDonation(
         quantity: units,
         subtotal: units * DONATION_UNIT,
         donationUnpaid: units,
+        testing: true,
       });
     }
     // It waits for that payment; sent already, it remembers to go back to sent.

@@ -453,6 +453,7 @@ export const pt: Record<MessageKey, string> = {
   'change.save': 'Guardar alterações',
   'change.send': 'Enviar alteração para aprovação',
   'change.sendFailed': 'Não foi possível enviar o pedido',
+  'change.testingLine': 'Testing: não se altera aqui',
   'change.title': 'Alterar o seu pedido',
   'change.withdraw': 'Retirar o pedido',
   'change.withdrawFailed': 'Não foi possível retirar o pedido',

@@ -1172,20 +1172,46 @@ export async function dropUnpaidTesting(
     ) {
       continue;
     }
-    dropped += 1;
     await db.transaction(async (tx) => {
-      await tx.delete(testingEntries).where(eq(testingEntries.orderId, row.id));
-      const paid = row.amountPaid >= row.total - row.testing;
+      // What was paid covers the products, shipping and fee first, then the
+      // testings in the order they were joined: only those it does not cover go.
+      const entries = await tx
+        .select()
+        .from(testingEntries)
+        .where(eq(testingEntries.orderId, row.id))
+        .orderBy(asc(testingEntries.createdAt));
+      const [given] = await tx
+        .select({ unpaid: sql<number>`coalesce(sum(${orderItems.donationUnpaid} * ${orderItems.unitPrice}), 0)::int` })
+        .from(orderItems)
+        .where(eq(orderItems.orderId, row.id));
+      let left = row.amountPaid - (row.total - row.testing - Number(given?.unpaid ?? 0));
+      const unpaid: typeof entries = [];
+      for (const entry of entries) {
+        if (entry.amount <= left) left -= entry.amount;
+        else unpaid.push(entry);
+      }
+      if (unpaid.length === 0) return;
+      dropped += 1;
+      const off = unpaid.reduce((sum, entry) => sum + entry.amount, 0);
+      await tx.delete(testingEntries).where(
+        inArray(
+          testingEntries.id,
+          unpaid.map((entry) => entry.id),
+        ),
+      );
+      const total = row.total - off;
+      const paid = row.amountPaid >= total;
       await tx
         .update(orders)
         .set({
-          total: row.total - row.testing,
-          testing: 0,
+          total,
+          testing: row.testing - off,
           status: paid ? (row.resumeStatus ?? 'paid') : 'pending',
           resumeStatus: paid ? null : row.resumeStatus,
           updatedAt: new Date(),
         })
         .where(eq(orders.id, row.id));
+      if (paid) await tx.update(orderItems).set({ donationUnpaid: 0 }).where(eq(orderItems.orderId, row.id));
     });
   }
   return dropped;

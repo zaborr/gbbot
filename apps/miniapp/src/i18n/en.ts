@@ -451,6 +451,7 @@ export const en = {
   'change.save': 'Save changes',
   'change.send': 'Send change for approval',
   'change.sendFailed': 'Could not send the request',
+  'change.testingLine': 'Testing: not changed here',
   'change.title': 'Change your order',
   'change.withdraw': 'Withdraw request',
   'change.withdrawFailed': 'Could not withdraw the request',

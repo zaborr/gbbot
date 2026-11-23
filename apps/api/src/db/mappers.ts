@@ -229,6 +229,7 @@ export function toOrderItemDTO(row: OrderItemRow): OrderItem {
     unitPrice: row.unitPrice,
     quantity: row.quantity,
     subtotal: row.subtotal,
+    testing: row.testing,
   };
 }
 

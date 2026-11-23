@@ -1210,6 +1210,84 @@ describeDb('API integration', () => {
     await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
   });
 
+  it('when the GB closes, keeps the testings its payment covers and drops only the others', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const auth = {
+      Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const [seed] = await db.select().from(products).where(eq(products.id, productId));
+    const [second] = await db
+      .insert(products)
+      .values({
+        shopId,
+        categoryId: seed!.categoryId,
+        slug: `matcha-two-${Date.now()}`,
+        title: 'Matcha',
+        description: '',
+        price: 2000,
+        currency: 'USDC',
+        stock: 10,
+        isActive: true,
+      })
+      .returning();
+    const make = async (tested: string): Promise<string> => {
+      const res = await request('/api/admin/testings', {
+        method: 'POST',
+        headers: admin,
+        body: JSON.stringify({
+          productId: tested,
+          variantId: null,
+          lab: 'Lab',
+          contribution: 1000,
+          perUnit: 0,
+          feeMode: 'optional',
+          tiers: [{ id: 'mp', name: 'M&P', cost: 5000, vials: 1 }],
+        }),
+      });
+      return ((await res.json()) as { id: string }).id;
+    };
+    const first = await make(productId);
+    const later = await make(second!.id);
+    await db.delete(carts).where(eq(carts.userId, CUSTOMER_ID));
+    await request('/api/cart/items', { method: 'POST', headers: auth, body: JSON.stringify({ productId, quantity: 1 }) });
+    await request('/api/cart/items', { method: 'POST', headers: auth, body: JSON.stringify({ productId: second!.id, quantity: 1 }) });
+    await request('/api/cart/testings', { method: 'POST', headers: auth, body: JSON.stringify({ testingId: first, volunteer: false }) });
+    const placed = await request('/api/orders', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ contactUsername: '@alice_test' }),
+    });
+    const { orderId } = (await placed.json()) as { orderId: string };
+    try {
+      // Paid with the first testing; the second joined later and not paid.
+      await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+      const added = await request(`/api/orders/${orderId}/testings`, {
+        method: 'POST',
+        headers: auth,
+        body: JSON.stringify({ testingId: later, volunteer: false }),
+      });
+      expect(added.status).toBe(200);
+      expect(await dropUnpaidTesting(db, shopId)).toBe(1);
+      const [row] = await db.select().from(orders).where(eq(orders.id, orderId));
+      expect(row).toMatchObject({ status: 'paid', testing: 1000 });
+      const left = await db.select().from(testingEntries).where(eq(testingEntries.orderId, orderId));
+      expect(left.map((e) => e.testingId)).toEqual([first]);
+    } finally {
+      await db.delete(testingEntries).where(eq(testingEntries.orderId, orderId));
+      await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
+      await db.delete(orders).where(eq(orders.id, orderId));
+      await db.delete(testings).where(inArray(testings.id, [first, later]));
+      await db.delete(products).where(eq(products.id, second!.id));
+      await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
+      await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
+    }
+  });
+
   it('draws the donors with the next Bitcoin block, volunteers first', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,

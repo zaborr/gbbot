@@ -385,6 +385,8 @@ export const orderItems = pgTable('order_items', {
   subtotal: integer('subtotal').notNull(),
   /** A donation to a testing: its units not paid yet (they come off if not paid in time). */
   donationUnpaid: integer('donation_unpaid').notNull().default(0),
+  /** A testing's line (what was given, a share of its extra round), not a product bought. */
+  testing: boolean('testing').notNull().default(false),
 });
 
 /**

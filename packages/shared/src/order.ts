@@ -61,6 +61,8 @@ export const orderItem = z.object({
   unitPrice: moneyAmount,
   quantity: z.number().int().positive(),
   subtotal: moneyAmount,
+  /** A testing's line (what was given, a share of its extra round): not changed with the products. */
+  testing: z.boolean().optional(),
 });
 export type OrderItem = z.infer<typeof orderItem>;
 
