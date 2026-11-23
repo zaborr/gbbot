@@ -165,6 +165,7 @@ export const shopConfig = shop
     orderFee: true,
     orderFeeLabel: true,
     vipNoFee: true,
+    vipOrderFee: true,
     vipNoShipping: true,
     autoCancelHours: true,
     overpayMargin: true,
