@@ -135,6 +135,7 @@ export function toShopConfigDTO(
     orderFee: row.orderFee,
     orderFeeLabel: row.orderFeeLabel,
     vipNoFee: row.vipNoFee,
+    vipOrderFee: row.vipOrderFee,
     vipNoShipping: row.vipNoShipping,
     autoCancelHours: row.autoCancelHours,
     overpayMargin: row.overpayMargin,

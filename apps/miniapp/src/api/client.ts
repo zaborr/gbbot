@@ -1150,11 +1150,11 @@ export class ApiClient {
   adminUpdateOrderFee(
     orderFee: number,
     orderFeeLabel: string,
-    vipNoFee?: boolean,
+    vipOrderFee?: number | null,
   ): Promise<ShopAdminView> {
     return this.request<ShopAdminView>('/admin/shop/fee', {
       method: 'PUT',
-      body: JSON.stringify({ orderFee, orderFeeLabel, vipNoFee }),
+      body: JSON.stringify({ orderFee, orderFeeLabel, vipOrderFee }),
     });
   }
 

@@ -231,7 +231,11 @@ function AdminHome(): React.JSX.Element {
           subtitle={
             fee > 0
               ? t('adminHome.feeOn', { label: config.orderFeeLabel, amount: toMajor(fee) }) +
-                (config.vipNoFee ? t('adminHome.feeVipFree') : '')
+                (config.vipOrderFee === 0
+                  ? t('adminHome.feeVipFree')
+                  : config.vipOrderFee !== null
+                    ? t('adminHome.feeVip', { amount: toMajor(config.vipOrderFee) })
+                    : '')
               : t('common.off')
           }
         >

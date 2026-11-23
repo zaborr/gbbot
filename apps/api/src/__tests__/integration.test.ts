@@ -4047,7 +4047,7 @@ describeDb('API integration', () => {
 
     await db
       .update(shops)
-      .set({ vipClub: { groups: [], userIds: [CUSTOMER_ID], usernames: [] }, orderFee: 50, vipNoFee: true })
+      .set({ vipClub: { groups: [], userIds: [CUSTOMER_ID], usernames: [] }, orderFee: 50, vipNoFee: true, vipOrderFee: 0 })
       .where(eq(shops.id, shopId));
     await db
       .update(products)
@@ -4080,6 +4080,22 @@ describeDb('API integration', () => {
     expect(vipCart.lines[0]?.unitPrice).toBe(99);
     const otherCart = await cartOf(other);
     expect(otherCart).toMatchObject({ isVip: false, fee: 50 });
+    // A reduced fee for VIPs, set by the organiser: they pay it, the rest the normal one.
+    const adminHeaders = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Ivan')}`, 'content-type': 'application/json' };
+    const reduced = await request('/api/admin/shop/fee', {
+      method: 'PUT',
+      headers: adminHeaders,
+      body: JSON.stringify({ orderFee: 50, orderFeeLabel: 'Fee', vipOrderFee: 20 }),
+    });
+    expect(await reduced.json()).toMatchObject({ vipOrderFee: 20, vipNoFee: false });
+    expect((await (await request('/api/cart', { headers: vip })).json()) as { fee: number }).toMatchObject({ fee: 20 });
+    expect((await (await request('/api/cart', { headers: other })).json()) as { fee: number }).toMatchObject({ fee: 50 });
+    // The older on/off still works: no fee for VIPs.
+    await request('/api/admin/shop/fee', {
+      method: 'PUT',
+      headers: adminHeaders,
+      body: JSON.stringify({ orderFee: 50, orderFeeLabel: 'Fee', vipNoFee: true }),
+    });
     expect(otherCart.lines[0]?.unitPrice).toBe(80);
 
     const create = await request('/api/orders', {
@@ -4101,7 +4117,7 @@ describeDb('API integration', () => {
     await request(`/api/orders/${orderId}`, { method: 'DELETE', headers: vip });
     await db
       .update(shops)
-      .set({ vipClub: { groups: [], userIds: [], usernames: [] }, orderFee: 0, vipNoFee: false })
+      .set({ vipClub: { groups: [], userIds: [], usernames: [] }, orderFee: 0, vipNoFee: false, vipOrderFee: null })
       .where(eq(shops.id, shopId));
     await db.update(products).set({ vipPrice: null, priceTiers: [] }).where(eq(products.id, productId));
   });
@@ -4148,7 +4164,7 @@ describeDb('API integration', () => {
   it('duplicates a GB: settings and catalog, hidden, without orders', async () => {
     const admin = await authToken(ADMIN_ID, 'Ivan');
     const headers = { Authorization: `Bearer ${admin}`, 'content-type': 'application/json' };
-    await db.update(shops).set({ orderFee: 25, vipNoFee: true }).where(eq(shops.id, shopId));
+    await db.update(shops).set({ orderFee: 25, vipNoFee: true, vipOrderFee: 0 }).where(eq(shops.id, shopId));
     await db.update(products).set({ vipPrice: 120 }).where(eq(products.id, productId));
 
     const res = await request('/api/admin/shop/duplicate', {
@@ -4166,6 +4182,7 @@ describeDb('API integration', () => {
       adminIds: [],
       orderFee: 25,
       vipNoFee: true,
+      vipOrderFee: 0,
     });
 
     // Donation products (made with testings) are not copied.
@@ -4179,7 +4196,7 @@ describeDb('API integration', () => {
     expect(await db.select().from(orders).where(eq(orders.shopId, copy.id))).toHaveLength(0);
 
     await db.delete(shops).where(eq(shops.id, copy.id));
-    await db.update(shops).set({ orderFee: 0, vipNoFee: false }).where(eq(shops.id, shopId));
+    await db.update(shops).set({ orderFee: 0, vipNoFee: false, vipOrderFee: null }).where(eq(shops.id, shopId));
     await db.update(products).set({ vipPrice: null }).where(eq(products.id, productId));
   });
 

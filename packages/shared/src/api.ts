@@ -131,8 +131,10 @@ export type CreateOrderResponse = z.infer<typeof createOrderResponse>;
 export const updateOrderFeeRequest = z.object({
   orderFee: z.number().int().nonnegative().max(100_000_000),
   orderFeeLabel: z.string().trim().min(1).max(64),
-  /** VIPs do not pay the fee (default: keep). */
+  /** VIPs do not pay the fee (default: keep). Older clients; vipOrderFee wins. */
   vipNoFee: z.boolean().optional(),
+  /** What VIPs pay instead: null = the same as everyone, 0 = nothing (default: keep). */
+  vipOrderFee: z.number().int().nonnegative().max(100_000_000).nullable().optional(),
 });
 export type UpdateOrderFeeRequest = z.infer<typeof updateOrderFeeRequest>;
 

@@ -83,8 +83,10 @@ export const shop = z.object({
   orderFee: z.number().int().nonnegative(),
   /** How the fee is shown to customers, e.g. "Service fee". */
   orderFeeLabel: z.string().min(1).max(64),
-  /** The GB's VIPs do not pay the per-order fee. */
+  /** The GB's VIPs do not pay the per-order fee (vipOrderFee is 0). */
   vipNoFee: z.boolean(),
+  /** What the GB's VIPs pay as the per-order fee: null = the same as everyone, 0 = nothing. */
+  vipOrderFee: z.number().int().nonnegative().nullable(),
   /** The GB's VIPs do not pay shipping. */
   vipNoShipping: z.boolean(),
   /** Unpaid orders are cancelled after this many hours without activity (0 = never). */
@@ -163,6 +165,7 @@ export const shopConfig = shop
     orderFee: true,
     orderFeeLabel: true,
     vipNoFee: true,
+    vipOrderFee: true,
     vipNoShipping: true,
     autoCancelHours: true,
     overpayMargin: true,
@@ -499,3 +502,11 @@ export const disclaimerAdminView = z.object({
   accepted: z.number().int().nonnegative(),
 });
 export type DisclaimerAdminView = z.infer<typeof disclaimerAdminView>;
+
+/** The fee an order pays: a VIP's own one when the GB sets it, else everyone's. */
+export function orderFeeFor(
+  shop: { orderFee: number; vipOrderFee: number | null },
+  isVip: boolean,
+): number {
+  return isVip && shop.vipOrderFee !== null ? shop.vipOrderFee : shop.orderFee;
+}
