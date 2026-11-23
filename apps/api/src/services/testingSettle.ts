@@ -134,16 +134,21 @@ export async function cancelTesting(db: Database, env: Env, shop: ShopRow, id: s
       if (order.amountPaid >= order.total) {
         await refundEntry(tx, entry, entry.amount);
       } else {
-        // Not paid: it simply leaves the order.
+        // Not paid: it simply leaves the order, which may then be paid in full.
         await tx.delete(testingEntries).where(eq(testingEntries.id, entry.id));
+        const total = order.total - entry.amount;
+        const settled = order.status === 'pending' && order.amountPaid > 0 && order.amountPaid >= total;
         await tx
           .update(orders)
           .set({
             testing: sql`${orders.testing} - ${entry.amount}`,
             total: sql`${orders.total} - ${entry.amount}`,
+            ...(settled ? { status: order.resumeStatus ?? 'paid', resumeStatus: null } : {}),
             updatedAt: new Date(),
           })
           .where(eq(orders.id, order.id));
+        // Paid in full now: whatever it gives to testings is paid too.
+        if (settled) await tx.update(orderItems).set({ donationUnpaid: 0 }).where(eq(orderItems.orderId, order.id));
       }
     }
     if (donorOrders.length > 0) {

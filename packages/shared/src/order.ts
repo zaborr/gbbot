@@ -33,10 +33,11 @@ export const ADMIN_STATUS_CHANGES: Record<OrderStatus, readonly OrderStatus[]> =
  * sent (the status it goes back to).
  */
 export function goodsStatus(
-  order: Pick<Order, 'status' | 'resumeStatus' | 'donationDue' | 'amountPaid' | 'total'>,
+  order: Pick<Order, 'status' | 'resumeStatus' | 'productsPaid' | 'amountPaid' | 'amountDue'>,
 ): OrderStatus {
   const waiting = order.status === 'pending' || order.status === 'awaiting_payment';
-  if (waiting && order.donationDue > 0 && order.amountPaid >= order.total - order.donationDue) {
+  // Paid in full but left pending (a testing part taken off later), or only a testing's part owed.
+  if (waiting && order.amountPaid > 0 && (order.amountDue <= 0 || order.productsPaid)) {
     return order.resumeStatus ?? 'paid';
   }
   return order.status;
@@ -131,6 +132,11 @@ export const order = z.object({
   donatedVials: z.array(z.string()),
   /** Given to testings and not paid yet (the only thing the order owes, when it was paid or sent). */
   donationDue: z.number().int(),
+  /**
+   * The products (and shipping and fee) are paid: what is missing, if anything,
+   * is only for testings (a fee added later, something given, an extra share).
+   */
+  productsPaid: z.boolean(),
   /** Sent (or delivered) and waiting only for that: where it goes back once paid. */
   resumeStatus: orderStatus.nullable(),
   /** Name of the shipping zone chosen at checkout. */

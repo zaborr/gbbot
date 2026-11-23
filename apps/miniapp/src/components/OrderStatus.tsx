@@ -20,8 +20,13 @@ type Kind = 'warn' | 'info' | 'ok' | '';
 /** What the order is waiting for, as a coloured label: orange = your turn. */
 function chipOf(order: Order): { text: string; kind: Kind } {
   if (order.changeRequest) return { text: t('orders.changeRequested'), kind: 'info' };
-  // Paid (or sent) and only a donation is owed.
-  if (order.donationDue > 0 && order.amountPaid >= order.total - order.donationDue) {
+  // Paid in full, left waiting by mistake (a testing part taken off): it is paid.
+  if (order.status === 'pending' && order.amountPaid > 0 && order.amountDue <= 0) {
+    const status = order.resumeStatus ?? 'paid';
+    return { text: statusText(status), kind: status === 'fulfilled' ? 'ok' : 'info' };
+  }
+  // Paid (or sent) and only a testing's part is owed: a fee added later, something given, an extra share.
+  if (order.status === 'pending' && order.productsPaid && order.amountDue > 0) {
     return {
       text: t('orders.donationPending', { status: statusText(order.resumeStatus ?? 'paid') }),
       kind: 'warn',

@@ -2586,6 +2586,67 @@ describeDb('API integration', () => {
     await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
   });
 
+  it('a paid order that joins a testing owes only its part, and is paid again if the testing goes', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const auth = {
+      Authorization: `Bearer ${await authToken(CUSTOMER_ID, 'Alice')}`,
+      'content-type': 'application/json',
+    };
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const created = await request('/api/admin/testings', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({
+        productId,
+        variantId: null,
+        lab: 'Lab',
+        contribution: 1000,
+        perUnit: 0,
+        feeMode: 'optional',
+        tiers: [{ id: 'mp', name: 'M&P', cost: 600, vials: 1 }],
+      }),
+    });
+    const { id: testingId } = (await created.json()) as { id: string };
+    await db.delete(carts).where(eq(carts.userId, CUSTOMER_ID));
+    await request('/api/cart/items', { method: 'POST', headers: auth, body: JSON.stringify({ productId, quantity: 1 }) });
+    const placed = await request('/api/orders', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ contactUsername: '@alice_test' }),
+    });
+    const { orderId } = (await placed.json()) as { orderId: string };
+    try {
+      await request(`/api/admin/orders/${orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
+      const joined = await request(`/api/orders/${orderId}/testings`, {
+        method: 'POST',
+        headers: auth,
+        body: JSON.stringify({ testingId, volunteer: false }),
+      });
+      expect(joined.status).toBeLessThan(300);
+      // Only the testing's part is owed: the products are paid.
+      const owing = (await (await request(`/api/admin/orders/${orderId}`, { headers: admin })).json()) as {
+        status: string;
+        productsPaid: boolean;
+        amountDue: number;
+      };
+      expect(owing).toMatchObject({ status: 'pending', productsPaid: true, amountDue: 1000 });
+      // The testing goes before it is paid: the order is paid again, not left with a "difference".
+      expect((await request(`/api/admin/testings/${testingId}/cancel`, { method: 'POST', headers: admin })).status).toBe(200);
+      const [row] = await db.select().from(orders).where(eq(orders.id, orderId));
+      expect(row).toMatchObject({ status: 'paid', testing: 0 });
+      expect((row?.total ?? 0) - (row?.amountPaid ?? 0)).toBe(0);
+    } finally {
+      await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
+      await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
+      await db.delete(orders).where(eq(orders.id, orderId));
+      await db.delete(testings).where(eq(testings.id, testingId));
+      await db.update(products).set({ stock: 10 }).where(eq(products.id, productId));
+    }
+  });
+
   it('keeps the active bot in the database, and takes a new BOT_TOKEN put in .env by hand', async () => {
     await db.delete(botSwitches);
     await db.delete(bots);
