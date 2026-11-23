@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
-import { isSaleStatus, type ExportRequest, type ExportScope, type Order } from '@tma-shop/shared';
+import { goodsStatus, isSaleStatus, type ExportRequest, type ExportScope, type Order } from '@tma-shop/shared';
 import { api, ApiClientError } from '../../api/client.js';
 import { Input } from '../../components/Field.js';
 import { decryptOrderDetails, loadPrivateKey } from '../../lib/addressCrypto.js';
@@ -73,17 +73,17 @@ function periodRange(period: Period, days?: Days): { from?: string; to?: string 
 function inScope(order: Order, scope: ExportScope): boolean {
   switch (scope) {
     case 'paid':
-      return isSaleStatus(order.status);
+      return isSaleStatus(goodsStatus(order));
     case 'toFulfil':
-      return order.status === 'paid';
+      return goodsStatus(order) === 'paid';
     case 'shipped':
-      return order.status === 'shipped';
+      return goodsStatus(order) === 'shipped';
     case 'fulfilled':
-      return order.status === 'fulfilled';
+      return goodsStatus(order) === 'fulfilled';
     case 'unpaid':
-      return order.status === 'pending' || order.status === 'awaiting_payment';
+      return goodsStatus(order) === 'pending' || goodsStatus(order) === 'awaiting_payment';
     case 'cancelled':
-      return order.status === 'cancelled';
+      return goodsStatus(order) === 'cancelled';
     case 'all':
       return true;
   }

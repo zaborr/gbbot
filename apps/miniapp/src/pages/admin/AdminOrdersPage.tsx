@@ -20,11 +20,12 @@ type FilterKey = 'all' | 'attention' | 'unpaid' | 'paid' | 'shipped' | 'fulfille
 const FILTERS: Record<FilterKey, { label: MessageKey; match: (order: Order) => boolean }> = {
   all: { label: 'catalog.all', match: () => true },
   attention: { label: 'adminHome.toReview', match: needsAttention },
-  unpaid: { label: 'filter.unpaid', match: (o) => o.status === 'pending' },
+  // By where the products are: paid ones owing only a donation are not "unpaid".
+  unpaid: { label: 'filter.unpaid', match: (o) => goodsStatus(o) === 'pending' },
   // From outside: nothing to send.
-  paid: { label: 'filter.toShip', match: (o) => o.status === 'paid' && !o.external },
-  shipped: { label: 'orderStatus.shipped', match: (o) => o.status === 'shipped' },
-  fulfilled: { label: 'orderStatus.fulfilled', match: (o) => o.status === 'fulfilled' },
+  paid: { label: 'filter.toShip', match: (o) => goodsStatus(o) === 'paid' && !o.external },
+  shipped: { label: 'orderStatus.shipped', match: (o) => goodsStatus(o) === 'shipped' },
+  fulfilled: { label: 'orderStatus.fulfilled', match: (o) => goodsStatus(o) === 'fulfilled' },
   cancelled: { label: 'orderStatus.cancelled', match: (o) => o.status === 'cancelled' },
   // Taking part in a testing (from outside too).
   testing: { label: 'testing.title', match: (o) => (o.testings?.length ?? 0) > 0 || o.external },

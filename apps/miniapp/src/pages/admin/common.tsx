@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Cell } from '@telegram-apps/telegram-ui';
-import { isSaleStatus, type Order, type OrderStatus, type Product, type ProductInput } from '@tma-shop/shared';
+import { goodsStatus, isSaleStatus, type Order, type OrderStatus, type Product, type ProductInput } from '@tma-shop/shared';
 import { ApiClientError } from '../../api/client.js';
 import { useShop } from '../../providers/ShopProvider.js';
 import { ErrorView } from '../../components/ErrorView.js';
@@ -37,7 +37,7 @@ export function statusLabel(order: Order): string {
 
 /** Orders counted as sales: payment confirmed (shipped and delivered included). */
 export function isSale(order: Order): boolean {
-  return isSaleStatus(order.status);
+  return isSaleStatus(goodsStatus(order));
 }
 
 /** Orders that need the admin to do something. */

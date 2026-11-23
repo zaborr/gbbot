@@ -26,6 +26,22 @@ export const ADMIN_STATUS_CHANGES: Record<OrderStatus, readonly OrderStatus[]> =
   cancelled: [],
 };
 
+/**
+ * Where the order's products are. An order already paid (or sent) that then
+ * gets a donation or a share of a testing's extra round to pay goes back to
+ * pending until that is paid; its products stay where they were: paid, or
+ * sent (the status it goes back to).
+ */
+export function goodsStatus(
+  order: Pick<Order, 'status' | 'resumeStatus' | 'donationDue' | 'amountPaid' | 'total'>,
+): OrderStatus {
+  const waiting = order.status === 'pending' || order.status === 'awaiting_payment';
+  if (waiting && order.donationDue > 0 && order.amountPaid >= order.total - order.donationDue) {
+    return order.resumeStatus ?? 'paid';
+  }
+  return order.status;
+}
+
 /** Orders counted as sales: payment confirmed, whether shipped or delivered. */
 export function isSaleStatus(status: OrderStatus): boolean {
   return status === 'paid' || status === 'shipped' || status === 'fulfilled';

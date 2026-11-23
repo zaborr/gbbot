@@ -1,5 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm';
-import type { BuyerDetail, BuyerProduct, BuyerSummary, BuyerTesting, Order } from '@tma-shop/shared';
+import { goodsStatus, type BuyerDetail, type BuyerProduct, type BuyerSummary, type BuyerTesting, type Order } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { cartItems, carts, productVariants, products, testingEntries, testings } from '../db/schema.js';
@@ -19,9 +19,10 @@ import { vipsAmong } from './vip.js';
 
 /** Where an order's units are: not paid yet, paid to send, or sent. */
 function placeOf(order: Order): keyof Pick<BuyerProduct, 'unpaid' | 'paid' | 'shipped'> | null {
-  if (order.status === 'cancelled') return null;
-  if (order.status === 'shipped' || order.status === 'fulfilled') return 'shipped';
-  if (order.status === 'paid') return 'paid';
+  const status = goodsStatus(order);
+  if (status === 'cancelled') return null;
+  if (status === 'shipped' || status === 'fulfilled') return 'shipped';
+  if (status === 'paid') return 'paid';
   return 'unpaid';
 }
 
@@ -75,9 +76,11 @@ function summarize(
     units,
     currency: mine[0]?.currency ?? 'USDC',
     paid: live.reduce((sum, o) => sum + o.amountPaid, 0),
-    owed: live.reduce((sum, o) => sum + o.amountDue, 0),
-    unpaid: live.some((o) => o.amountDue > 0),
-    toShip: live.some((o) => o.status === 'paid' && !o.external),
+    // What they still have to pay (a refund owed to them is not a negative debt).
+    owed: live.reduce((sum, o) => sum + Math.max(o.amountDue, 0), 0),
+    // Products not paid yet (a donation owed on paid ones only shows in what they owe).
+    unpaid: live.some((o) => placeOf(o) === 'unpaid'),
+    toShip: live.some((o) => goodsStatus(o) === 'paid' && !o.external),
     testing: inTesting,
     cartUnits,
     vip,
