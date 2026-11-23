@@ -1,4 +1,5 @@
 import {
+  goodsStatus,
   isSaleStatus,
   type ExportRequest,
   type ExportScope,
@@ -380,15 +381,15 @@ function statusText(L: (key: TextKey) => string, status: Order['status']): strin
 export function matchesScope(order: Order, scope: ExportScope): boolean {
   switch (scope) {
     case 'paid':
-      return isSaleStatus(order.status);
+      return isSaleStatus(goodsStatus(order));
     case 'toFulfil':
-      return order.status === 'paid';
+      return goodsStatus(order) === 'paid';
     case 'shipped':
-      return order.status === 'shipped';
+      return goodsStatus(order) === 'shipped';
     case 'fulfilled':
-      return order.status === 'fulfilled';
+      return goodsStatus(order) === 'fulfilled';
     case 'unpaid':
-      return order.status === 'pending' || order.status === 'awaiting_payment';
+      return goodsStatus(order) === 'pending' || goodsStatus(order) === 'awaiting_payment';
     case 'cancelled':
       return order.status === 'cancelled';
     case 'all':

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
-import { isSaleStatus, type Order } from '@tma-shop/shared';
+import { goodsStatus, isSaleStatus, type Order } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
 import { formatPrice } from '../../lib/format.js';
@@ -18,10 +18,11 @@ import { t, tn, type MessageKey } from '../../i18n/index.js';
 type Scope = 'all' | 'toFulfil' | 'shipped' | 'fulfilled';
 
 const SCOPES: Record<Scope, { label: MessageKey; match: (order: Order) => boolean }> = {
-  all: { label: 'summary.allPaid', match: (o) => isSaleStatus(o.status) },
-  toFulfil: { label: 'filter.toShip', match: (o) => o.status === 'paid' },
-  shipped: { label: 'orderStatus.shipped', match: (o) => o.status === 'shipped' },
-  fulfilled: { label: 'orderStatus.fulfilled', match: (o) => o.status === 'fulfilled' },
+  // By where the products are (paid, even if a donation is still owed).
+  all: { label: 'summary.allPaid', match: (o) => isSaleStatus(goodsStatus(o)) },
+  toFulfil: { label: 'filter.toShip', match: (o) => goodsStatus(o) === 'paid' && !o.external },
+  shipped: { label: 'orderStatus.shipped', match: (o) => goodsStatus(o) === 'shipped' },
+  fulfilled: { label: 'orderStatus.fulfilled', match: (o) => goodsStatus(o) === 'fulfilled' },
 };
 
 interface ProductTotal {
