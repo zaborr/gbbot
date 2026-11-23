@@ -803,6 +803,29 @@ export async function deleteOrder(
 const CHANGEABLE: Order['status'][] = ['paid', 'awaiting_payment'];
 
 /**
+ * An order's lines that belong to a testing (what was given, or a share of its
+ * extra round): a change of products keeps them exactly as they are, with
+ * what is still unpaid of them.
+ */
+async function testingLinesOf(
+  tx: Pick<Database, 'select'>,
+  items: readonly OrderItemRow[],
+): Promise<OrderItemRow[]> {
+  const ids = [...new Set(items.map((item) => item.productId))];
+  if (ids.length === 0) return [];
+  const hidden = await tx
+    .select({ id: products.id })
+    .from(products)
+    .where(and(inArray(products.id, ids), ne(products.kind, 'sale')));
+  const set = new Set(hidden.map((row) => row.id));
+  return items.filter((item) => set.has(item.productId));
+}
+
+/** The kept testing lines, as they go back in after a change. */
+const reinserted = (orderId: string, kept: readonly OrderItemRow[]) =>
+  kept.map(({ id: _id, ...line }) => ({ ...line, orderId }));
+
+/**
  * Stores a customer's requested modification (the full new item list) for
  * admin approval. Lines already in the order keep their original unit price;
  * new products use the current price. Stock is checked against what the order
@@ -868,6 +891,8 @@ export async function requestOrderChange(
   const items: OrderChangeRequest['items'] = [];
   for (const [key, { productId, variantId, quantity }] of wanted) {
     const product = byId.get(productId);
+    // A testing's lines are not the customer's to change: they stay as they are.
+    if (product && product.kind !== 'sale') continue;
     const inOrder = currentQty.has(key);
     if (!product || (!inOrder && (!product.isActive || (product.vipOnly && !order.isVip)))) {
       throw ApiError.badRequest('unknown_product', 'A product in the change is no longer available');
@@ -921,6 +946,8 @@ export async function requestOrderChange(
   if (unchanged) throw ApiError.badRequest('no_changes', 'The order is unchanged');
 
   // Nothing paid yet: the change applies at once, no approval needed.
+  // Only a testing's lines left: there must be some product.
+  if (items.length === 0) throw ApiError.badRequest('empty_change', 'Keep at least one product (or ask the shop to cancel the order)');
   if (direct) return applyUnpaidEdit(db, shopId, order.id, items);
 
   // Testings stay while the order still holds what they test.
@@ -958,7 +985,13 @@ async function applyUnpaidEdit(
     if (!editableDirectly(order)) {
       throw ApiError.conflict('order_changed', 'The order changed meanwhile. Reload it.');
     }
+    const current = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+    const kept = await testingLinesOf(tx, current);
+    const keptIds = new Set(kept.map((line) => line.productId));
+    // Requests from before kept them in the list: only the products count.
+    items = items.filter((item) => !keptIds.has(item.productId));
     const itemsTotal = items.reduce((sum, item) => sum + item.subtotal, 0);
+    const keptTotal = kept.reduce((sum, line) => sum + line.subtotal, 0);
     let shipping = order.shipping;
     if (order.shippingZoneName) {
       const shop = await tx.query.shops.findFirst({ where: eq(shops.id, shopId) });
@@ -979,11 +1012,12 @@ async function applyUnpaidEdit(
         })),
       )
       .returning();
+    if (kept.length > 0) inserted.push(...(await tx.insert(orderItems).values(reinserted(order.id, kept)).returning()));
     const testing = await testingAfterChange(tx, order.id, linesOf(items), true);
     const [updated] = await tx
       .update(orders)
       .set({
-        total: itemsTotal + order.fee + shipping + testing,
+        total: itemsTotal + keptTotal + order.fee + shipping + testing,
         shipping,
         testing,
         changeRequest: null,
@@ -1036,7 +1070,12 @@ export async function approveOrderChange(
       throw ApiError.conflict('not_changeable', `Order is ${order.status} and cannot be changed`);
     }
 
-    const current = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+    const all = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+    // A testing's lines stay as they are; the change is about the products.
+    const kept = await testingLinesOf(tx, all);
+    const keptIds = new Set(kept.map((line) => line.productId));
+    const current = all.filter((item) => !keptIds.has(item.productId));
+    const changed = { ...change, items: change.items.filter((item) => !keptIds.has(item.productId)) };
 
     if (order.stockApplied) {
       const delta = new Map<string, { productId: string; variantId: string | null; diff: number }>();
@@ -1046,7 +1085,7 @@ export async function approveOrderChange(
         delta.set(key, { productId, variantId, diff: (prev?.diff ?? 0) + by });
       };
       for (const item of current) bump(item.productId, item.variantId, -item.quantity);
-      for (const item of change.items) bump(item.productId, item.variantId ?? null, item.quantity);
+      for (const item of changed.items) bump(item.productId, item.variantId ?? null, item.quantity);
 
       for (const { productId, variantId, diff } of delta.values()) {
         if (diff === 0) continue;
@@ -1086,7 +1125,7 @@ export async function approveOrderChange(
     const inserted = await tx
       .insert(orderItems)
       .values(
-        change.items.map((item) => ({
+        changed.items.map((item) => ({
           orderId: order.id,
           ...item,
           variantId: item.variantId ?? null,
@@ -1095,11 +1134,16 @@ export async function approveOrderChange(
         })),
       )
       .returning();
+    if (kept.length > 0) inserted.push(...(await tx.insert(orderItems).values(reinserted(order.id, kept)).returning()));
 
     // Testings whose product left the order drop out (what was paid for them is refunded).
-    const testing = await testingAfterChange(tx, order.id, linesOf(change.items), true);
+    const testing = await testingAfterChange(tx, order.id, linesOf(changed.items), true);
     const total =
-      change.items.reduce((sum, item) => sum + item.subtotal, 0) + order.fee + order.shipping + testing;
+      changed.items.reduce((sum, item) => sum + item.subtotal, 0) +
+      kept.reduce((sum, line) => sum + line.subtotal, 0) +
+      order.fee +
+      order.shipping +
+      testing;
     const status = order.status === 'paid' && total > order.amountPaid ? 'pending' : order.status;
     const [updated] = await tx
       .update(orders)

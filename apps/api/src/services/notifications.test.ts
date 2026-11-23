@@ -14,6 +14,7 @@ const base: Order = {
   testing: 0,
   donatedVials: [],
   donationDue: 0,
+  productsPaid: false,
   resumeStatus: null,
   shippingZoneName: 'Spain',
   encryptedAddress: null,

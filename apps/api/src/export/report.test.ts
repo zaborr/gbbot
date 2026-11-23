@@ -23,6 +23,7 @@ function order(partial: Partial<Order> & Pick<Order, 'id' | 'status' | 'createdA
     testing: 0,
     donatedVials: [],
   donationDue: 0,
+  productsPaid: false,
   resumeStatus: null,
     shippingZoneName: null,
     encryptedAddress: null,
