@@ -540,6 +540,13 @@
       "when": 1796587200000,
       "tag": "0076_order_item_testing",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1796673600000,
+      "tag": "0077_vip_order_fee",
+      "breakpoints": true
     }
   ]
 }

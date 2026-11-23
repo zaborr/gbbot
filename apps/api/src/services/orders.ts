@@ -7,6 +7,7 @@ import {
   exchangeRateFor,
   type ExchangeRates,
   MAX_ADDRESS_EXTRAS,
+  orderFeeFor,
   shippingCost,
   type Order,
   type OrderStatus,
@@ -265,7 +266,7 @@ export async function createOrderFromCart(
 
     // The shop's per-order fee is frozen on the order and charged once (VIPs
     // may be spared it).
-    const fee = isVip && shop.vipNoFee ? 0 : shop.orderFee;
+    const fee = orderFeeFor(shop, isVip);
     // Testings ticked in the cart that still apply go on the order.
     const testingLines = draft.items.map((item) => ({
       productId: item.productId,

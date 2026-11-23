@@ -37,12 +37,12 @@ function AdminFee(): React.JSX.Element {
       <PageTitle title={t('adminHome.fee')} />
       <ErrorBanner message={actions.error} />
       <OrderFeeForm
-        key={`${shop.data.orderFee}-${shop.data.orderFeeLabel}-${shop.data.vipNoFee}`}
+        key={`${shop.data.orderFee}-${shop.data.orderFeeLabel}-${shop.data.vipOrderFee}`}
         fee={shop.data.orderFee}
         label={shop.data.orderFeeLabel}
-        vipNoFee={shop.data.vipNoFee}
-        onSave={(fee, label, vipNoFee) =>
-          actions.run(() => api.adminUpdateOrderFee(fee, label, vipNoFee))
+        vipFee={shop.data.vipOrderFee}
+        onSave={(fee, label, vipFee) =>
+          actions.run(() => api.adminUpdateOrderFee(fee, label, vipFee))
         }
       />
     </List>

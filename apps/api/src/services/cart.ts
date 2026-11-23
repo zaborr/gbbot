@@ -1,5 +1,5 @@
 import { and, eq, isNull, or } from 'drizzle-orm';
-import type { Cart, CartLine } from '@tma-shop/shared';
+import { orderFeeFor, type Cart, type CartLine } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import { cartItems, carts, productVariants, products, shops } from '../db/schema.js';
 import { toProductDTO, toVariantDTO, variantLabel } from '../db/mappers.js';
@@ -148,9 +148,8 @@ export async function getCart(
   });
 
   // The per-order fee is added once, only when there is something to buy
-  // (and not for VIPs when the GB says so).
-  const fee =
-    lines.length > 0 && !(isVip && shop?.vipNoFee) ? (shop?.orderFee ?? 0) : 0;
+  // (VIPs pay their own one when the GB sets it).
+  const fee = lines.length > 0 && shop ? orderFeeFor(shop, isVip) : 0;
   // Testings ticked here that still apply (the cart holds what they test).
   const testings = shop
     ? await cartTestingsFor(db, shop, cart.id, userId, cartLinesForTesting(lines), isVip)

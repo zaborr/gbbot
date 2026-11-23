@@ -196,12 +196,26 @@ async function updateShop(
 export async function updateOrderFee(
   db: Database,
   shopId: string,
-  input: { orderFee: number; orderFeeLabel: string; vipNoFee?: boolean | undefined },
+  input: {
+    orderFee: number;
+    orderFeeLabel: string;
+    vipNoFee?: boolean | undefined;
+    vipOrderFee?: number | null | undefined;
+  },
 ): Promise<ShopAdminView> {
+  // The VIP fee, if given (or as the older on/off said); vipNoFee follows it.
+  const vip =
+    input.vipOrderFee !== undefined
+      ? input.vipOrderFee
+      : input.vipNoFee === undefined
+        ? undefined
+        : input.vipNoFee
+          ? 0
+          : null;
   const row = await updateShop(db, shopId, {
     orderFee: input.orderFee,
     orderFeeLabel: input.orderFeeLabel,
-    ...(input.vipNoFee === undefined ? {} : { vipNoFee: input.vipNoFee }),
+    ...(vip === undefined ? {} : { vipOrderFee: vip, vipNoFee: vip === 0 }),
   });
   return toShopAdminDTO(row);
 }
