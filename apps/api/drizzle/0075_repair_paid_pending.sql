@@ -5,5 +5,5 @@ WHERE "order_id" IN (
   SELECT "id" FROM "orders"
   WHERE "status" = 'pending' AND "amount_paid" > 0 AND "amount_paid" >= "total" AND "amount_submitted" = 0
 );--> statement-breakpoint
-UPDATE "orders" SET "status" = COALESCE("resume_status", 'paid'), "resume_status" = NULL, "updated_at" = now()
+UPDATE "orders" SET "status" = COALESCE("resume_status", 'paid')::order_status, "resume_status" = NULL, "updated_at" = now()
 WHERE "status" = 'pending' AND "amount_paid" > 0 AND "amount_paid" >= "total" AND "amount_submitted" = 0;
