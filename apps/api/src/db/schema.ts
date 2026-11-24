@@ -868,3 +868,24 @@ export const botSettings = pgTable('bot_settings', {
   lastErrorAt: timestamp('last_error_at', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Images uploaded from the app (a GB's picture), kept here so they go with the
+ * backups and nobody's browser asks another site for them. Served at
+ * /api/images/:id; one no longer used is deleted.
+ */
+export const images = pgTable(
+  'images',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: uuid('shop_id')
+      .notNull()
+      .references(() => shops.id, { onDelete: 'cascade' }),
+    mime: text('mime').notNull(),
+    data: bytea('data').notNull(),
+    size: integer('size').notNull(),
+    uploadedBy: bigint('uploaded_by', { mode: 'number' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('images_shop_idx').on(table.shopId)],
+);

@@ -575,6 +575,13 @@
       "when": 1797019200000,
       "tag": "0081_payment_round_titles",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1797105600000,
+      "tag": "0082_images",
+      "breakpoints": true
     }
   ]
 }

@@ -44,6 +44,7 @@ import {
 import type { Context } from 'hono';
 import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth, requireOwner } from '../auth/middleware.js';
+import { imageUrl, saveImage } from '../services/images.js';
 import { testingAdminRoutes } from './testing.js';
 import { announceTestingTiers, listTestings, markTestings, setTestingEnabled } from '../services/testing.js';
 import { unpaidExtras } from '../services/testingExtra.js';
@@ -208,6 +209,14 @@ const categoryInput = z.object({
 export function adminRoutes(): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
   app.use('*', requireAuth, requireAdmin);
+
+  // An image from the phone (already made smaller), kept here: its link back.
+  app.post('/images', async (c) => {
+    const mime = (c.req.header('content-type') ?? '').split(';')[0]!.trim().toLowerCase();
+    const data = Buffer.from(await c.req.arrayBuffer());
+    const id = await saveImage(c.get('db'), c.get('shopId'), c.get('claims').sub, mime, data);
+    return c.json({ url: imageUrl(c.get('env'), new URL(c.req.url).origin, id) }, 201);
+  });
 
   // Shop settings (admin view includes the payment setup and admin ids).
   app.get('/shop', (c) => c.json(getShopAdminView(c.get('shop'))));

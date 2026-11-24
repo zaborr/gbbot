@@ -23,6 +23,7 @@ import { createClubChecker, createVipChecker } from './vip.js';
 import { shopTestingCounts, shopsOpenToOutside } from './testing.js';
 import { loadPeople, organizerTags, resolvePeople } from './team.js';
 import { goalProgressOf, goalTotals } from './goal.js';
+import { dropImageIfUnused } from './images.js';
 
 export type ShopRow = typeof shops.$inferSelect;
 
@@ -256,13 +257,17 @@ export async function updateShopProfile(
   shopId: string,
   input: ShopProfileInput,
 ): Promise<ShopAdminView> {
-  return toShopAdminDTO(
-    await updateShop(db, shopId, {
-      ...input,
-      nameEn: optionalText(input.nameEn),
-      descriptionEn: optionalText(input.descriptionEn),
-    }),
-  );
+  const before = await db.query.shops.findFirst({ where: eq(shops.id, shopId) });
+  const row = await updateShop(db, shopId, {
+    ...input,
+    nameEn: optionalText(input.nameEn),
+    descriptionEn: optionalText(input.descriptionEn),
+  });
+  // The picture changed: an uploaded one no longer used goes.
+  if (before?.imageUrl && before.imageUrl !== row.imageUrl) {
+    await dropImageIfUnused(db, before.imageUrl).catch((error: unknown) => console.error('Dropping an image failed:', error));
+  }
+  return toShopAdminDTO(row);
 }
 
 /**
