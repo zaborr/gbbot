@@ -1,5 +1,6 @@
 import type { Env } from '../config/env.js';
 import { deleteExpiredUploads } from './uploads.js';
+import { deleteUnusedImages } from './images.js';
 import { closeStaleBroadcasts } from './broadcast.js';
 import { deleteExpiredMessages } from './expiringMessages.js';
 import type { Database } from '../db/client.js';
@@ -52,6 +53,12 @@ export async function runMaintenance(db: Database, env: Env): Promise<void> {
     if (dropped > 0) console.log(`Deleted ${dropped} expired file(s) sent to the bot.`);
   } catch (error) {
     console.error('Cleaning files sent to the bot failed:', error);
+  }
+  try {
+    const dropped = await deleteUnusedImages(db);
+    if (dropped > 0) console.log(`Deleted ${dropped} uploaded image(s) never used.`);
+  } catch (error) {
+    console.error('Cleaning uploaded images failed:', error);
   }
   try {
     const report = await runRetention(db);

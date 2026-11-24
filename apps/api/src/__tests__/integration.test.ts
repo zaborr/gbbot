@@ -4884,6 +4884,46 @@ describeDb('API integration', () => {
     await db.update(shops).set({ nameEn: null }).where(eq(shops.id, shopId));
   });
 
+  it('keeps a GB picture uploaded from the app, and drops it once replaced', async () => {
+    const token = await authToken(ADMIN_ID, 'Admin');
+    // A 1×1 PNG.
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+      'base64',
+    );
+    const up = await request('/api/admin/images', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'content-type': 'image/png' },
+      body: png,
+    });
+    expect(up.status).toBe(201);
+    const { url } = (await up.json()) as { url: string };
+    expect(url).toMatch(/\/api\/images\/[0-9a-f-]{36}$/);
+    const id = url.split('/').pop()!;
+    const served = await request(`/api/images/${id}`);
+    expect(served.status).toBe(200);
+    expect(served.headers.get('content-type')).toBe('image/png');
+    expect(Buffer.from(await served.arrayBuffer()).equals(png)).toBe(true);
+    // Not an image: refused.
+    const text = await request('/api/admin/images', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'content-type': 'text/plain' },
+      body: 'hello',
+    });
+    expect(text.status).toBe(400);
+
+    const admin = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const save = (imageUrl: string | null) =>
+      request('/api/admin/shop/profile', {
+        method: 'PUT',
+        headers: admin,
+        body: JSON.stringify({ name: 'Test Shop', description: '', nameEn: null, descriptionEn: null, imageUrl }),
+      });
+    expect((await save(url)).status).toBe(200);
+    expect((await save(null)).status).toBe(200);
+    expect((await request(`/api/images/${id}`)).status).toBe(404);
+  });
+
   it('enforces admin-only routes', async () => {
     const customer = await authToken(CUSTOMER_ID, 'Alice');
     const denied = await request('/api/admin/orders', {

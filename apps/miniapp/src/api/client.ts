@@ -161,7 +161,7 @@ export class ApiClient {
 
   private async request<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
     const headers = new Headers(init.headers);
-    if (init.body) headers.set('Content-Type', 'application/json');
+    if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     if (this.token) headers.set('Authorization', `Bearer ${this.token}`);
     if (this.shop) headers.set('X-Shop', this.shop);
     // Error messages come back in the user's language.
@@ -744,6 +744,15 @@ export class ApiClient {
   }
 
   /** The time to join and give opens again (closed, or settled with nothing reached). */
+  /** An image (already made smaller) kept on the server: its link back. */
+  adminUploadImage(image: Blob): Promise<{ url: string }> {
+    return this.request<{ url: string }>('/admin/images', {
+      method: 'POST',
+      headers: { 'Content-Type': image.type },
+      body: image,
+    });
+  }
+
   adminOpenTestingExtra(id: string, hours: number): Promise<{ ok: boolean }> {
     return this.request<{ ok: boolean }>(`/admin/testings/${id}/extra`, {
       method: 'POST',

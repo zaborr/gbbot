@@ -18,6 +18,7 @@ import { platformRoutes } from './routes/platform.js';
 import { meRoutes } from './routes/me.js';
 import { organizerRoutes } from './routes/organizer.js';
 import { uploadRoutes } from './routes/uploads.js';
+import { imageRoutes } from './routes/images.js';
 import { webAccountRoutes } from './routes/webAccounts.js';
 
 export function createApp(deps: AppDeps): Hono<AppBindings> {
@@ -73,6 +74,7 @@ export function createApp(deps: AppDeps): Hono<AppBindings> {
   api.route('/me', meRoutes());
   api.route('/organizer', organizerRoutes());
   api.route('/uploads', uploadRoutes());
+  api.route('/images', imageRoutes());
   api.route('/web-accounts', webAccountRoutes());
 
   // Shop routes: the `X-Shop` header (id or slug) picks the shop.

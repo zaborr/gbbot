@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import { Input, Textarea } from '../../components/Field.js';
 import type { ShopAdminView } from '@tma-shop/shared';
@@ -12,6 +12,7 @@ import { AdminOnly, ErrorBanner, useAdminActions } from './common.js';
 import { PageTitle } from '../../components/PageTitle.js';
 import { LangTabs, type TextLang } from '../../components/LangTabs.js';
 import { t } from '../../i18n/index.js';
+import { MAX_SOURCE_BYTES, shrinkImage } from '../../lib/imageResize.js';
 
 /** Shop name, description and image, editable by the shop's own admins. */
 export function AdminSettingsPage(): React.JSX.Element {
@@ -167,6 +168,7 @@ function ProfileForm({
           value={imageUrl}
           onChange={(e) => setImageUrl(e.target.value)}
         />
+        <ImageUpload onUploaded={setImageUrl} />
         {image !== '' && !imageInvalid && (
           <div style={{ padding: '8px 16px' }}>
             <ProductImage url={image} alt={t('common.preview')} size={96} />
@@ -266,3 +268,54 @@ export function AutoCancelForm({
     </>
   );
 }
+
+/** A picture from the phone: made smaller here, kept on the server, its link put in the field. */
+function ImageUpload({ onUploaded }: { onUploaded: (url: string) => void }): React.JSX.Element {
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  const pick = async (file: File | undefined): Promise<void> => {
+    if (!file) return;
+    if (file.size > MAX_SOURCE_BYTES) {
+      setNote(t('settings.imageTooBig'));
+      return;
+    }
+    setBusy(true);
+    setNote(null);
+    try {
+      const small = await shrinkImage(file);
+      if (!small) {
+        setNote(t('settings.imageUnreadable'));
+        return;
+      }
+      const { url } = await api.adminUploadImage(small);
+      onUploaded(url);
+      setNote(t('settings.imageUploaded'));
+    } catch (error) {
+      setNote(error instanceof Error ? error.message : t('settings.imageUnreadable'));
+    } finally {
+      setBusy(false);
+      if (input.current) input.current.value = '';
+    }
+  };
+
+  return (
+    <div style={{ padding: '8px 16px' }}>
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={(e) => void pick(e.target.files?.[0])}
+      />
+      <Button stretched mode="bezeled" loading={busy} onClick={() => input.current?.click()}>
+        {t('settings.imageUpload')}
+      </Button>
+      {note && (
+        <div style={{ paddingTop: 8, fontSize: 14, color: 'var(--tgui--hint_color)' }}>{note}</div>
+      )}
+    </div>
+  );
+}
+
