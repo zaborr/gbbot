@@ -143,10 +143,20 @@ export function CatalogPage(): React.JSX.Element {
   // Only "Others": no point in a bar or a title.
   const sections = groups.length === 1 && groups[0]!.key === 'other' ? [] : groups;
   const [active, setActive] = useState<string | null>(null);
+  const jumping = useRef(false);
+  const jumpEnd = useRef<number | null>(null);
   useEffect(() => {
     if (sections.length === 0) return;
     // The category being read: the last whose title is past the bar.
     const onScroll = (): void => {
+      // Jumping to a category: it stays marked until the page stops moving.
+      if (jumping.current) {
+        if (jumpEnd.current) window.clearTimeout(jumpEnd.current);
+        jumpEnd.current = window.setTimeout(() => {
+          jumping.current = false;
+        }, 150);
+        return;
+      }
       let current: string | null = sections[0]!.key;
       for (const g of sections) {
         const el = document.getElementById(`gb-cat-${g.key}`);
@@ -163,7 +173,14 @@ export function CatalogPage(): React.JSX.Element {
     if (active) document.getElementById(`gb-chip-${active}`)?.scrollIntoView({ block: 'nearest', inline: 'center' });
   }, [active]);
   const jump = (key: string): void => {
+    jumping.current = true;
+    setActive(key);
     document.getElementById(`gb-cat-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Already there (nothing moves): marking goes back to following the scroll.
+    if (jumpEnd.current) window.clearTimeout(jumpEnd.current);
+    jumpEnd.current = window.setTimeout(() => {
+      jumping.current = false;
+    }, 800);
   };
 
   // With something in the cart, the bottom button leads to it (with its total).
@@ -286,8 +303,16 @@ export function CatalogPage(): React.JSX.Element {
         </div>
       )}
       {products.data &&
-        sections.map((g) => (
-          <div key={g.key} id={`gb-cat-${g.key}`} style={{ scrollMarginTop: BAR_OFFSET }}>
+        sections.map((g, i) => (
+          <div
+            key={g.key}
+            id={`gb-cat-${g.key}`}
+            // The last one, however short, can still come up to the top.
+            style={{
+              scrollMarginTop: BAR_OFFSET,
+              minHeight: i === sections.length - 1 ? `calc(100vh - ${BAR_OFFSET}px)` : undefined,
+            }}
+          >
             <Section header={g.title}>
               {g.items.map((product) => (
                 <ProductCard key={product.id} product={product} testings={testings.data ?? []} />
