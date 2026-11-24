@@ -9,6 +9,7 @@ import {
   exchangeRateFor,
   payBefore,
   shippingCost,
+  shipUnitsOf,
   unitPriceFor,
   type ExchangeRates,
   type ManualMethodView,
@@ -785,7 +786,13 @@ function ChangeEditor({
   // The fee is charged once per order. Shipping stays as it was, except for an
   // unpaid order, where it follows the zone again (free shipping threshold).
   const zone = direct ? zones.find((z) => z.name === order.shippingZoneName) : undefined;
-  const shipping = zone ? shippingCost(zone, itemsTotal, vipFreeShipping) : order.shipping;
+  // Each line counts for free shipping as its product (or variant) says.
+  const shipUnits = lines.reduce((sum, l) => {
+    const product = products.get(l.productId);
+    const variant = product?.variants.find((v) => v.id === l.variantId) ?? null;
+    return sum + l.quantity * (product ? shipUnitsOf(product, variant) : 100);
+  }, 0);
+  const shipping = zone ? shippingCost(zone, itemsTotal, vipFreeShipping, shipUnits) : order.shipping;
   // Testings stay while the order holds what they test (the server drops the others).
   const total = itemsTotal + fixedTotal + order.fee + shipping + order.testing;
   const diff = total - coveredAmount(order);

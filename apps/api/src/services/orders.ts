@@ -8,6 +8,7 @@ import {
   type ExchangeRates,
   MAX_ADDRESS_EXTRAS,
   orderFeeFor,
+  shipUnitsOf,
   shippingCost,
   type Order,
   type OrderStatus,
@@ -260,7 +261,9 @@ export async function createOrderFromCart(
       addressKeyFingerprint = envelope.kid;
     }
     if (zone) {
-      shipping = shippingCost(zone, draft.total, isVip && shop.vipNoShipping);
+      // Each product counts for free shipping as it says (its variant's own, if set).
+      const units = valid.reduce((sum, { item, product, variant }) => sum + item.quantity * shipUnitsOf(product, variant), 0);
+      shipping = shippingCost(zone, draft.total, isVip && shop.vipNoShipping, units);
       shippingZoneName = zone.name;
     }
 
@@ -822,6 +825,31 @@ async function testingLinesOf(
   return items.filter((item) => set.has(item.productId));
 }
 
+/** What lines count for free shipping (hundredths): each unit as its variant or product says. */
+async function shipUnitsOfItems(
+  tx: Pick<Database, 'select'>,
+  items: ReadonlyArray<{ productId: string; variantId: string | null; quantity: number }>,
+): Promise<number> {
+  if (items.length === 0) return 0;
+  const productRows = await tx
+    .select({ id: products.id, shipUnits: products.shipUnits })
+    .from(products)
+    .where(inArray(products.id, [...new Set(items.map((i) => i.productId))]));
+  const variantIds = items.flatMap((i) => (i.variantId ? [i.variantId] : []));
+  const variantRows = variantIds.length
+    ? await tx
+        .select({ id: productVariants.id, shipUnits: productVariants.shipUnits })
+        .from(productVariants)
+        .where(inArray(productVariants.id, variantIds))
+    : [];
+  const ofProduct = new Map(productRows.map((p) => [p.id, p.shipUnits]));
+  const ofVariant = new Map(variantRows.map((v) => [v.id, v.shipUnits]));
+  return items.reduce((sum, item) => {
+    const own = item.variantId ? ofVariant.get(item.variantId) : null;
+    return sum + item.quantity * (own ?? ofProduct.get(item.productId) ?? 100);
+  }, 0);
+}
+
 /** The kept testing lines, as they go back in after a change. */
 const reinserted = (orderId: string, kept: readonly OrderItemRow[]) =>
   kept.map(({ id: _id, ...line }) => ({ ...line, orderId }));
@@ -997,7 +1025,9 @@ async function applyUnpaidEdit(
     if (order.shippingZoneName) {
       const shop = await tx.query.shops.findFirst({ where: eq(shops.id, shopId) });
       const zone = shop?.shippingZones.find((z) => z.name === order.shippingZoneName);
-      if (zone) shipping = shippingCost(zone, itemsTotal, order.isVip && (shop?.vipNoShipping ?? false));
+      if (zone) {
+        shipping = shippingCost(zone, itemsTotal, order.isVip && (shop?.vipNoShipping ?? false), await shipUnitsOfItems(tx, items));
+      }
     }
 
     await tx.delete(orderItems).where(eq(orderItems.orderId, order.id));

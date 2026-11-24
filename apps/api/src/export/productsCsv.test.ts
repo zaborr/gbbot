@@ -23,6 +23,7 @@ function product(partial: Partial<Product>): Product {
     isActive: true,
     vipOnly: false,
     minQuantity: 1,
+    shipUnits: 100,
     options: [],
     variants: [],
     priceTiers: [],
@@ -80,8 +81,8 @@ describe('readProductsCsv', () => {
       ],
     });
     expect(shirt.input.variants).toEqual([
-      { values: ['M', 'Red'], price: null, vipPrice: null, stock: 3, isActive: true },
-      { values: ['L', 'Red'], price: 2200, vipPrice: null, stock: null, isActive: true },
+      { values: ['M', 'Red'], price: null, vipPrice: null, stock: 3, isActive: true, shipUnits: null },
+      { values: ['L', 'Red'], price: 2200, vipPrice: null, stock: null, isActive: true, shipUnits: null },
     ]);
     expect(shirt.category).toBe('Clothes');
     expect(products[1]?.input).toMatchObject({ slug: 'mug', price: 800, stock: 10, isActive: false });

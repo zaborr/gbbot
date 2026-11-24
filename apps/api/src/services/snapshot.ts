@@ -106,6 +106,7 @@ export async function takeSnapshot(db: Database, shop: ShopRow): Promise<GbSnaps
       isActive: p.isActive,
       vipOnly: p.vipOnly,
       minQuantity: p.minQuantity,
+      shipUnits: p.shipUnits,
       options: p.options,
       priceTiers: p.priceTiers,
       variants: variantRows
@@ -116,6 +117,7 @@ export async function takeSnapshot(db: Database, shop: ShopRow): Promise<GbSnaps
           vipPrice: v.vipPrice,
           stock: v.stock,
           isActive: v.isActive,
+          shipUnits: v.shipUnits,
         })),
     })),
     labs: labRows.map((l) => ({ name: l.name, currency: l.currency, tests: l.tests, notes: l.notes })),
@@ -236,6 +238,7 @@ export async function restoreSnapshot(
             vipPrice: v.vipPrice,
             stock: v.stock,
             isActive: v.isActive,
+            shipUnits: v.shipUnits ?? null,
             sortOrder: index,
           })),
         ).returning({ id: productVariants.id, optionValues: productVariants.optionValues });

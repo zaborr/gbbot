@@ -17,6 +17,8 @@ interface Row {
   name: string;
   price: string;
   freeFrom: string;
+  /** Free from this many shipping units (each product counts as it says). */
+  freeUnits: string;
   active: boolean;
 }
 
@@ -63,6 +65,7 @@ function ShippingForm({
       name: z.name,
       price: toMajor(z.price),
       freeFrom: z.freeFrom === null ? '' : toMajor(z.freeFrom),
+      freeUnits: z.freeFromUnits ? String(z.freeFromUnits / 100) : '',
       active: z.isActive,
     })),
   );
@@ -76,7 +79,8 @@ function ShippingForm({
     (r) =>
       !r.name.trim() ||
       !PRICE_RE.test(r.price.trim()) ||
-      (r.freeFrom.trim() !== '' && !PRICE_RE.test(r.freeFrom.trim())),
+      (r.freeFrom.trim() !== '' && !PRICE_RE.test(r.freeFrom.trim())) ||
+      (r.freeUnits.trim() !== '' && !PRICE_RE.test(r.freeUnits.trim())),
   );
   const anyActive = rows.some((r) => r.active);
 
@@ -89,6 +93,7 @@ function ShippingForm({
           name: r.name.trim(),
           price: toCents(r.price.trim()),
           freeFrom: r.freeFrom.trim() === '' ? null : toCents(r.freeFrom.trim()) || null,
+          freeFromUnits: r.freeUnits.trim() === '' ? null : toCents(r.freeUnits.trim()) || null,
           isActive: r.active,
         })),
         vipFree,
@@ -150,6 +155,17 @@ function ShippingForm({
             value={row.freeFrom}
             onChange={(e) => update(row.key, { freeFrom: e.target.value })}
           />
+          <Input
+            header={t('shipping.freeFromUnits')}
+            type="text"
+            inputMode="decimal"
+            placeholder="e.g. 10"
+            status={
+              row.freeUnits.trim() === '' || PRICE_RE.test(row.freeUnits.trim()) ? 'default' : 'error'
+            }
+            value={row.freeUnits}
+            onChange={(e) => update(row.key, { freeUnits: e.target.value })}
+          />
           <Cell
             after={
               <Button
@@ -196,7 +212,7 @@ function ShippingForm({
             onClick={() => {
               setRows((prev) => [
                 ...prev,
-                { key: nextKey, id: undefined, name: '', price: '', freeFrom: '', active: true },
+                { key: nextKey, id: undefined, name: '', price: '', freeFrom: '', freeUnits: '', active: true },
               ]);
               setNextKey((k) => k + 1);
             }}

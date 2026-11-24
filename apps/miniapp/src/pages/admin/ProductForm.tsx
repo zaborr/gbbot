@@ -10,6 +10,8 @@ import {
   buildVariants,
   initialDrafts,
   initialOptions,
+  parseShip,
+  shipText,
   VariantsEditor,
   type OptionDraft,
   type VariantDraft,
@@ -41,6 +43,8 @@ export function ProductForm({
   const [token, setToken] = useState<string>(product?.currency ?? defaultToken);
   const [vipOnly, setVipOnly] = useState(product?.vipOnly ?? false);
   const [minQty, setMinQty] = useState(product && product.minQuantity > 1 ? String(product.minQuantity) : '');
+  const [ship, setShip] = useState(product && product.shipUnits !== 100 ? shipText(product.shipUnits) : '');
+  const shipInvalid = ship.trim() !== '' && parseShip(ship) === null;
   const [stock, setStock] = useState(
     product && product.stock !== null ? String(product.stock) : '',
   );
@@ -104,6 +108,8 @@ export function ProductForm({
       isActive: product?.isActive ?? true,
       vipOnly,
       minQuantity: minValue === '' || minInvalid ? 1 : Number(minValue),
+      // Empty = counts as 1 unit for free shipping.
+      shipUnits: ship.trim() === '' ? 100 : (parseShip(ship) ?? 100),
       options: built.options,
       variants: built.variants,
       priceTiers: builtTiers.tiers,
@@ -268,6 +274,15 @@ export function ProductForm({
         value={minQty}
         onChange={(e) => setMinQty(e.target.value)}
       />
+      <Input
+        header={t('productForm.shipUnits')}
+        type="text"
+        inputMode="decimal"
+        placeholder="1"
+        status={shipInvalid ? 'error' : 'default'}
+        value={ship}
+        onChange={(e) => setShip(e.target.value)}
+      />
     </Section>
 
     {!withVariants && (
@@ -298,6 +313,7 @@ export function ProductForm({
       setDrafts={setVariantDrafts}
       basePrice={price}
       vipBasePrice={vipPrice}
+      baseShip={ship.trim() || '1'}
       currency={token}
     />
 
@@ -321,6 +337,7 @@ export function ProductForm({
             vipInvalid ||
             (!withVariants && stockInvalid) ||
             minInvalid ||
+            shipInvalid ||
             formError !== null
           }
           onClick={() => void submit()}

@@ -162,6 +162,7 @@ export async function syncVariants(
           vipPrice: input.vipPrice ?? null,
           stock: input.stock,
           isActive: input.isActive,
+          shipUnits: input.shipUnits ?? null,
           sortOrder: index,
         })
         .where(inArray(productVariants.id, [current.id]));
@@ -173,6 +174,7 @@ export async function syncVariants(
         vipPrice: input.vipPrice ?? null,
         stock: input.stock,
         isActive: input.isActive,
+        shipUnits: input.shipUnits ?? null,
         sortOrder: index,
       });
     }

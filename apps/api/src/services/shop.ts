@@ -324,6 +324,7 @@ export async function updateShippingZones(
     name: z.name.trim(),
     price: z.price,
     freeFrom: z.freeFrom,
+    freeFromUnits: z.freeFromUnits ?? null,
     isActive: z.isActive,
   }));
   return toShopAdminDTO(
