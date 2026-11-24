@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { formatDateTime } from '../../lib/format.js';
+import { formatDateTime, formatPrice } from '../../lib/format.js';
 import { useState } from 'react';
 import { Cell, List, Section, Switch } from '@telegram-apps/telegram-ui';
 import type { Testing } from '@tma-shop/shared';
@@ -91,6 +91,11 @@ function AdminTestings(): React.JSX.Element {
                   ))}
                 </Section>
               ))}
+            {totalsLine(all) && (
+              <Section>
+                <Cell multiline>{totalsLine(all)}</Cell>
+              </Section>
+            )}
             <Section footer={t('testing.listFooter')}>
               <Cell onClick={() => navigate(to('/admin/testings/new'))}>{t('testing.new')}</Cell>
               <Cell onClick={() => navigate(to('/admin/testing-reports'))} after="›">
@@ -104,6 +109,31 @@ function AdminTestings(): React.JSX.Element {
         ))}
     </List>
   );
+}
+
+/** What each person pays: the extra round's share while it lasts, else the fee. */
+function perPerson(testing: Testing): string {
+  const fmt = (amount: number): string => formatPrice(amount, testing.currency);
+  const share = testing.extra?.estimate.share ?? null;
+  if (testing.extra && testing.extra.outcome === null && share !== null) {
+    return t('testing.panel.extraPerPerson', { amount: fmt(share) });
+  }
+  return testing.contribution > 0
+    ? t('testing.panel.perPerson', { amount: fmt(testing.contribution) })
+    : t('testing.panel.noFee');
+}
+
+/** The testings going on, added up: how many, people on them and the pot (per currency). */
+function totalsLine(items: Testing[]): string | null {
+  const live = items.filter((x) => x.status !== 'settled' && x.status !== 'cancelled' && x.money);
+  if (live.length === 0) return null;
+  const pots = new Map<string, number>();
+  for (const x of live) pots.set(x.currency, (pots.get(x.currency) ?? 0) + (x.money?.pot ?? 0));
+  return t('testing.panel.totals', {
+    testings: live.length,
+    people: live.reduce((sum, x) => sum + (x.money?.entries ?? 0), 0),
+    pot: [...pots].map(([currency, amount]) => formatPrice(amount, currency)).join(' + '),
+  });
 }
 
 /** One testing in the panel: what comes next, how far the pot is, who paid. */
@@ -129,7 +159,13 @@ function TestingPanelCell({ testing, onOpen }: { testing: Testing; onOpen: () =>
                 count: testing.tiers.length,
               })}
             </span>
+            {live && testing.money && (
+              <span className="gb-chip">
+                {tn(testing.money.entries, 'testing.panel.entries.one', 'testing.panel.entries.other')}
+              </span>
+            )}
             {live && <span className="gb-chip">{tn(testing.participants, 'testing.panel.paid.one', 'testing.panel.paid.other')}</span>}
+            {live && <span className="gb-chip">{perPerson(testing)}</span>}
             {live && unpaid > 0 && (
               <span className="gb-chip gb-chip--warn">{tn(unpaid, 'testing.panel.unpaid.one', 'testing.panel.unpaid.other')}</span>
             )}
