@@ -37,7 +37,18 @@ function points(testing: Testing, shop: { closedAt: string | null; closesAt: str
   }
   if (testing.extraEnabled) {
     const extra = testing.extra;
-    add('extra', 'testing.timeline.extra', extra?.stage === 'done' || drawn, extra?.until ?? null);
+    if (testing.next?.step === 'extra') {
+      // Waiting for the organisers: it never opened, or it got nothing.
+      add('extra', extra ? 'testing.timeline.extraNothing' : 'testing.timeline.extraNotOpened', false, extra?.until ?? null);
+    } else {
+      const got = (extra?.outcome?.tiers.length ?? 0) > 0;
+      add(
+        'extra',
+        extra?.stage === 'done' && !got ? 'testing.timeline.extraNothing' : 'testing.timeline.extra',
+        extra?.stage === 'done' || drawn,
+        extra?.until ?? null,
+      );
+    }
   }
   add('draw', 'testing.timeline.draw', drawn, testing.draw?.drawnAt ?? testing.draw?.announcedAt ?? null);
   add('sent', 'testing.timeline.vialsSent', Boolean(lab.sentAt), lab.sentAt ?? null);
