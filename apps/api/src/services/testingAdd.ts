@@ -42,7 +42,8 @@ export async function addParticipant(
     : await db.query.users.findFirst({ where: sql`lower(${users.username}) = ${who.toLowerCase()}` });
   if (!person) {
     const bot = botUsername();
-    throw ApiError.notFound(
+    throw new ApiError(
+      404,
       'testing_not_seen',
       bot ? `This person has not opened the bot yet: send them https://t.me/${bot}` : 'This person has not opened the bot yet',
     );
