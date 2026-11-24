@@ -111,16 +111,22 @@ function AdminTestings(): React.JSX.Element {
   );
 }
 
-/** What each person pays: the extra round's share while it lasts, else the fee. */
+/**
+ * What each person pays: the extra round's share while it lasts; else the fee,
+ * and, when short of the next tier, what is missing shared out among those in it.
+ */
 function perPerson(testing: Testing): string {
   const fmt = (amount: number): string => formatPrice(amount, testing.currency);
   const share = testing.extra?.estimate.share ?? null;
   if (testing.extra && testing.extra.outcome === null && share !== null) {
     return t('testing.panel.extraPerPerson', { amount: fmt(share) });
   }
-  return testing.contribution > 0
-    ? t('testing.panel.perPerson', { amount: fmt(testing.contribution) })
-    : t('testing.panel.noFee');
+  const fee = testing.contribution > 0 ? t('testing.panel.perPerson', { amount: fmt(testing.contribution) }) : null;
+  const missing = testing.money?.steps.find((step) => step.missing > 0)?.missing ?? 0;
+  const people = testing.money?.entries ?? 0;
+  if (missing <= 0 || people <= 0) return fee ?? t('testing.panel.noFee');
+  const short = t('testing.panel.missingPerPerson', { amount: fmt(Math.ceil(missing / people)) });
+  return fee ? `${fee} · ${short}` : short;
 }
 
 /** The testings going on, added up: how many, people on them and the pot (per currency). */

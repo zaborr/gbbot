@@ -1526,6 +1526,7 @@ export const en = {
   'testing.panel.entries.other': '👥 {count} in',
   'testing.panel.extraPerPerson': '💶 extra round ≈ {amount} each',
   'testing.panel.going': 'Going on',
+  'testing.panel.missingPerPerson': '💶 missing ≈ {amount} per person',
   'testing.panel.noFee': '💶 no fee',
   'testing.panel.paid.one': '{count} paid',
   'testing.panel.paid.other': '{count} paid',
