@@ -683,6 +683,16 @@ export class ApiClient {
   }
 
   /** Closes a drawn testing: donors get their vial's price back. */
+  adminAddTestingParticipant(
+    id: string,
+    input: { who: string; amount: number | null; volunteer: boolean; notify: boolean },
+  ): Promise<{ orderId: string; notified: boolean }> {
+    return this.request<{ orderId: string; notified: boolean }>(`/admin/testings/${id}/participants`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
   adminRemindTestingUnpaid(id: string): Promise<{ sent: number }> {
     return this.request<{ sent: number }>(`/admin/testings/${id}/remind`, { method: 'POST' });
   }
