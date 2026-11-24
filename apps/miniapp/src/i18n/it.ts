@@ -423,6 +423,7 @@ export const it: Record<MessageKey, string> = {
   'catalog.inCart': 'Nel carrello · {count}',
   'catalog.myOrders': '📦 I miei ordini',
   'catalog.noProducts': 'Nessun prodotto trovato',
+  'catalog.other': 'Altri',
   'catalog.search': 'Cerca prodotti',
   'catalog.showMore': 'Mostra altri ({shown} di {total})',
   'catalog.testingAll': 'Tutti i test ottenuti',

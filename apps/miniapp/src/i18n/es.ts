@@ -423,6 +423,7 @@ export const es: Record<MessageKey, string> = {
   'catalog.inCart': 'En carrito · {count}',
   'catalog.myOrders': '📦 Mis pedidos',
   'catalog.noProducts': 'No hay productos',
+  'catalog.other': 'Otros',
   'catalog.search': 'Buscar productos',
   'catalog.showMore': 'Ver más ({shown} de {total})',
   'catalog.testingAll': 'Todos los tests conseguidos',

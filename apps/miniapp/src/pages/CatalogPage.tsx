@@ -22,15 +22,16 @@ import { GoalBar } from '../components/GoalBar.js';
 import { useMainButton } from '../hooks/useMainButton.js';
 import { formatPrice } from '../lib/format.js';
 
-/** Products loaded at a time; "Show more" brings the next ones. */
-const PAGE_SIZE = 30;
+/** Products loaded at a time (all of a GB, as a rule: they are shown by category); "Show more" brings the rest. */
+const PAGE_SIZE = 150;
+/** Room the category bar takes at the top, for jumping to a section. */
+const BAR_OFFSET = 64;
 
 /**
  * Where the customer was in each GB's catalog (filters, extra pages, scroll),
  * so coming back from a product puts them in the same place.
  */
 interface CatalogPlace {
-  categoryId: string | undefined;
   search: string;
   onlyTesting: boolean;
   more: { items: Product[]; page: number };
@@ -44,7 +45,6 @@ export function CatalogPage(): React.JSX.Element {
   const { itemCount, cart } = useCart();
   const { shop, canManage } = useShop();
   const [place] = useState(() => places.get(shop.id));
-  const [categoryId, setCategoryId] = useState<string | undefined>(place?.categoryId);
   const [search, setSearch] = useState(place?.search ?? '');
   const [onlyTesting, setOnlyTesting] = useState(place?.onlyTesting ?? false);
 
@@ -56,8 +56,8 @@ export function CatalogPage(): React.JSX.Element {
     shop.testingEnabled,
   ]);
   const unpaid = (myOrders.data ?? []).filter(awaitsPayment);
-  const query = { categoryId, search: search.trim() || undefined, ...(onlyTesting ? { testing: '1' as const } : {}) };
-  const products = useAsync(() => api.getProducts({ ...query, limit: PAGE_SIZE }), [categoryId, search, onlyTesting]);
+  const query = { search: search.trim() || undefined, ...(onlyTesting ? { testing: '1' as const } : {}) };
+  const products = useAsync(() => api.getProducts({ ...query, limit: PAGE_SIZE }), [search, onlyTesting]);
   // Further pages, appended below the first; cleared when the search or the
   // category changes (an answer for an old search is dropped).
   const [more, setMore] = useState<{ items: Product[]; page: number }>(
@@ -67,18 +67,18 @@ export function CatalogPage(): React.JSX.Element {
   const queryKey = useRef('');
   const firstRun = useRef(true);
   useEffect(() => {
-    queryKey.current = `${categoryId ?? ''}|${search}|${onlyTesting}`;
+    queryKey.current = `${search}|${onlyTesting}`;
     // On arrival the remembered pages stay; a new search starts again.
     if (firstRun.current) {
       firstRun.current = false;
       return;
     }
     setMore({ items: [], page: 1 });
-  }, [categoryId, search, onlyTesting]);
+  }, [search, onlyTesting]);
 
   // Remember the place when leaving; scroll back to it once the list is there.
-  const latest = useRef({ categoryId, search, onlyTesting, more });
-  latest.current = { categoryId, search, onlyTesting, more };
+  const latest = useRef({ search, onlyTesting, more });
+  latest.current = { search, onlyTesting, more };
   useEffect(
     () => () => {
       places.set(shop.id, { ...latest.current, scrollY: window.scrollY });
@@ -126,6 +126,45 @@ export function CatalogPage(): React.JSX.Element {
     [...testedProducts].filter((id) => (productTestingState(id, openTestings)?.reached.length ?? 0) > 0),
   );
   const total = products.data?.total ?? 0;
+  // As in the admin: one section per category (in its order), the rest at the end.
+  // A search shows its results as one list.
+  const categoryList = categories.data ?? [];
+  const grouped = !search.trim() && categoryList.length > 0;
+  const groups = grouped
+    ? [
+        ...categoryList.map((c) => ({ key: c.id, title: c.title, items: items.filter((p) => p.categoryId === c.id) })),
+        {
+          key: 'other',
+          title: t('catalog.other'),
+          items: items.filter((p) => p.categoryId === null || !categoryList.some((c) => c.id === p.categoryId)),
+        },
+      ].filter((g) => g.items.length > 0)
+    : [];
+  // Only "Others": no point in a bar or a title.
+  const sections = groups.length === 1 && groups[0]!.key === 'other' ? [] : groups;
+  const [active, setActive] = useState<string | null>(null);
+  useEffect(() => {
+    if (sections.length === 0) return;
+    // The category being read: the last whose title is past the bar.
+    const onScroll = (): void => {
+      let current: string | null = sections[0]!.key;
+      for (const g of sections) {
+        const el = document.getElementById(`gb-cat-${g.key}`);
+        if (el && el.getBoundingClientRect().top <= BAR_OFFSET + 8) current = g.key;
+      }
+      setActive(current);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [sections.map((g) => g.key).join('|')]);
+  useEffect(() => {
+    // The chip of the category being read stays in sight in the bar.
+    if (active) document.getElementById(`gb-chip-${active}`)?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [active]);
+  const jump = (key: string): void => {
+    document.getElementById(`gb-cat-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   // With something in the cart, the bottom button leads to it (with its total).
   useMainButton({
@@ -227,34 +266,40 @@ export function CatalogPage(): React.JSX.Element {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <div style={{ display: 'flex', gap: 8, padding: '8px 16px', flexWrap: 'wrap' }}>
-          <Button
-            size="s"
-            mode={categoryId === undefined ? 'filled' : 'bezeled'}
-            onClick={() => setCategoryId(undefined)}
-          >
-            {t('catalog.all')}
-          </Button>
-          {categories.data?.map((category) => (
-            <Button
-              key={category.id}
-              size="s"
-              mode={categoryId === category.id ? 'filled' : 'bezeled'}
-              onClick={() => setCategoryId(category.id)}
-            >
-              {category.title}
-            </Button>
-          ))}
-        </div>
       </Section>
 
       {products.loading && <Loader />}
       {products.error && <ErrorView message={products.error} />}
-      {products.data && (
+      {products.data && sections.length > 0 && (
+        <div className="gb-catbar" role="tablist">
+          {sections.map((g) => (
+            <Button
+              key={g.key}
+              id={`gb-chip-${g.key}`}
+              size="s"
+              mode={active === g.key ? 'filled' : 'bezeled'}
+              onClick={() => jump(g.key)}
+            >
+              {g.title}
+            </Button>
+          ))}
+        </div>
+      )}
+      {products.data &&
+        sections.map((g) => (
+          <div key={g.key} id={`gb-cat-${g.key}`} style={{ scrollMarginTop: BAR_OFFSET }}>
+            <Section header={g.title}>
+              {g.items.map((product) => (
+                <ProductCard key={product.id} product={product} testings={testings.data ?? []} />
+              ))}
+            </Section>
+          </div>
+        ))}
+      {products.data && (items.length === 0 || sections.length === 0 || items.length < total) && (
         <Section>
           {items.length === 0 ? (
             <Cell>{t('catalog.noProducts')}</Cell>
-          ) : (
+          ) : sections.length > 0 ? null : (
             items.map((product) => (
               <ProductCard key={product.id} product={product} testings={testings.data ?? []} />
             ))
