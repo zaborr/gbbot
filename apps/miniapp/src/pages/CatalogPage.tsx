@@ -170,12 +170,20 @@ export function CatalogPage(): React.JSX.Element {
   }, [sections.map((g) => g.key).join('|')]);
   useEffect(() => {
     // The chip of the category being read stays in sight in the bar.
-    if (active) document.getElementById(`gb-chip-${active}`)?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    // Only the bar moves sideways: scrolling the chip into view would stop the page's own jump (iOS).
+    const chip = active ? document.getElementById(`gb-chip-${active}`) : null;
+    const bar = chip?.parentElement;
+    if (chip && bar) {
+      bar.scrollTo({ left: chip.offsetLeft - (bar.clientWidth - chip.offsetWidth) / 2, behavior: 'smooth' });
+    }
   }, [active]);
   const jump = (key: string): void => {
     jumping.current = true;
     setActive(key);
-    document.getElementById(`gb-cat-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const section = document.getElementById(`gb-cat-${key}`);
+    if (section) {
+      window.scrollTo({ top: section.getBoundingClientRect().top + window.scrollY - BAR_OFFSET, behavior: 'smooth' });
+    }
     // Already there (nothing moves): marking goes back to following the scroll.
     if (jumpEnd.current) window.clearTimeout(jumpEnd.current);
     jumpEnd.current = window.setTimeout(() => {
