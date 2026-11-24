@@ -352,6 +352,7 @@ function TestingForm({
           donationsOpen: testing?.donationsOpen ?? false,
           donationProductId: null,
           money: null,
+          invites: [],
         }
       : null;
 
