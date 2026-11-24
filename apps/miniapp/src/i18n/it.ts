@@ -1520,6 +1520,7 @@ export const it: Record<MessageKey, string> = {
   'testing.panel.entries.other': '👥 {count} iscritti',
   'testing.panel.extraPerPerson': '💶 fase extra ≈ {amount} a testa',
   'testing.panel.going': 'In corso',
+  'testing.panel.missingPerPerson': '💶 mancano ≈ {amount} a persona',
   'testing.panel.noFee': '💶 senza quota',
   'testing.panel.paid.one': '{count} pagato',
   'testing.panel.paid.other': '{count} pagati',
