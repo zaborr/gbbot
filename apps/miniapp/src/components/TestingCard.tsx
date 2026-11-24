@@ -51,6 +51,11 @@ function stepOf(testing: Testing): Step | null {
   }
   const stage = testing.extra?.stage;
   if (stage && stage !== 'done') return 'extra';
+  // Nothing reached and the extra round not opened yet (or it got nothing): it is still that step.
+  const gotNothing = !testing.extra || (stage === 'done' && (testing.extra.outcome?.tiers.length ?? 0) === 0);
+  if (testing.status === 'closed' && testing.extraEnabled && gotNothing && !testing.tiers.some((tier) => tier.reached)) {
+    return 'extra';
+  }
   return 'draw';
 }
 

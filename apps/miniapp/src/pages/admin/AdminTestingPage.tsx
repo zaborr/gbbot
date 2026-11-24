@@ -769,7 +769,7 @@ function TestingForm({
           {preview && <TestingCard testing={preview} preview />}
           {money && <PotSection testing={testing} steps={steps} />}
           {testing.next?.step === 'extra' && <OpenExtra testing={testing} onChange={onChange} />}
-          {testing.extra && <ExtraStatus testing={testing} />}
+          {testing.extra && testing.next?.step !== 'extra' && <ExtraStatus testing={testing} />}
           {testing.extraPre && (
             <Section header={t('extra.title')} footer={t('testing.extraPreAdminFooter')}>
               <Cell after={String(testing.extraPre.signed)}>{t('testing.extraPreSigned')}</Cell>
@@ -854,21 +854,26 @@ function PotSection({ testing, steps }: { testing: Testing; steps: ReturnType<ty
           .filter(Boolean)
           .join(' ')}
       >
-        <Line
-          label={t('testing.potFees', { count: m.payers, amount: fmt(testing.contribution) })}
-          value={fmt(m.fees)}
-        />
+        {/* Only what this testing uses: no fee or no hidden part, no line of zeros. */}
+        {(testing.contribution > 0 || m.fees > 0) && (
+          <Line
+            label={t('testing.potFees', { count: m.payers, amount: fmt(testing.contribution) })}
+            value={fmt(m.fees)}
+          />
+        )}
         {/* What was given on top of the part, in the cart or from the order: all one. */}
         <Line label={t('testing.potDonations')} value={fmt(m.extras + m.donations)} />
-        <Line
-          label={t('testing.potHidden', { units: units(m.units), amount: fmt(m.perUnit) })}
-          value={fmt(m.perUnitTotal)}
-        />
+        {(m.perUnit > 0 || m.perUnitTotal > 0) && (
+          <Line
+            label={t('testing.potHidden', { units: units(m.units), amount: fmt(m.perUnit) })}
+            value={fmt(m.perUnitTotal)}
+          />
+        )}
         <Line label={t('testing.potTotal')} value={fmt(m.pot)} strong />
       </Section>
       <Section
         header={t('testing.potTiers')}
-        footer={t('testing.potUnitValue', { amount: fmt(m.unitValue), orders: m.orders })}
+        footer={m.unitValue > 0 ? t('testing.potUnitValue', { amount: fmt(m.unitValue), orders: m.orders }) : undefined}
       >
         {steps.map((step) => (
           <Cell
@@ -1443,7 +1448,9 @@ function ExtraStatus({ testing }: { testing: Testing }): React.JSX.Element | nul
   return (
     <Section header={t('testing.extraStatusTitle')}>
       <Cell multiline subtitle={extra.stage === 'done' ? undefined : t('testing.extraUntil', { date: until })}>
-        {t(`testing.extraStage.${extra.stage}`)}
+        {extra.stage === 'done' && !extra.outcome?.tiers.length
+          ? t('testing.extraStage.doneNothing')
+          : t(`testing.extraStage.${extra.stage}`)}
       </Cell>
       {extra.stage === 'signup' &&
         extra.missing.map((m) => (
