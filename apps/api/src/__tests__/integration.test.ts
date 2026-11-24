@@ -1329,9 +1329,24 @@ describeDb('API integration', () => {
       expect(entry).toMatchObject({ amount: 500, volunteer: true });
       // Not twice; and not someone the bot has never seen.
       expect((await add({ who: '555007001' })).status).toBe(409);
-      const unseen = await add({ who: '@nobody_seen_here' });
-      expect(unseen.status).toBe(404);
-      expect(((await unseen.json()) as { error: { message: string } }).error.message).toContain('not opened the bot');
+      // Someone who never opened the bot: kept, and in once they do (by @username or by id).
+      const unseen = await add({ who: '@Nobody_Seen_Here', amount: 0 });
+      expect(unseen.status).toBe(201);
+      expect(await unseen.json()).toMatchObject({ orderId: null, invited: true });
+      expect((await add({ who: '@nobody_seen_here' })).status).toBe(409);
+      expect((await add({ who: '555007003' })).status).toBe(201);
+      const [kept] = await db.select().from(testings).where(eq(testings.id, testingId));
+      expect(kept!.invites.map((i) => i.who)).toEqual(['nobody_seen_here', '555007003']);
+      send.mockClear();
+      await authToken(555007002, 'Nobody', 'nobody_seen_here');
+      const [joined] = await db.select().from(testingEntries).where(eq(testingEntries.userId, 555007002));
+      expect(joined).toMatchObject({ testingId, amount: 0 });
+      expect(send).toHaveBeenCalledWith(555007002, expect.any(String), expect.anything());
+      // Taken back by hand; and whoever is left stays out of the draw.
+      const removed = await request(`/api/admin/testings/${testingId}/invites/555007003`, { method: 'DELETE', headers: admin });
+      expect(removed.status).toBe(200);
+      const [left] = await db.select().from(testings).where(eq(testings.id, testingId));
+      expect(left!.invites).toEqual([]);
     } finally {
       send.mockRestore();
       menu.mockRestore();

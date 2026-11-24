@@ -28,6 +28,20 @@ export const testingTier = z.object({
 });
 export type TestingTier = z.infer<typeof testingTier>;
 
+/**
+ * Someone put in a testing by hand who has not opened the bot yet (by
+ * @username, lowercase, or Telegram id): they join when they first open it.
+ * Left out of the draw if they have not by then.
+ */
+export interface TestingInvite {
+  who: string;
+  /** What they pay; null = the testing's fee. */
+  amount: number | null;
+  volunteer: boolean;
+  notify: boolean;
+  at: string;
+}
+
 export const MAX_TESTING_TIERS = 10;
 
 /** Donations are whole units of the token (a line of a hidden product at 1 a unit). */
@@ -230,6 +244,8 @@ export const testing = z.object({
   donationProductId: z.string().nullable(),
   /** Only for the organiser. */
   money: z.custom<TestingMoney>().nullable(),
+  /** Only for the organiser: people put in by hand who have not opened the bot yet. */
+  invites: z.custom<TestingInvite[]>(),
   /** For the organisers' list: where it is and what comes next. */
   next: z.custom<TestingNext>().optional(),
 });

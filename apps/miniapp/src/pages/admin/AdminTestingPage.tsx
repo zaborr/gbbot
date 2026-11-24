@@ -352,6 +352,7 @@ function TestingForm({
           donationsOpen: testing?.donationsOpen ?? false,
           donationProductId: null,
           money: null,
+          invites: [],
         }
       : null;
 
@@ -778,7 +779,7 @@ function TestingForm({
         </>
       )}
 
-      {testing && on('orders') && <TestingOrders testing={testing} />}
+      {testing && on('orders') && <TestingOrders testing={testing} onChanged={onChange} />}
 
       {testing && on('draw') && (
         <>
@@ -1011,6 +1012,13 @@ function DrawSection({ testing, onChange }: { testing: Testing; onChange: () => 
       <Section header={t('testing.drawTitle')} footer={t('testing.drawFooter')}>
         <ErrorBanner message={actions.error} />
         <Cell multiline>{reason}</Cell>
+        {testing.invites.length > 0 && (
+          <Cell multiline>
+            {t('testing.invites.left', {
+              who: testing.invites.map((i) => (/^\d+$/.test(i.who) ? i.who : `@${i.who}`)).join(', '),
+            })}
+          </Cell>
+        )}
         <div style={{ padding: 16 }}>
           <Button
             stretched

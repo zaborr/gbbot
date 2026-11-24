@@ -250,7 +250,8 @@ export async function launchDraw(
   };
   const [row] = await db
     .update(testings)
-    .set({ status: 'drawing', draw, updatedAt: new Date() })
+    // Whoever was put in by hand and has not opened the bot yet stays out.
+    .set({ status: 'drawing', draw, invites: [], updatedAt: new Date() })
     .where(and(eq(testings.id, testing.id), eq(testings.status, 'closed')))
     .returning();
   if (!row) throw ApiError.conflict('draw_done', 'This testing was already drawn');
