@@ -252,6 +252,17 @@ export const testing = z.object({
 export type Testing = z.infer<typeof testing>;
 
 /** Someone taking part, for the organiser. */
+/** Bought what is tested (an order not cancelled) and is not in the testing. */
+export interface TestingNotJoined {
+  userId: number;
+  name: string;
+  contact: string | null;
+  units: number;
+  /** Their latest order with it. */
+  orderId: string;
+  ref: string;
+}
+
 export interface TestingParticipant {
   orderId: string;
   /** The order's short id (as the draw publishes it). */

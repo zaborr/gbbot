@@ -298,6 +298,7 @@ const en = {
   'testing.addedByOrganiser': '🧪 The organisers of {shop} have put you in the testing of {what}. See your order to pay your part.',
   'testing.addedOpen': 'See my order',
   'testing.addedByOrganiserFree': '🧪 The organisers of {shop} have put you in the testing of {what}. Nothing to pay.',
+  'testing.inviteBuyer': '🧪 {shop}: you bought {what}, and there is a lab testing of it you can still join. Open Testing to see it and join.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -588,6 +589,7 @@ const es: Record<BotMessageKey, string> = {
   'testing.addedByOrganiser': '🧪 Los organizadores de {shop} te han apuntado al testing de {what}. Mira tu pedido para pagar tu parte.',
   'testing.addedOpen': 'Ver mi pedido',
   'testing.addedByOrganiserFree': '🧪 Los organizadores de {shop} te han apuntado al testing de {what}. No tienes que pagar nada.',
+  'testing.inviteBuyer': '🧪 {shop}: compraste {what} y hay un testing de laboratorio al que aún puedes unirte. Abre Testing para verlo y apuntarte.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -876,6 +878,7 @@ const it: Record<BotMessageKey, string> = {
   'testing.addedByOrganiser': '🧪 Gli organizzatori di {shop} ti hanno iscritto al testing di {what}. Guarda il tuo ordine per pagare la tua parte.',
   'testing.addedOpen': 'Vedi il mio ordine',
   'testing.addedByOrganiserFree': '🧪 Gli organizzatori di {shop} ti hanno iscritto al testing di {what}. Non devi pagare nulla.',
+  'testing.inviteBuyer': '🧪 {shop}: hai comprato {what} e c\'è un testing di laboratorio a cui puoi ancora unirti. Apri Testing per vederlo e iscriverti.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -1164,6 +1167,7 @@ const pt: Record<BotMessageKey, string> = {
   'testing.addedByOrganiser': '🧪 Os organizadores de {shop} inscreveram-no no testing de {what}. Veja o seu pedido para pagar a sua parte.',
   'testing.addedOpen': 'Ver o meu pedido',
   'testing.addedByOrganiserFree': '🧪 Os organizadores de {shop} inscreveram-no no testing de {what}. Não tem nada a pagar.',
+  'testing.inviteBuyer': '🧪 {shop}: comprou {what} e há um testing de laboratório ao qual ainda se pode juntar. Abra Testing para o ver e inscrever-se.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

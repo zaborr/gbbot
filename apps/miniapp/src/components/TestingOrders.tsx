@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Cell, Section, Switch } from '@telegram-apps/telegram-ui';
-import type { Testing, TestingParticipant } from '@tma-shop/shared';
+import type { Testing, TestingNotJoined, TestingParticipant } from '@tma-shop/shared';
 import { api } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { copyText } from '../lib/clipboard.js';
@@ -40,7 +40,8 @@ export function TestingOrders({
   const { to } = useShop();
   const [reloadKey, setReloadKey] = useState(0);
   const list = useAsync(() => api.adminGetTestingParticipants(testing.id), [testing.id, reloadKey]);
-  const [filter, setFilter] = useState<Filter>('all');
+  const notJoined = useAsync(() => api.adminGetTestingNotJoined(testing.id), [testing.id, reloadKey]);
+  const [filter, setFilter] = useState<Filter | 'notJoined'>('all');
   const [search, setSearch] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
   const [reminded, setReminded] = useState<number | null>(null);
@@ -97,21 +98,39 @@ export function TestingOrders({
     setCopied((await copyText(toTsv(rows))) ? t('sheet.copied') : t('sheet.copyFailed'));
   };
 
+  const others = notJoined.data ?? [];
+  const tabs = (
+    <div className="gb-tabs" role="tablist">
+      {filters.map((f) => (
+        <Button
+          key={f.key}
+          size="s"
+          mode={f.key === filter ? 'filled' : 'bezeled'}
+          onClick={() => setFilter(f.key)}
+        >
+          {`${t(f.label)} · ${all.filter(f.match).length}`}
+        </Button>
+      ))}
+      {others.length > 0 && (
+        <Button size="s" mode={filter === 'notJoined' ? 'filled' : 'bezeled'} onClick={() => setFilter('notJoined')}>
+          {`${t('testing.notJoined.filter')} · ${others.length}`}
+        </Button>
+      )}
+    </div>
+  );
+  if (filter === 'notJoined' && others.length > 0) {
+    return (
+      <>
+        {tabs}
+        <NotJoined testing={testing} people={others} />
+      </>
+    );
+  }
+
   return (
     <>
       <ErrorBanner message={actions.error} />
-      <div className="gb-tabs" role="tablist">
-        {filters.map((f) => (
-          <Button
-            key={f.key}
-            size="s"
-            mode={f.key === filter ? 'filled' : 'bezeled'}
-            onClick={() => setFilter(f.key)}
-          >
-            {`${t(f.label)} · ${all.filter(f.match).length}`}
-          </Button>
-        ))}
-      </div>
+      {tabs}
       {all.length > 0 && (
         <Section>
           <Input
@@ -215,6 +234,72 @@ export function TestingOrders({
           </div>
         </Section>
       )}
+    </>
+  );
+}
+
+/** Bought what is tested and not in it: copied, or invited through the bot while one can join. */
+function NotJoined({ testing, people }: { testing: Testing; people: TestingNotJoined[] }): React.JSX.Element {
+  const navigate = useNavigate();
+  const { to } = useShop();
+  const [copied, setCopied] = useState<string | null>(null);
+  const [invited, setInvited] = useState<number | null>(null);
+  const actions = useAdminActions(() => undefined);
+  const canJoin = testing.status === 'open' || (testing.status === 'closed' && testing.donationsOpen);
+
+  const copy = async (): Promise<void> => {
+    const rows = [
+      [t('testing.orders.colOrder'), t('testing.orders.colName'), t('testing.orders.colContact'), t('testing.orders.colUnits')],
+      ...people.map((p) => [p.ref, p.name, p.contact ? `@${p.contact}` : '', p.units]),
+    ];
+    setCopied((await copyText(toTsv(rows))) ? t('sheet.copied') : t('sheet.copyFailed'));
+  };
+
+  return (
+    <>
+      <Section footer={t('testing.notJoined.footer')}>
+        {people.map((p) => (
+          <Cell
+            key={p.userId}
+            onClick={() => navigate(to(`/admin/orders/${p.orderId}`))}
+            subtitle={`#${p.ref} · ${units(p.units)}`}
+            multiline
+          >
+            {p.contact ? `${p.name} · @${p.contact}` : p.name}
+          </Cell>
+        ))}
+      </Section>
+      {canJoin && (
+        <Section
+          footer={
+            invited !== null
+              ? tn(invited, 'testing.notJoined.invited.one', 'testing.notJoined.invited.other')
+              : t('testing.notJoined.inviteFooter')
+          }
+        >
+          <ErrorBanner message={actions.error} />
+          <div style={{ padding: 16 }}>
+            <Button
+              stretched
+              mode="bezeled"
+              onClick={() =>
+                void actions.twoTap('invite', async () => {
+                  setInvited((await api.adminInviteTestingBuyers(testing.id)).sent);
+                })
+              }
+            >
+              {actions.tapLabel('invite', tn(people.length, 'testing.notJoined.invite.one', 'testing.notJoined.invite.other'))}
+            </Button>
+          </div>
+        </Section>
+      )}
+      <Section footer={copied ?? t('testing.notJoined.copyFooter')}>
+        <div style={{ padding: 16 }}>
+          <Button stretched mode="bezeled" onClick={() => void copy()}>
+            {t('sheet.copy')}
+          </Button>
+        </div>
+      </Section>
     </>
   );
 }

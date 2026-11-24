@@ -1,7 +1,7 @@
 import { announceNewTesting, moveTestingWindow, reopenTesting } from '../services/testingDonations.js';
 import { Hono } from 'hono';
 import { withNext } from '../services/testingNext.js';
-import { remindUnpaid } from '../services/testingRemind.js';
+import { inviteNotJoined, listNotJoined, remindUnpaid } from '../services/testingRemind.js';
 import { addParticipant, removeInvite } from '../services/testingAdd.js';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
@@ -138,6 +138,13 @@ export function testingAdminRoutes(): Hono<AppBindings> {
       await removeInvite(c.get('db'), c.get('shop'), id, who);
       return c.json({ ok: true });
     },
+  );
+  // Those who bought what is tested and are not in it; and inviting them through the bot.
+  app.get('/:id/not-joined', zValidator('param', idParam), async (c) =>
+    c.json(await listNotJoined(c.get('db'), c.get('shop'), c.req.valid('param').id)),
+  );
+  app.post('/:id/invite-buyers', zValidator('param', idParam), async (c) =>
+    c.json(await inviteNotJoined(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('param').id)),
   );
   // A message through the bot to those whose order is not paid yet, with a button to it.
   app.post('/:id/remind', zValidator('param', idParam), async (c) =>
