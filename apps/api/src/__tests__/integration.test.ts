@@ -1294,6 +1294,9 @@ describeDb('API integration', () => {
       'content-type': 'application/json',
     };
     const send = vi.spyOn(TelegramApi.prototype, 'sendMessage').mockResolvedValue(true);
+    const menu = vi
+      .spyOn(TelegramApi.prototype, 'getChatMenuButton')
+      .mockResolvedValue({ type: 'web_app', web_app: { url: 'https://app.example' } });
     await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
     const created = await request('/api/admin/testings', {
       method: 'POST',
@@ -1330,6 +1333,8 @@ describeDb('API integration', () => {
       expect(((await unseen.json()) as { error: { message: string } }).error.message).toContain('not opened the bot');
     } finally {
       send.mockRestore();
+      menu.mockRestore();
+      resetMiniAppUrlCache();
       await db.delete(testingEntries).where(eq(testingEntries.testingId, testingId));
       await db.delete(orders).where(eq(orders.externalTestingId, testingId));
       await db.delete(testings).where(eq(testings.id, testingId));
