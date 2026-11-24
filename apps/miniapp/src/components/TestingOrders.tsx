@@ -122,7 +122,7 @@ export function TestingOrders({
     return (
       <>
         {tabs}
-        <NotJoined testing={testing} people={others} />
+        <NotJoined testing={testing} people={others} onAdded={() => setReloadKey((k) => k + 1)} />
       </>
     );
   }
@@ -239,7 +239,18 @@ export function TestingOrders({
 }
 
 /** Bought what is tested and not in it: copied, or invited through the bot while one can join. */
-function NotJoined({ testing, people }: { testing: Testing; people: TestingNotJoined[] }): React.JSX.Element {
+function NotJoined({
+  testing,
+  people,
+  onAdded,
+}: {
+  testing: Testing;
+  people: TestingNotJoined[];
+  onAdded: () => void;
+}): React.JSX.Element {
+  const [chosen, setChosen] = useState<TestingNotJoined | null>(null);
+  const [added, setAdded] = useState<string | null>(null);
+  const canAdd = testing.status === 'open' || testing.status === 'closed';
   const navigate = useNavigate();
   const { to } = useShop();
   const [copied, setCopied] = useState<string | null>(null);
@@ -257,12 +268,40 @@ function NotJoined({ testing, people }: { testing: Testing; people: TestingNotJo
 
   return (
     <>
-      <Section footer={t('testing.notJoined.footer')}>
+      {chosen && (
+        <AddParticipant
+          key={chosen.userId}
+          testing={testing}
+          preset={{ who: String(chosen.userId), label: chosen.contact ? `${chosen.name} · @${chosen.contact}` : chosen.name }}
+          onAdded={onAdded}
+          onInvited={onAdded}
+          onClose={(done) => {
+            setChosen(null);
+            setAdded(done);
+          }}
+        />
+      )}
+      <Section footer={added ?? t('testing.notJoined.footer')}>
         {people.map((p) => (
           <Cell
             key={p.userId}
             onClick={() => navigate(to(`/admin/orders/${p.orderId}`))}
             subtitle={`#${p.ref} · ${units(p.units)}`}
+            after={
+              canAdd ? (
+                <Button
+                  size="s"
+                  mode="bezeled"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAdded(null);
+                    setChosen(p);
+                  }}
+                >
+                  {t('testing.notJoined.add')}
+                </Button>
+              ) : undefined
+            }
             multiline
           >
             {p.contact ? `${p.name} · @${p.contact}` : p.name}
@@ -309,14 +348,20 @@ function AddParticipant({
   testing,
   onAdded,
   onInvited,
+  preset,
+  onClose,
 }: {
   testing: Testing;
   onAdded: () => void;
   /** Kept for when they open the bot: the testing itself changed. */
   onInvited: () => void;
+  /** Someone already chosen (from those who bought and are not in): the form opens with them. */
+  preset?: { who: string; label: string };
+  /** The form of a chosen one closes (cancelled, or added: with what happened). */
+  onClose?: (done: string | null) => void;
 }): React.JSX.Element {
-  const [open, setOpen] = useState(false);
-  const [who, setWho] = useState('');
+  const [open, setOpen] = useState(preset !== undefined);
+  const [who, setWho] = useState(preset?.who ?? '');
   const [amount, setAmount] = useState('');
   const [volunteer, setVolunteer] = useState(false);
   const [notify, setNotify] = useState(true);
@@ -348,22 +393,33 @@ function AddParticipant({
             : t('testing.add.done'),
       );
       if (result.invited) onInvited();
+      if (onClose) {
+        onClose(
+          result.notified ? t('testing.add.doneNotified') : t('testing.add.done'),
+        );
+        return;
+      }
       setWho('');
       setAmount('');
       setVolunteer(false);
       setOpen(false);
     });
+  const close = (): void => (onClose ? onClose(null) : setOpen(false));
 
   return (
-    <Section header={t('testing.add.title')} footer={t('testing.add.footer')}>
+    <Section header={t('testing.add.title')} footer={preset ? t('testing.add.footerBuyer') : t('testing.add.footer')}>
       <ErrorBanner message={actions.error} />
-      <Input
-        header={t('testing.add.who')}
-        placeholder="@usuario"
-        autoCapitalize="none"
-        value={who}
-        onChange={(e) => setWho(e.target.value)}
-      />
+      {preset ? (
+        <Cell multiline>{preset.label}</Cell>
+      ) : (
+        <Input
+          header={t('testing.add.who')}
+          placeholder="@usuario"
+          autoCapitalize="none"
+          value={who}
+          onChange={(e) => setWho(e.target.value)}
+        />
+      )}
       <Input
         header={t('testing.add.amount', { currency: testing.currency })}
         type="text"
@@ -380,7 +436,7 @@ function AddParticipant({
         {t('testing.add.notify')}
       </Cell>
       <div style={{ display: 'flex', gap: 8, padding: 16 }}>
-        <Button stretched mode="bezeled" onClick={() => setOpen(false)}>
+        <Button stretched mode="bezeled" onClick={close}>
           {t('common.cancel')}
         </Button>
         <Button stretched disabled={!who.trim() || amountBad} onClick={add}>
