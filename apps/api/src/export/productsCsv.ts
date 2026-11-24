@@ -279,6 +279,7 @@ export function readProductsCsv(
         vipPrice: v.vipPriceOverride,
         stock: v.stock,
         isActive: v.isActive,
+        shipUnits: v.shipUnits,
       })) ?? [];
     let stock = current?.stock ?? null;
 
@@ -313,12 +314,17 @@ export function readProductsCsv(
           if (vipText !== '' && variantVip === null) issue(row.line, 'bad_price', { value: vipText });
           if (stockText !== '' && !/^\d+$/.test(stockText)) issue(row.line, 'bad_stock', { value: stockText });
           const rowActive = activeOf(row) ?? true;
+          // Not in the CSV: what it counts for shipping stays as it was.
+          const same = current?.variants.find(
+            (v) => v.values.map((x) => x.toLowerCase()).join('\u0000') === combo.map((x) => x.toLowerCase()).join('\u0000'),
+          );
           variants.push({
             values: combo,
             price: variantPrice,
             vipPrice: variantVip,
             stock: stockText === '' ? null : Number(stockText),
             isActive: rowActive,
+            shipUnits: same?.shipUnits ?? null,
           });
         }
         options = names.map((name, i) => ({ name, values: values[i] as string[] }));
@@ -362,6 +368,7 @@ export function readProductsCsv(
       isActive,
       vipOnly,
       minQuantity,
+      shipUnits: current?.shipUnits ?? 100,
       options,
       priceTiers,
       variants,

@@ -178,6 +178,7 @@ export async function cloneProducts(
           isActive: false,
           vipOnly: product.vipOnly,
           minQuantity: product.minQuantity,
+          shipUnits: product.shipUnits,
           options: product.options,
           priceTiers: product.priceTiers,
         })
@@ -193,6 +194,7 @@ export async function cloneProducts(
             vipPrice: v.vipPrice,
             stock: input.copyStock ? v.stock : null,
             isActive: v.isActive,
+            shipUnits: v.shipUnits,
             sortOrder: v.sortOrder,
           })),
         );

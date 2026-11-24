@@ -16,6 +16,11 @@ export const shippingZone = z.object({
   price: z.number().int().nonnegative(),
   /** Free shipping when the items reach this amount; null = never free. */
   freeFrom: z.number().int().positive().nullable(),
+  /**
+   * Free shipping from this many shipping units (hundredths: 1000 = 10 units),
+   * each product counting as it says (1, 0.5…); null = not by units.
+   */
+  freeFromUnits: z.number().int().positive().nullable().default(null),
   isActive: z.boolean(),
 });
 export type ShippingZone = z.infer<typeof shippingZone>;
@@ -417,13 +422,25 @@ export function mergeDelivery(address: DeliveryAddress, extras: readonly Deliver
 
 /** Shipping cost of an order with `itemsTotal` worth of products in `zone`. */
 export function shippingCost(
-  zone: Pick<ShippingZone, 'price' | 'freeFrom'>,
+  zone: Pick<ShippingZone, 'price' | 'freeFrom'> & { freeFromUnits?: number | null },
   itemsTotal: number,
   /** A VIP in a GB where VIPs do not pay shipping. */
   free = false,
+  /** The order's shipping units (hundredths), each product counting as it says. */
+  units = 0,
 ): number {
   if (free) return 0;
-  return zone.freeFrom !== null && itemsTotal >= zone.freeFrom ? 0 : zone.price;
+  if (zone.freeFrom !== null && itemsTotal >= zone.freeFrom) return 0;
+  const byUnits = zone.freeFromUnits ?? null;
+  return byUnits !== null && units >= byUnits ? 0 : zone.price;
+}
+
+/** How much one unit counts for shipping (hundredths): the variant's own, else the product's. */
+export function shipUnitsOf(
+  product: { shipUnits: number },
+  variant: { shipUnits: number | null } | null | undefined,
+): number {
+  return variant?.shipUnits ?? product.shipUnits;
 }
 
 /**

@@ -187,6 +187,8 @@ export const products = pgTable(
     kind: text('kind').$type<'sale' | 'donation' | 'extra'>().notNull().default('sale'),
     /** Minimum units per order, all variants together (1 = none). */
     minQuantity: integer('min_quantity').notNull().default(1),
+    /** What one unit counts for free shipping, in hundredths (100 = 1). */
+    shipUnits: integer('ship_units').notNull().default(100),
     /** Option groups (Color, Size…); empty for a product without variants. */
     options: jsonb('options').$type<ProductOption[]>().notNull().default([]),
     /** Quantity breaks on the product's price, sorted by `minQty`. */
@@ -210,6 +212,8 @@ export const productVariants = pgTable('product_variants', {
   vipPrice: integer('vip_price'),
   /** NULL = not stock-tracked. */
   stock: integer('stock'),
+  /** NULL = counts for shipping as its product. */
+  shipUnits: integer('ship_units'),
   isActive: boolean('is_active').notNull().default(true),
   sortOrder: integer('sort_order').notNull().default(0),
 });

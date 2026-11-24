@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useState } from 'react';
-import { DEFAULT_CHECKOUT_FIELDS, awaitsPayment, shippingCost, type DeliveryAddress } from '@tma-shop/shared';
+import { DEFAULT_CHECKOUT_FIELDS, awaitsPayment, shippingCost, shipUnitsOf, type DeliveryAddress } from '@tma-shop/shared';
 import { useNavigate } from 'react-router-dom';
 import { Button, Cell, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
 import { Input } from '../components/Field.js';
@@ -108,7 +108,12 @@ export function CartPage(): React.JSX.Element {
   })();
   // VIPs may not pay shipping in this GB.
   const vipFreeShipping = (cart?.isVip ?? false) && (shop.data?.vipNoShipping ?? false);
-  const shipping = zone ? shippingCost(zone, itemsTotal, vipFreeShipping) : 0;
+  // What the cart counts for free shipping by units (each product as it says).
+  const shipUnits = (cart?.lines ?? []).reduce(
+    (sum, line) => sum + line.quantity * shipUnitsOf(line.product, line.variant),
+    0,
+  );
+  const shipping = zone ? shippingCost(zone, itemsTotal, vipFreeShipping, shipUnits) : 0;
   const grandTotal = (cart?.total ?? 0) + shipping;
   // The GB's minimum: how far it would get with this order (when amounts are shown).
   const goal = shop.data?.goal ?? null;
@@ -452,19 +457,27 @@ export function CartPage(): React.JSX.Element {
       {needsShipping && cart && (
         <Section header={`2 · ${t('cart.shippingZone')}`}>
           {zones.map((z) => {
-            const cost = shippingCost(z, itemsTotal, vipFreeShipping);
+            const cost = shippingCost(z, itemsTotal, vipFreeShipping, shipUnits);
+            const unitsLeft =
+              z.freeFromUnits && shipUnits < z.freeFromUnits ? (z.freeFromUnits - shipUnits) / 100 : null;
             return (
               <Cell
                 key={z.id}
                 onClick={() => setZoneId(z.id)}
                 subtitle={
-                  z.freeFrom !== null
-                    ? t('cart.freeFrom', {
-                        amount:
-                          formatPrice(z.freeFrom, cart.currency) +
-                          (other ? ` (≈ ${convertedPrice(z.freeFrom, other)})` : ''),
-                      })
-                    : undefined
+                  [
+                    z.freeFrom !== null
+                      ? t('cart.freeFrom', {
+                          amount:
+                            formatPrice(z.freeFrom, cart.currency) +
+                            (other ? ` (≈ ${convertedPrice(z.freeFrom, other)})` : ''),
+                        })
+                      : null,
+                    // Still paying: how many units are missing for it to be free.
+                    cost > 0 && unitsLeft !== null ? t('cart.freeUnitsLeft', { count: unitsLeft }) : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || undefined
                 }
                 after={
                   <span>

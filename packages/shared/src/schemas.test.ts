@@ -9,6 +9,7 @@ import {
   priceTiers,
   product,
   shippingCost,
+  shipUnitsOf,
   slug,
   unitPriceFor,
 } from './index.js';
@@ -110,5 +111,18 @@ describe('shippingCost', () => {
     expect(shippingCost(zone, 4999)).toBe(600);
     expect(shippingCost(zone, 5000)).toBe(0);
     expect(shippingCost(zone, 100, true)).toBe(0);
+  });
+
+  it('is free from a number of shipping units, each product counting as it says', () => {
+    const byUnits = { price: 600, freeFrom: null, freeFromUnits: 1000 };
+    // 6 of 1 and 7 of half: 9.5 units, not yet; one more half and it is free.
+    const units = 6 * shipUnitsOf({ shipUnits: 100 }, null) + 7 * shipUnitsOf({ shipUnits: 100 }, { shipUnits: 50 });
+    expect(units).toBe(950);
+    expect(shippingCost(byUnits, 100, false, units)).toBe(600);
+    expect(shippingCost(byUnits, 100, false, units + 50)).toBe(0);
+    // Either is enough: the amount or the units.
+    expect(shippingCost({ ...byUnits, freeFrom: 5000 }, 5000, false, 0)).toBe(0);
+    // Without a threshold by units, units do not matter.
+    expect(shippingCost(zone, 100, false, 100_000)).toBe(600);
   });
 });

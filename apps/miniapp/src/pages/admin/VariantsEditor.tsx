@@ -18,6 +18,16 @@ export interface VariantDraft {
   vipPrice: string;
   stock: string;
   active: boolean;
+  /** What one unit counts for free shipping; empty = the product's. */
+  ship?: string;
+}
+
+/** Shipping units as shown: 100 → "1", 50 → "0.5". */
+export const shipText = (hundredths: number): string => String(hundredths / 100);
+/** "0,5" → 50; null when it is not a number like that. */
+export function parseShip(text: string): number | null {
+  const value = text.trim();
+  return /^\d+([.,]\d{1,2})?$/.test(value) ? Math.round(Number(value.replace(',', '.')) * 100) : null;
 }
 
 export const MAX_OPTIONS = 3;
@@ -63,6 +73,7 @@ export function initialDrafts(product: Product | null): Record<string, VariantDr
       vipPrice: v.vipPriceOverride === null ? '' : toMajor(v.vipPriceOverride),
       stock: v.stock === null ? '' : String(v.stock),
       active: v.isActive,
+      ship: v.shipUnits === null ? '' : shipText(v.shipUnits),
     };
   }
   return drafts;
@@ -92,6 +103,8 @@ export function buildVariants(
     const price = draft.price.trim();
     const vipPrice = (draft.vipPrice ?? '').trim();
     const stock = draft.stock.trim();
+    const ship = (draft.ship ?? '').trim();
+    if (ship !== '' && parseShip(ship) === null) return { error: t('variants.badShip', { name: values.join(' / ') }) };
     if ((price !== '' && !PRICE_RE.test(price)) || (vipPrice !== '' && !PRICE_RE.test(vipPrice))) {
       return { error: t('variants.badPrice', { name: values.join(' / ') }) };
     }
@@ -104,6 +117,7 @@ export function buildVariants(
       vipPrice: vipPrice === '' ? null : Math.round(Number(vipPrice.replace(',', '.')) * 100),
       stock: stock === '' ? null : Number(stock),
       isActive: draft.active,
+      shipUnits: ship === '' ? null : parseShip(ship),
     });
   }
   if (!variants.some((v) => v.isActive)) return { error: t('variants.needOne') };
@@ -118,6 +132,7 @@ export function VariantsEditor({
   setDrafts,
   basePrice,
   vipBasePrice,
+  baseShip = '1',
   currency,
 }: {
   options: OptionDraft[];
@@ -127,6 +142,8 @@ export function VariantsEditor({
   basePrice: string;
   /** The product's VIP price as typed (placeholder for each variant's). */
   vipBasePrice: string;
+  /** What the product counts for shipping, as typed (placeholder for each variant's). */
+  baseShip?: string;
   currency: string;
 }): React.JSX.Element {
   const [bulkStock, setBulkStock] = useState('');
@@ -271,16 +288,29 @@ export function VariantsEditor({
                       />
                     </div>
                   </div>
-                  <div style={{ padding: '0 8px' }}>
-                    <Input
-                      header={t('variants.vipPrice', { currency })}
-                      type="text"
-                      inputMode="decimal"
-                      placeholder={vipBasePrice || '—'}
-                      status={vipBad ? 'error' : 'default'}
-                      value={draft.vipPrice ?? ''}
-                      onChange={(e) => updateDraft(values, { vipPrice: e.target.value })}
-                    />
+                  <div style={{ display: 'flex', gap: 8, padding: '0 8px' }}>
+                    <div style={{ flex: 1 }}>
+                      <Input
+                        header={t('variants.vipPrice', { currency })}
+                        type="text"
+                        inputMode="decimal"
+                        placeholder={vipBasePrice || '—'}
+                        status={vipBad ? 'error' : 'default'}
+                        value={draft.vipPrice ?? ''}
+                        onChange={(e) => updateDraft(values, { vipPrice: e.target.value })}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <Input
+                        header={t('variants.ship')}
+                        type="text"
+                        inputMode="decimal"
+                        placeholder={baseShip}
+                        status={(draft.ship ?? '').trim() !== '' && parseShip(draft.ship ?? '') === null ? 'error' : 'default'}
+                        value={draft.ship ?? ''}
+                        onChange={(e) => updateDraft(values, { ship: e.target.value })}
+                      />
+                    </div>
                   </div>
                 </div>
               );

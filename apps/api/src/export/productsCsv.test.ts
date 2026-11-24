@@ -23,6 +23,7 @@ function product(partial: Partial<Product>): Product {
     isActive: true,
     vipOnly: false,
     minQuantity: 1,
+    shipUnits: 100,
     options: [],
     variants: [],
     priceTiers: [],

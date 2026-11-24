@@ -77,6 +77,7 @@ export const gbSnapshot = z.object({
         isActive: z.boolean(),
         vipOnly: z.boolean().default(false),
         minQuantity: z.number().int().min(1).max(999).default(1),
+        shipUnits: z.number().int().nonnegative().max(100_000).default(100),
         options: z.array(productOption).max(3),
         priceTiers: z.array(priceTier).max(10),
         variants: z
@@ -87,6 +88,7 @@ export const gbSnapshot = z.object({
               vipPrice: moneyAmount.nullable(),
               stock: z.number().int().nonnegative().nullable(),
               isActive: z.boolean(),
+              shipUnits: z.number().int().nonnegative().max(100_000).nullable().default(null),
             }),
           )
           .max(200),

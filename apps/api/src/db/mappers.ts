@@ -62,6 +62,7 @@ export function toVariantDTO(row: VariantRow, product: ProductRow, showVip = fal
     vipPrice: showVip ? (row.vipPrice ?? product.vipPrice) : null,
     stock: row.stock,
     isActive: row.isActive,
+    shipUnits: row.shipUnits,
   };
 }
 
@@ -88,6 +89,7 @@ export function toProductDTO(
     isActive: row.isActive,
     vipOnly: row.vipOnly,
     minQuantity: row.minQuantity,
+    shipUnits: row.shipUnits,
     options: row.options,
     priceTiers: row.priceTiers,
     variants: row.options.length > 0 ? variants.map((v) => toVariantDTO(v, row, showVip)) : [],

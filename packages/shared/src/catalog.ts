@@ -39,6 +39,8 @@ export const productVariant = z.object({
   /** `null` = not stock-tracked. */
   stock: z.number().int().nonnegative().nullable(),
   isActive: z.boolean(),
+  /** What one unit counts for free shipping (hundredths); null = the product's. */
+  shipUnits: z.number().int().nonnegative().nullable(),
 });
 export type ProductVariant = z.infer<typeof productVariant>;
 
@@ -50,6 +52,7 @@ export const variantInput = z.object({
   vipPrice: moneyAmount.nullable().default(null),
   stock: z.number().int().nonnegative().nullable(),
   isActive: z.boolean(),
+  shipUnits: z.number().int().nonnegative().max(100_000).nullable().default(null),
 });
 export type VariantInput = z.infer<typeof variantInput>;
 
@@ -80,6 +83,8 @@ export const product = z.object({
   vipOnly: z.boolean(),
   /** Minimum units per order, all variants together (1 = none). */
   minQuantity: z.number().int().min(1).max(999),
+  /** What one unit counts for free shipping, in hundredths (100 = 1, 50 = half, 0 = does not count). */
+  shipUnits: z.number().int().nonnegative().max(100_000),
   /** Option groups (max 3). Empty for a product without variants. */
   options: z.array(productOption).max(3),
   /** Every combination of the options (admins also see inactive ones). */
@@ -107,6 +112,7 @@ export const productInput = product
     vipPrice: moneyAmount.nullable().default(null),
     vipOnly: z.boolean().default(false),
     minQuantity: z.number().int().min(1).max(999).default(1),
+    shipUnits: z.number().int().nonnegative().max(100_000).default(100),
     titleEn: z.string().trim().max(256).nullable().default(null),
     descriptionEn: z.string().trim().max(4096).nullable().default(null),
   });
