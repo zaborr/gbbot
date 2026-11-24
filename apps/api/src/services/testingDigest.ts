@@ -12,6 +12,7 @@ import { notifyShopTeam } from './webNotices.js';
 function stepText(lang: Lang, next: TestingNext): string {
   const keys: Partial<Record<NonNullable<TestingNext['step']>, BotMessageKey>> = {
     unpaid: 'testing.digest.unpaid',
+    extra: 'testing.digest.extra',
     draw: 'testing.digest.draw',
     vials: 'testing.digest.vials',
     report: 'testing.digest.report',

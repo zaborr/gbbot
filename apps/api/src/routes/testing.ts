@@ -1,3 +1,4 @@
+import { openExtra } from '../services/testingExtra.js';
 import { announceNewTesting, moveTestingWindow, reopenTesting } from '../services/testingDonations.js';
 import { Hono } from 'hono';
 import { withNext } from '../services/testingNext.js';
@@ -76,6 +77,16 @@ export function testingAdminRoutes(): Hono<AppBindings> {
     return c.json({ ok: true });
   });
   // The time to join and give opens again (closed, or settled with nothing reached).
+  // Opening the extra round by hand: it never started, or it got nothing.
+  app.post(
+    '/:id/extra',
+    zValidator('param', idParam),
+    zValidator('json', z.object({ hours: z.number().int().min(1).max(24 * 14) })),
+    async (c) => {
+      await openExtra(c.get('db'), c.get('env'), c.get('shopId'), c.req.valid('param').id, c.req.valid('json').hours);
+      return c.json({ ok: true });
+    },
+  );
   app.post(
     '/:id/reopen',
     zValidator('param', idParam),

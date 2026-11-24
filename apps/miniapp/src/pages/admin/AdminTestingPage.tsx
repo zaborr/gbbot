@@ -768,6 +768,7 @@ function TestingForm({
           <TestingTimeline testing={testing} />
           {preview && <TestingCard testing={preview} preview />}
           {money && <PotSection testing={testing} steps={steps} />}
+          {testing.next?.step === 'extra' && <OpenExtra testing={testing} onChange={onChange} />}
           {testing.extra && <ExtraStatus testing={testing} />}
           {testing.extraPre && (
             <Section header={t('extra.title')} footer={t('testing.extraPreAdminFooter')}>
@@ -1388,6 +1389,45 @@ function CancelSection({ testing, onChange }: { testing: Testing; onChange: () =
           onClick={() => void actions.twoTap('cancel', () => api.adminCancelTesting(testing.id))}
         >
           {actions.tapLabel('cancel', t('testing.cancel'))}
+        </Button>
+      </div>
+    </Section>
+  );
+}
+
+/**
+ * No test reached and the extra round never opened (or got nothing): what
+ * happened, and opening it for a few hours. Closing or cancelling stay below.
+ */
+function OpenExtra({ testing, onChange }: { testing: Testing; onChange: () => void }): React.JSX.Element {
+  const actions = useAdminActions(onChange);
+  const [hours, setHours] = useState(String(testing.extraSignupHours > 0 ? testing.extraSignupHours : 24));
+  const n = Number(hours);
+  const bad = !Number.isInteger(n) || n < 1 || n > 24 * 14;
+  const missing = testing.money?.steps.find((step) => step.missing > 0)?.missing ?? 0;
+  return (
+    <Section header={t('testing.openExtra.title')} footer={t('testing.openExtra.footer')}>
+      <ErrorBanner message={actions.error} />
+      <Cell multiline>
+        {t(testing.extra ? 'testing.openExtra.gotNothing' : 'testing.openExtra.notStarted', {
+          missing: formatPrice(missing, testing.currency),
+        })}
+      </Cell>
+      <Input
+        header={t('testing.openExtra.hours')}
+        type="text"
+        inputMode="numeric"
+        status={bad ? 'error' : 'default'}
+        value={hours}
+        onChange={(e) => setHours(e.target.value)}
+      />
+      <div style={{ padding: 16 }}>
+        <Button
+          stretched
+          disabled={bad}
+          onClick={() => void actions.twoTap('openExtra', () => api.adminOpenTestingExtra(testing.id, n))}
+        >
+          {actions.tapLabel('openExtra', t(testing.extra ? 'testing.openExtra.again' : 'testing.openExtra.open'))}
         </Button>
       </div>
     </Section>

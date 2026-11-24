@@ -299,6 +299,7 @@ const en = {
   'testing.addedOpen': 'See my order',
   'testing.addedByOrganiserFree': '🧪 The organisers of {shop} have put you in the testing of {what}. Nothing to pay.',
   'testing.inviteBuyer': '🧪 {shop}: you bought {what}, and there is a lab testing of it you can still join. Open Testing to see it and join.',
+  'testing.digest.extra': 'no test reached: open the extra round, or close it',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -590,6 +591,7 @@ const es: Record<BotMessageKey, string> = {
   'testing.addedOpen': 'Ver mi pedido',
   'testing.addedByOrganiserFree': '🧪 Los organizadores de {shop} te han apuntado al testing de {what}. No tienes que pagar nada.',
   'testing.inviteBuyer': '🧪 {shop}: compraste {what} y hay un testing de laboratorio al que aún puedes unirte. Abre Testing para verlo y apuntarte.',
+  'testing.digest.extra': 'ningún tramo cubierto: abre la fase extra o ciérralo',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -879,6 +881,7 @@ const it: Record<BotMessageKey, string> = {
   'testing.addedOpen': 'Vedi il mio ordine',
   'testing.addedByOrganiserFree': '🧪 Gli organizzatori di {shop} ti hanno iscritto al testing di {what}. Non devi pagare nulla.',
   'testing.inviteBuyer': '🧪 {shop}: hai comprato {what} e c\'è un testing di laboratorio a cui puoi ancora unirti. Apri Testing per vederlo e iscriverti.',
+  'testing.digest.extra': 'nessun livello raggiunto: apri la fase extra o chiudilo',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -1168,6 +1171,7 @@ const pt: Record<BotMessageKey, string> = {
   'testing.addedOpen': 'Ver o meu pedido',
   'testing.addedByOrganiserFree': '🧪 Os organizadores de {shop} inscreveram-no no testing de {what}. Não tem nada a pagar.',
   'testing.inviteBuyer': '🧪 {shop}: comprou {what} e há um testing de laboratório ao qual ainda se pode juntar. Abra Testing para o ver e inscrever-se.',
+  'testing.digest.extra': 'nenhum nível alcançado: abra a fase extra ou feche-o',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

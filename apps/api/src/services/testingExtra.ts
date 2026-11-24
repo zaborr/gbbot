@@ -10,7 +10,7 @@ import {
 } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
-import { orderItems, orders, testingEntries, testingExtraMembers, testings } from '../db/schema.js';
+import { orderItems, orders, products, testingEntries, testingExtraMembers, testings } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 import { tr } from '../i18n/messages.js';
 import { notifyShopTeam } from './webNotices.js';
@@ -52,9 +52,88 @@ async function missingSteps(db: Database, row: TestingRow): Promise<TierStep[]> 
   return stepsOf({ ...row, status: 'open' }, totals, price, { withoutExtra: true }).filter((s) => !s.reached);
 }
 
+/**
+ * The extra round can be opened by hand: the time to join and give is over,
+ * it is on, and it never started (or ended without any test).
+ */
+export const extraCanOpen = (row: TestingRow): boolean =>
+  row.status === 'closed' &&
+  row.extraEnabled &&
+  row.donationsDone &&
+  (row.extra === null || (row.extra.stage === 'done' && (row.extra.outcome?.tiers.length ?? 0) === 0));
+
+/**
+ * The hidden product whose order lines are the extra round's shares. Testings
+ * made before the extra round existed have none: it is made when needed.
+ */
+async function ensureExtraProduct(db: Database, row: TestingRow): Promise<TestingRow> {
+  if (row.extraProductId) return row;
+  const product = await db.query.products.findFirst({ where: (p, { eq: same }) => same(p.id, row.productId) });
+  if (!product) return row;
+  const what = await testedLabel(db, row);
+  const [extra] = await db
+    .insert(products)
+    .values({
+      shopId: row.shopId,
+      slug: `extra-${product.slug}-${Math.random().toString(36).slice(2, 8)}`,
+      title: `Fase extra · ${what} (testing)`,
+      titleEn: `Extra round · ${what} (testing)`,
+      price: 1,
+      currency: row.currency,
+      isActive: false,
+      kind: 'extra',
+    })
+    .returning({ id: products.id });
+  if (!extra) return row;
+  const [updated] = await db
+    .update(testings)
+    .set({ extraProductId: extra.id })
+    .where(and(eq(testings.id, row.id), sql`${testings.extraProductId} is null`))
+    .returning();
+  // Someone else made it meanwhile: theirs stays, this one goes.
+  if (!updated) {
+    await db.delete(products).where(eq(products.id, extra.id));
+    return (await db.query.testings.findFirst({ where: eq(testings.id, row.id) })) ?? row;
+  }
+  return updated;
+}
+
+/**
+ * The organisers open the extra round by hand (it never started, or it got
+ * nothing): a new time of `hours` to set caps, for everyone in the testing.
+ */
+export async function openExtra(db: Database, env: Env, shopId: string, id: string, hours: number): Promise<void> {
+  if (!Number.isInteger(hours) || hours < 1 || hours > 24 * 14) throw ApiError.badRequest('bad_hours', 'Hours out of range');
+  const row = await db.query.testings.findFirst({ where: and(eq(testings.shopId, shopId), eq(testings.id, id)) });
+  if (!row) throw ApiError.notFound('Testing not found');
+  if (!extraCanOpen(row)) throw ApiError.conflict('extra_not_openable', 'The extra round cannot be opened now');
+  let fresh = row;
+  if (row.extra !== null) {
+    // The one that got nothing goes: nobody paid anything in it.
+    await db.delete(testingExtraMembers).where(eq(testingExtraMembers.testingId, row.id));
+    const [reset] = await db
+      .update(testings)
+      .set({ extra: null, updatedAt: new Date() })
+      .where(and(eq(testings.id, row.id), sql`${testings.extra} is not null`))
+      .returning();
+    if (!reset) throw ApiError.conflict('extra_not_openable', 'The extra round cannot be opened now');
+    fresh = reset;
+  }
+  if (!(await startExtra(db, env, fresh, new Date(), hours))) {
+    throw ApiError.conflict('extra_nothing_missing', 'No test is missing: there is nothing to pay for');
+  }
+}
+
 /** The time to give is over: the extra round starts when it is on and tests are missing. */
-export async function startExtra(db: Database, env: Env, row: TestingRow, now = new Date()): Promise<boolean> {
-  if (row.extra) return false;
+export async function startExtra(
+  db: Database,
+  env: Env,
+  current: TestingRow,
+  now = new Date(),
+  signupHours = current.extraSignupHours,
+): Promise<boolean> {
+  if (current.extra) return false;
+  const row = current.extraEnabled ? await ensureExtraProduct(db, current) : current;
   const early = await earlyMembers(db, row);
   const missing = row.extraEnabled && row.extraProductId ? await missingSteps(db, row) : [];
   if (missing.length === 0) {
@@ -79,7 +158,7 @@ export async function startExtra(db: Database, env: Env, row: TestingRow, now = 
   }
   const state: TestingExtraState = {
     stage: 'signup',
-    until: new Date(now.getTime() + hours(Math.max(row.extraSignupHours, 0))).toISOString(),
+    until: new Date(now.getTime() + hours(Math.max(signupHours, 0))).toISOString(),
     target: [],
     share: 0,
   };
@@ -92,7 +171,7 @@ export async function startExtra(db: Database, env: Env, row: TestingRow, now = 
   const shop = await db.query.shops.findFirst({ where: (s, { eq: same }) => same(s.id, row.shopId) });
   if (!shop) return true;
   // One time for giving and setting caps: it is shared out now among those who set one.
-  if (row.extraSignupHours === 0) {
+  if (signupHours === 0) {
     await shareOutExtra(db, env, shop, started, now);
     return true;
   }
@@ -114,7 +193,7 @@ export async function startExtra(db: Database, env: Env, row: TestingRow, now = 
     tr(lang, 'testing.extraOpen', {
       shop: shop.name,
       product: what,
-      hours: row.extraSignupHours,
+      hours: signupHours,
       min: formatMoney(extraMin(row), row.currency),
       list,
     }),
@@ -125,7 +204,7 @@ export async function startExtra(db: Database, env: Env, row: TestingRow, now = 
       tr(lang, 'testing.extraOpenSigned', {
         shop: shop.name,
         product: what,
-        hours: row.extraSignupHours,
+        hours: signupHours,
         cap: formatMoney(member.cap, row.currency),
         list,
       }),

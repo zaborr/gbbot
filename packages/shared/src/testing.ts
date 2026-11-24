@@ -170,6 +170,8 @@ export type TestingStep =
   | 'wait_window'
   | 'wait_extra'
   | 'unpaid'
+  /** No test reached and the extra round never opened, or ended with nothing: open it (or close). */
+  | 'extra'
   | 'draw'
   | 'wait_block'
   | 'vials'
