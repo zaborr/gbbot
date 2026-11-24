@@ -1297,6 +1297,7 @@ describeDb('API integration', () => {
     const menu = vi
       .spyOn(TelegramApi.prototype, 'getChatMenuButton')
       .mockResolvedValue({ type: 'web_app', web_app: { url: 'https://app.example' } });
+    resetMiniAppUrlCache();
     await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
     const created = await request('/api/admin/testings', {
       method: 'POST',
