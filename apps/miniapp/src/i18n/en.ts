@@ -421,6 +421,7 @@ export const en = {
   'catalog.inCart': 'In cart · {count}',
   'catalog.myOrders': '📦 My orders',
   'catalog.noProducts': 'No products found',
+  'catalog.other': 'Others',
   'catalog.search': 'Search products',
   'catalog.showMore': 'Show more ({shown} of {total})',
   'catalog.testingAll': 'All tests secured',

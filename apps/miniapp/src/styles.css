@@ -868,3 +868,23 @@ html[data-theme='dark'] .gb-testing-badge--hot {
   border: 0;
   object-fit: contain;
 }
+
+/* The customer's catalog: its categories, always in sight at the top; tapping one jumps to it. */
+.gb-catbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 10px 16px;
+  background: var(--tgui--secondary_bg_color);
+  white-space: nowrap;
+}
+.gb-catbar::-webkit-scrollbar {
+  display: none;
+}
+.gb-catbar > * {
+  flex: 0 0 auto;
+}
