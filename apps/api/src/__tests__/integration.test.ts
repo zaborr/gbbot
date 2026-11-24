@@ -1318,6 +1318,12 @@ describeDb('API integration', () => {
     try {
       const add = (body: Record<string, unknown>) =>
         request(`/api/admin/testings/${testingId}/participants`, { method: 'POST', headers: admin, body: JSON.stringify(body) });
+      // Nobody bought it: nobody to invite.
+      const others = await request(`/api/admin/testings/${testingId}/not-joined`, { headers: admin });
+      expect(others.status).toBe(200);
+      expect(await others.json()).toEqual([]);
+      const invite = await request(`/api/admin/testings/${testingId}/invite-buyers`, { method: 'POST', headers: admin });
+      expect(await invite.json()).toEqual({ sent: 0 });
       const res = await add({ who: '@outsider_test', amount: 500, volunteer: true });
       expect(res.status).toBe(201);
       const { orderId, notified } = (await res.json()) as { orderId: string; notified: boolean };

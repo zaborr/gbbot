@@ -67,6 +67,7 @@ import type {
   Lab,
   LabRequest,
   PendingRefund,
+  TestingNotJoined,
   TestingParticipant,
   UpdateTestingRequest,
 } from '@tma-shop/shared';
@@ -695,6 +696,14 @@ export class ApiClient {
 
   adminRemoveTestingInvite(id: string, who: string): Promise<{ ok: boolean }> {
     return this.request<{ ok: boolean }>(`/admin/testings/${id}/invites/${encodeURIComponent(who)}`, { method: 'DELETE' });
+  }
+
+  adminGetTestingNotJoined(id: string): Promise<TestingNotJoined[]> {
+    return this.request<TestingNotJoined[]>(`/admin/testings/${id}/not-joined`);
+  }
+
+  adminInviteTestingBuyers(id: string): Promise<{ sent: number }> {
+    return this.request<{ sent: number }>(`/admin/testings/${id}/invite-buyers`, { method: 'POST' });
   }
 
   adminRemindTestingUnpaid(id: string): Promise<{ sent: number }> {
