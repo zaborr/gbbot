@@ -5,7 +5,7 @@ import { orders, testingEntries, testings } from '../db/schema.js';
 import type { ShopRow } from './shop.js';
 import { donationsOpen } from './testing.js';
 import { drawBlocker } from './testingDraw.js';
-import { extraGoing } from './testingExtra.js';
+import { extraCanOpen, extraGoing } from './testingExtra.js';
 
 type TestingRow = typeof testings.$inferSelect;
 
@@ -57,8 +57,12 @@ export function nextOf(
         return { ...base, phase: 'window', step: 'wait_window', until: row.donationsUntil?.toISOString() ?? null };
       }
       if (blocker === 'unpaid') return { ...base, phase: 'draw', step: 'unpaid', action: true };
-      // Nothing reached: there is nothing to draw, only to close it.
-      if (!view.tiers.some((tier) => tier.reached)) return { ...base, phase: 'draw', step: 'settle', action: true };
+      if (!view.tiers.some((tier) => tier.reached)) {
+        // Nothing reached: the extra round can still be opened (again, if it got nothing).
+        if (extraCanOpen(row)) return { ...base, phase: 'extra', step: 'extra', action: true };
+        // Else there is nothing to draw, only to close it.
+        return { ...base, phase: 'draw', step: 'settle', action: true };
+      }
       return { ...base, phase: 'draw', step: 'draw', action: true };
     }
     case 'drawn': {

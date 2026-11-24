@@ -16,6 +16,8 @@ export function nextText(next: TestingNext): string | null {
       return t('testing.next.waitExtra', { date: date ?? '—' });
     case 'unpaid':
       return tn(next.unpaid, 'testing.next.unpaid.one', 'testing.next.unpaid.other');
+    case 'extra':
+      return t('testing.next.extra');
     case 'draw':
       return t('testing.next.draw');
     case 'wait_block':

@@ -744,6 +744,13 @@ export class ApiClient {
   }
 
   /** The time to join and give opens again (closed, or settled with nothing reached). */
+  adminOpenTestingExtra(id: string, hours: number): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/testings/${id}/extra`, {
+      method: 'POST',
+      body: JSON.stringify({ hours }),
+    });
+  }
+
   adminReopenTesting(id: string, hours: number): Promise<{ ok: boolean }> {
     return this.request<{ ok: boolean }>(`/admin/testings/${id}/reopen`, {
       method: 'POST',

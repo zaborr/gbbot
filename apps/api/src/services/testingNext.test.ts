@@ -39,6 +39,14 @@ describe('what comes next in a testing', () => {
     expect(nextOf(row({}), none, closedShop, 0, null, NOW)).toMatchObject({ step: 'settle', action: true });
   });
 
+  it('offers the extra round when nothing is reached and it never opened, or got nothing', () => {
+    expect(nextOf(row({ extraEnabled: true }), none, closedShop, 0, null, NOW)).toMatchObject({ step: 'extra', action: true });
+    const nothing = { stage: 'done', until: NOW.toISOString(), target: [], share: 0, outcome: { tiers: [], collected: 0, refunded: 0 } } as Row['extra'];
+    expect(nextOf(row({ extraEnabled: true, extra: nothing }), none, closedShop, 0, null, NOW)).toMatchObject({ step: 'extra' });
+    const got = { ...nothing!, outcome: { tiers: ['mp'], collected: 100, refunded: 0 } } as Row['extra'];
+    expect(nextOf(row({ extraEnabled: true, extra: got }), none, closedShop, 0, null, NOW)).toMatchObject({ step: 'settle' });
+  });
+
   it('follows the lab after the draw, until it can be closed', () => {
     const drawn = (patch: Partial<Row>) => nextOf(row({ status: 'drawn', ...patch }), reached, closedShop, 0, null, NOW);
     expect(drawn({})).toMatchObject({ phase: 'lab', step: 'vials', action: true });
