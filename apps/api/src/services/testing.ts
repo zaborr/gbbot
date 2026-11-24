@@ -409,6 +409,7 @@ function toTestingDTO(
     extraPayHours: row.extraPayHours,
     extra: null,
     extraPre: null,
+    invites: admin ? row.invites : [],
     money: admin
       ? {
           perUnit: row.perUnit,

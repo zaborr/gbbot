@@ -4,6 +4,7 @@ import { authRequest, webAuthRequest, type AuthResponse } from '@tma-shop/shared
 import type { AppBindings } from '../context.js';
 import { validateInitData } from '../auth/init-data.js';
 import { signSession } from '../auth/jwt.js';
+import { claimInvites } from '../services/testingAdd.js';
 import { getUser, upsertUser } from '../services/users.js';
 import { claimPendingRoles } from '../services/team.js';
 import { claimBlacklisted } from '../services/blacklist.js';
@@ -34,6 +35,10 @@ export function authRoutes(): Hono<AppBindings> {
     // Added by @username to a GB's admins or to the organisers: the role is theirs now.
     await claimPendingRoles(db, userRow.telegramId, userRow.username);
     await claimBlacklisted(db, userRow.telegramId, userRow.username);
+    // Put in a testing by hand before they had opened the bot: in now.
+    await claimInvites(db, env, userRow.telegramId, userRow.username).catch((error) =>
+      console.error('Could not claim testing invites:', error),
+    );
     // Platform super-admin status always follows the current ADMIN_TELEGRAM_IDS.
     const role = env.ADMIN_TELEGRAM_IDS.includes(userRow.telegramId) ? 'admin' : 'customer';
     const { token, expiresAt } = await signSession(

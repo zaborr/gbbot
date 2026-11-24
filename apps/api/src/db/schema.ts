@@ -38,6 +38,7 @@ import type {
   CheckoutFields,
   TestingTier,
   TestingDraw,
+  TestingInvite,
   TestingExtraState,
   WebRole,
 } from '@tma-shop/shared';
@@ -463,6 +464,8 @@ export const testings = pgTable(
     notifiedTiers: integer('notified_tiers').notNull().default(0),
     /** The draw of donors (block, candidates, result). */
     draw: jsonb('draw').$type<TestingDraw>(),
+    /** Put in by hand before they opened the bot: they join when they do. */
+    invites: jsonb('invites').$type<TestingInvite[]>().notNull().default([]),
     /** No longer used (money of the first testing model). */
     settlement: jsonb('settlement'),
     /** The lab report (a file in Telegram) and when it was sent to the participants. */

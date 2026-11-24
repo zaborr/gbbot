@@ -28,7 +28,14 @@ const units = (n: number): string => tn(n, 'testing.units.one', 'testing.units.o
  * The orders in a testing: who takes part, filtered and searched, copied as
  * a table, and a reminder through the bot to those who have not paid.
  */
-export function TestingOrders({ testing }: { testing: Testing }): React.JSX.Element {
+export function TestingOrders({
+  testing,
+  onChanged,
+}: {
+  testing: Testing;
+  /** The testing itself changed (someone kept for when they open the bot). */
+  onChanged: () => void;
+}): React.JSX.Element {
   const navigate = useNavigate();
   const { to } = useShop();
   const [reloadKey, setReloadKey] = useState(0);
@@ -37,7 +44,10 @@ export function TestingOrders({ testing }: { testing: Testing }): React.JSX.Elem
   const [search, setSearch] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
   const [reminded, setReminded] = useState<number | null>(null);
-  const actions = useAdminActions(() => setReloadKey((k) => k + 1));
+  const actions = useAdminActions(() => {
+    setReloadKey((k) => k + 1);
+    onChanged();
+  });
 
   if (!list.data) return list.error ? <ErrorBanner message={list.error} /> : <Loader />;
   const all = list.data;
@@ -144,7 +154,40 @@ export function TestingOrders({ testing }: { testing: Testing }): React.JSX.Elem
         ))}
       </Section>
       {(testing.status === 'open' || testing.status === 'closed') && (
-        <AddParticipant testing={testing} onAdded={() => setReloadKey((k) => k + 1)} />
+        <>
+          {testing.invites.length > 0 && (
+            <Section header={t('testing.invites.title', { count: testing.invites.length })} footer={t('testing.invites.footer')}>
+              <ErrorBanner message={actions.error} />
+              {testing.invites.map((i) => (
+                <Cell
+                  key={i.who}
+                  subtitle={[
+                    i.amount === 0
+                      ? t('testing.invites.free')
+                      : formatPrice(i.amount ?? testing.contribution, testing.currency),
+                    i.volunteer ? t('testing.volunteerChip') : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  after={
+                    <Button
+                      size="s"
+                      mode="plain"
+                      onClick={() =>
+                        void actions.twoTap(`invite:${i.who}`, () => api.adminRemoveTestingInvite(testing.id, i.who))
+                      }
+                    >
+                      {actions.tapLabel(`invite:${i.who}`, t('testing.invites.remove'))}
+                    </Button>
+                  }
+                >
+                  {`⏳ ${/^\d+$/.test(i.who) ? i.who : `@${i.who}`}`}
+                </Cell>
+              ))}
+            </Section>
+          )}
+          <AddParticipant testing={testing} onAdded={() => setReloadKey((k) => k + 1)} onInvited={onChanged} />
+        </>
       )}
       {unpaid > 0 && (
         <Section footer={reminded !== null ? tn(reminded, 'testing.orders.reminded.one', 'testing.orders.reminded.other') : t('testing.orders.remindFooter')}>
@@ -177,7 +220,16 @@ export function TestingOrders({ testing }: { testing: Testing }): React.JSX.Elem
 }
 
 /** Someone put in by hand: a buyer of the product, or anyone (an order of only the fee). */
-function AddParticipant({ testing, onAdded }: { testing: Testing; onAdded: () => void }): React.JSX.Element {
+function AddParticipant({
+  testing,
+  onAdded,
+  onInvited,
+}: {
+  testing: Testing;
+  onAdded: () => void;
+  /** Kept for when they open the bot: the testing itself changed. */
+  onInvited: () => void;
+}): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [who, setWho] = useState('');
   const [amount, setAmount] = useState('');
@@ -203,7 +255,14 @@ function AddParticipant({ testing, onAdded }: { testing: Testing; onAdded: () =>
         volunteer,
         notify,
       });
-      setDone(result.notified ? t('testing.add.doneNotified') : t('testing.add.done'));
+      setDone(
+        result.invited
+          ? t('testing.add.doneInvited')
+          : result.notified
+            ? t('testing.add.doneNotified')
+            : t('testing.add.done'),
+      );
+      if (result.invited) onInvited();
       setWho('');
       setAmount('');
       setVolunteer(false);

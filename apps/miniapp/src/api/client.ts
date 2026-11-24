@@ -686,11 +686,15 @@ export class ApiClient {
   adminAddTestingParticipant(
     id: string,
     input: { who: string; amount: number | null; volunteer: boolean; notify: boolean },
-  ): Promise<{ orderId: string; notified: boolean }> {
-    return this.request<{ orderId: string; notified: boolean }>(`/admin/testings/${id}/participants`, {
-      method: 'POST',
-      body: JSON.stringify(input),
-    });
+  ): Promise<{ orderId: string | null; notified: boolean; invited: boolean }> {
+    return this.request<{ orderId: string | null; notified: boolean; invited: boolean }>(
+      `/admin/testings/${id}/participants`,
+      { method: 'POST', body: JSON.stringify(input) },
+    );
+  }
+
+  adminRemoveTestingInvite(id: string, who: string): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/testings/${id}/invites/${encodeURIComponent(who)}`, { method: 'DELETE' });
   }
 
   adminRemindTestingUnpaid(id: string): Promise<{ sent: number }> {
