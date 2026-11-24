@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Cell, Section } from '@telegram-apps/telegram-ui';
+import { Button, Cell, Section, Switch } from '@telegram-apps/telegram-ui';
 import type { Testing, TestingParticipant } from '@tma-shop/shared';
 import { api } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
@@ -143,6 +143,9 @@ export function TestingOrders({ testing }: { testing: Testing }): React.JSX.Elem
           </Cell>
         ))}
       </Section>
+      {(testing.status === 'open' || testing.status === 'closed') && (
+        <AddParticipant testing={testing} onAdded={() => setReloadKey((k) => k + 1)} />
+      )}
       {unpaid > 0 && (
         <Section footer={reminded !== null ? tn(reminded, 'testing.orders.reminded.one', 'testing.orders.reminded.other') : t('testing.orders.remindFooter')}>
           <div style={{ padding: 16 }}>
@@ -170,5 +173,76 @@ export function TestingOrders({ testing }: { testing: Testing }): React.JSX.Elem
         </Section>
       )}
     </>
+  );
+}
+
+/** Someone put in by hand: a buyer of the product, or anyone (an order of only the fee). */
+function AddParticipant({ testing, onAdded }: { testing: Testing; onAdded: () => void }): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const [who, setWho] = useState('');
+  const [amount, setAmount] = useState('');
+  const [volunteer, setVolunteer] = useState(false);
+  const [notify, setNotify] = useState(true);
+  const [done, setDone] = useState<string | null>(null);
+  const actions = useAdminActions(onAdded);
+  const amountText = amount.trim().replace(',', '.');
+  const amountBad = amountText !== '' && !/^\d+(\.\d{1,2})?$/.test(amountText);
+
+  if (!open) {
+    return (
+      <Section footer={done ?? undefined}>
+        <Cell onClick={() => setOpen(true)}>{t('testing.add.open')}</Cell>
+      </Section>
+    );
+  }
+  const add = (): void =>
+    void actions.run(async () => {
+      const result = await api.adminAddTestingParticipant(testing.id, {
+        who: who.trim(),
+        amount: amountText === '' ? null : Math.round(Number(amountText) * 100),
+        volunteer,
+        notify,
+      });
+      setDone(result.notified ? t('testing.add.doneNotified') : t('testing.add.done'));
+      setWho('');
+      setAmount('');
+      setVolunteer(false);
+      setOpen(false);
+    });
+
+  return (
+    <Section header={t('testing.add.title')} footer={t('testing.add.footer')}>
+      <ErrorBanner message={actions.error} />
+      <Input
+        header={t('testing.add.who')}
+        placeholder="@usuario"
+        autoCapitalize="none"
+        value={who}
+        onChange={(e) => setWho(e.target.value)}
+      />
+      <Input
+        header={t('testing.add.amount', { currency: testing.currency })}
+        type="text"
+        inputMode="decimal"
+        placeholder={formatPrice(testing.contribution, testing.currency)}
+        status={amountBad ? 'error' : 'default'}
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+      />
+      <Cell Component="label" after={<Switch checked={volunteer} onChange={(e) => setVolunteer(e.target.checked)} />} multiline>
+        {t('testing.add.volunteer')}
+      </Cell>
+      <Cell Component="label" after={<Switch checked={notify} onChange={(e) => setNotify(e.target.checked)} />} multiline>
+        {t('testing.add.notify')}
+      </Cell>
+      <div style={{ display: 'flex', gap: 8, padding: 16 }}>
+        <Button stretched mode="bezeled" onClick={() => setOpen(false)}>
+          {t('common.cancel')}
+        </Button>
+        <Button stretched disabled={!who.trim() || amountBad} onClick={add}>
+          {t('testing.add.submit')}
+        </Button>
+      </div>
+    </Section>
   );
 }

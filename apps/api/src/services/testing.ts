@@ -258,7 +258,7 @@ export const takesPart = (
 ): boolean => !feeExempt(testing, isVip) && (amount > 0 || testing.contribution === 0);
 
 /** The testings this person already takes part in (on an order not cancelled). */
-async function joinedBy(db: Executor, userId: number | undefined, testingIds: readonly string[]): Promise<Set<string>> {
+export async function joinedBy(db: Executor, userId: number | undefined, testingIds: readonly string[]): Promise<Set<string>> {
   if (userId === undefined || testingIds.length === 0) return new Set();
   const rows = await db
     .select({ testingId: testingEntries.testingId })

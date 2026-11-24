@@ -1288,6 +1288,55 @@ describeDb('API integration', () => {
     }
   });
 
+  it('the organisers put people in a testing by hand, from outside too', async () => {
+    const admin = {
+      Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
+      'content-type': 'application/json',
+    };
+    const send = vi.spyOn(TelegramApi.prototype, 'sendMessage').mockResolvedValue(true);
+    await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: true }) });
+    const created = await request('/api/admin/testings', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({
+        productId,
+        variantId: null,
+        lab: 'Lab',
+        contribution: 1000,
+        perUnit: 0,
+        feeMode: 'optional',
+        tiers: [{ id: 'mp', name: 'M&P', cost: 5000, vials: 1 }],
+      }),
+    });
+    const { id: testingId } = (await created.json()) as { id: string };
+    // Someone who opened the bot once, with no order here; the testing takes nobody from outside.
+    await authToken(555007001, 'Outsider', 'outsider_test');
+    try {
+      const add = (body: Record<string, unknown>) =>
+        request(`/api/admin/testings/${testingId}/participants`, { method: 'POST', headers: admin, body: JSON.stringify(body) });
+      const res = await add({ who: '@outsider_test', amount: 500, volunteer: true });
+      expect(res.status).toBe(201);
+      const { orderId, notified } = (await res.json()) as { orderId: string; notified: boolean };
+      expect(notified).toBe(true);
+      expect(send).toHaveBeenCalledWith(555007001, expect.any(String), expect.anything());
+      const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+      expect(order).toMatchObject({ external: true, total: 500, testing: 500, status: 'pending', userId: 555007001 });
+      const [entry] = await db.select().from(testingEntries).where(eq(testingEntries.orderId, orderId));
+      expect(entry).toMatchObject({ amount: 500, volunteer: true });
+      // Not twice; and not someone the bot has never seen.
+      expect((await add({ who: '555007001' })).status).toBe(409);
+      const unseen = await add({ who: '@nobody_seen_here' });
+      expect(unseen.status).toBe(404);
+      expect(((await unseen.json()) as { error: { message: string } }).error.message).toContain('not opened the bot');
+    } finally {
+      send.mockRestore();
+      await db.delete(testingEntries).where(eq(testingEntries.testingId, testingId));
+      await db.delete(orders).where(eq(orders.externalTestingId, testingId));
+      await db.delete(testings).where(eq(testings.id, testingId));
+      await request('/api/admin/shop/testing', { method: 'PUT', headers: admin, body: JSON.stringify({ enabled: false }) });
+    }
+  });
+
   it('draws the donors with the next Bitcoin block, volunteers first', async () => {
     const admin = {
       Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`,
