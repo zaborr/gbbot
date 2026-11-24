@@ -817,8 +817,8 @@ export async function insertTesting(
     .values({
       shopId,
       slug: `extra-${product.slug}-${Math.random().toString(36).slice(2, 8)}`,
-      title: `Fase extra · ${what} (testing)`,
-      titleEn: `Extra round · ${whatEn} (testing)`,
+      title: `Fase «Pagar» · ${what} (testing)`,
+      titleEn: `«Pay» round · ${whatEn} (testing)`,
       price: 1,
       currency: product.currency,
       isActive: false,
