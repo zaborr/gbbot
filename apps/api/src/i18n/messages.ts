@@ -300,6 +300,13 @@ const en = {
   'testing.addedByOrganiserFree': '🧪 The organisers of {shop} have put you in the testing of {what}. Nothing to pay.',
   'testing.inviteBuyer': '🧪 {shop}: you bought {what}, and there is a lab testing of it you can still join. Open Testing to see it and join.',
   'testing.digest.extra': 'no test reached: open the payment round, or close it',
+  'label.request': '📎 {shop}: the organisers need your shipping label for order #{ref}.\n\nReply to this message with the PDF (or a photo), or upload it in your order.',
+  'label.requestNote': '📎 {shop}: the organisers need your shipping label for order #{ref}.\n\n💬 {note}\n\nReply to this message with the PDF (or a photo), or upload it in your order.',
+  'label.uploadButton': '📎 Upload label',
+  'label.received': '📎 {shop}: shipping label of order #{ref}, from {who}.',
+  'label.thanks': '✅ Got it: label of order #{ref} sent to the organisers.',
+  'label.whichOrder': 'You have several orders waiting for a label: reply to the bot\'s message of the right order with the file, or upload it in that order.',
+  'label.badFile': '⚠️ That file could not be kept: send a PDF or a photo of up to 10 MB.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -592,6 +599,13 @@ const es: Record<BotMessageKey, string> = {
   'testing.addedByOrganiserFree': '🧪 Los organizadores de {shop} te han apuntado al testing de {what}. No tienes que pagar nada.',
   'testing.inviteBuyer': '🧪 {shop}: compraste {what} y hay un testing de laboratorio al que aún puedes unirte. Abre Testing para verlo y apuntarte.',
   'testing.digest.extra': 'ningún tramo cubierto: abre la fase de pago o ciérralo',
+  'label.request': '📎 {shop}: los organizadores necesitan tu etiqueta de envío para el pedido #{ref}.\n\nResponde a este mensaje con el PDF (o una foto), o súbela en tu pedido.',
+  'label.requestNote': '📎 {shop}: los organizadores necesitan tu etiqueta de envío para el pedido #{ref}.\n\n💬 {note}\n\nResponde a este mensaje con el PDF (o una foto), o súbela en tu pedido.',
+  'label.uploadButton': '📎 Subir etiqueta',
+  'label.received': '📎 {shop}: etiqueta de envío del pedido #{ref}, de {who}.',
+  'label.thanks': '✅ Recibida: la etiqueta del pedido #{ref} ya está con los organizadores.',
+  'label.whichOrder': 'Tienes varios pedidos esperando etiqueta: responde con el archivo al mensaje del bot del pedido que toca, o súbela en ese pedido.',
+  'label.badFile': '⚠️ No se ha podido guardar ese archivo: manda un PDF o una foto de hasta 10 MB.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -882,6 +896,13 @@ const it: Record<BotMessageKey, string> = {
   'testing.addedByOrganiserFree': '🧪 Gli organizzatori di {shop} ti hanno iscritto al testing di {what}. Non devi pagare nulla.',
   'testing.inviteBuyer': '🧪 {shop}: hai comprato {what} e c\'è un testing di laboratorio a cui puoi ancora unirti. Apri Testing per vederlo e iscriverti.',
   'testing.digest.extra': 'nessun livello raggiunto: apri la fase di pagamento o chiudilo',
+  'label.request': '📎 {shop}: gli organizzatori hanno bisogno della tua etichetta di spedizione per l\'ordine #{ref}.\n\nRispondi a questo messaggio con il PDF (o una foto), oppure caricala nel tuo ordine.',
+  'label.requestNote': '📎 {shop}: gli organizzatori hanno bisogno della tua etichetta di spedizione per l\'ordine #{ref}.\n\n💬 {note}\n\nRispondi a questo messaggio con il PDF (o una foto), oppure caricala nel tuo ordine.',
+  'label.uploadButton': '📎 Carica etichetta',
+  'label.received': '📎 {shop}: etichetta di spedizione dell\'ordine #{ref}, da {who}.',
+  'label.thanks': '✅ Ricevuta: l\'etichetta dell\'ordine #{ref} è arrivata agli organizzatori.',
+  'label.whichOrder': 'Hai diversi ordini in attesa di etichetta: rispondi con il file al messaggio del bot dell\'ordine giusto, oppure caricala in quell\'ordine.',
+  'label.badFile': '⚠️ Impossibile salvare quel file: invia un PDF o una foto fino a 10 MB.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -1172,6 +1193,13 @@ const pt: Record<BotMessageKey, string> = {
   'testing.addedByOrganiserFree': '🧪 Os organizadores de {shop} inscreveram-no no testing de {what}. Não tem nada a pagar.',
   'testing.inviteBuyer': '🧪 {shop}: comprou {what} e há um testing de laboratório ao qual ainda se pode juntar. Abra Testing para o ver e inscrever-se.',
   'testing.digest.extra': 'nenhum nível alcançado: abra a fase de pagamento ou feche-o',
+  'label.request': '📎 {shop}: os organizadores precisam da sua etiqueta de envio para o pedido #{ref}.\n\nResponda a esta mensagem com o PDF (ou uma foto), ou carregue-a no seu pedido.',
+  'label.requestNote': '📎 {shop}: os organizadores precisam da sua etiqueta de envio para o pedido #{ref}.\n\n💬 {note}\n\nResponda a esta mensagem com o PDF (ou uma foto), ou carregue-a no seu pedido.',
+  'label.uploadButton': '📎 Carregar etiqueta',
+  'label.received': '📎 {shop}: etiqueta de envio do pedido #{ref}, de {who}.',
+  'label.thanks': '✅ Recebida: a etiqueta do pedido #{ref} já está com os organizadores.',
+  'label.whichOrder': 'Tem vários pedidos à espera de etiqueta: responda com o ficheiro à mensagem do bot do pedido certo, ou carregue-a nesse pedido.',
+  'label.badFile': '⚠️ Não foi possível guardar esse ficheiro: envie um PDF ou uma foto até 10 MB.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

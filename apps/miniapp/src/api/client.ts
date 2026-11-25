@@ -756,6 +756,37 @@ export class ApiClient {
   }
 
   /** The time to join and give opens again (closed, or settled with nothing reached). */
+  /** The shipping label the organisers asked for: the file as it is. */
+  uploadOrderLabel(orderId: string, file: File): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/orders/${orderId}/label`, {
+      method: 'POST',
+      headers: { 'Content-Type': file.type, 'X-File-Name': encodeURIComponent(file.name) },
+      body: file,
+    });
+  }
+
+  adminRequestLabel(orderId: string, note: string | null): Promise<{ sent: boolean }> {
+    return this.request<{ sent: boolean }>(`/admin/orders/${orderId}/label-request`, {
+      method: 'POST',
+      body: JSON.stringify({ note }),
+    });
+  }
+
+  adminRequestLabels(input: { zone: string | null; note: string | null; dryRun: boolean }): Promise<{ count: number; sent: number }> {
+    return this.request<{ count: number; sent: number }>('/admin/orders/label-requests', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  adminLabelFile(orderId: string): Promise<Blob> {
+    return this.requestBlob(`/admin/orders/${orderId}/label`);
+  }
+
+  adminSendLabel(orderId: string): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/orders/${orderId}/label/send`, { method: 'POST' });
+  }
+
   /** An image (already made smaller) kept on the server: its link back. */
   adminUploadImage(image: Blob): Promise<{ url: string }> {
     return this.request<{ url: string }>('/admin/images', {

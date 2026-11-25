@@ -1,3 +1,4 @@
+import { CustomerLabelSection } from '../components/OrderLabel.js';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Cell, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
@@ -164,6 +165,9 @@ export function PaymentPage(): React.JSX.Element {
       {shop.data.testingEnabled && <OrderTestingLink order={current} onOpen={() => navigate(to('/testing'))} />}
 
       {!done && <StatusSection order={current} autoCancelHours={shop.data.autoCancelHours} />}
+
+      {/* The shipping label the organisers asked for. */}
+      <CustomerLabelSection order={current} onSent={reload} />
 
       <OrderDetailsSection order={current} shop={shop.data} onAdded={reload} />
 

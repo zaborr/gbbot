@@ -1,3 +1,4 @@
+import { AdminLabelSection } from '../../components/OrderLabel.js';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
@@ -211,6 +212,8 @@ function AdminOrder(): React.JSX.Element {
       </Section>
 
       <AddressSection order={o} />
+
+      <AdminLabelSection order={o} onChanged={() => setReloadKey((k) => k + 1)} />
 
       <CopyOrders orders={[o]} several={false} />
 

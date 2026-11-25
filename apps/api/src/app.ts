@@ -54,7 +54,10 @@ export function createApp(deps: AppDeps): Hono<AppBindings> {
   const tooBig = (): never => {
     throw new ApiError(413, 'too_large', 'The request is too large');
   };
-  app.use('/api/*', bodyLimit({ maxSize: 3 * 1024 * 1024, onError: tooBig }));
+  // A shipping label (a PDF or a photo) may be bigger than anything else sent.
+  const usual = bodyLimit({ maxSize: 3 * 1024 * 1024, onError: tooBig });
+  const label = bodyLimit({ maxSize: 11 * 1024 * 1024, onError: tooBig });
+  app.use('/api/*', (c, next) => (/\/orders\/[^/]+\/label$/.test(c.req.path) ? label(c, next) : usual(c, next)));
   app.use('/webhook/*', bodyLimit({ maxSize: 1024 * 1024, onError: tooBig }));
   // Requests per minute per client (the webhook is not limited: Telegram
   // proves itself with its secret, and a limit could lose bot messages).

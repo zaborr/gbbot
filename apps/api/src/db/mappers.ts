@@ -272,6 +272,14 @@ export function toOrderDTO(row: OrderRow, items: OrderItemRow[]): Order {
     trackingNumber: row.trackingNumber,
     carrier: row.carrier,
     statusNote: row.statusNote,
+    label: row.label
+      ? {
+          requestedAt: row.label.requestedAt,
+          note: row.label.note,
+          receivedAt: row.label.receivedAt,
+          fileName: row.label.fileName,
+        }
+      : null,
     amountPaid: row.amountPaid,
     // A cancelled order owes nothing; whatever was paid goes back.
     amountDue: (row.status === 'cancelled' ? 0 : row.total) - row.amountPaid,

@@ -1,3 +1,4 @@
+import { handleLabelMessage } from './labels.js';
 import { langFrom, type Lang } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
@@ -92,6 +93,12 @@ export async function handleBotMessage(
     return;
   }
   const message = update.message;
+  // A shipping label the bot asked a customer for (a reply, or their only order waiting for one).
+  if ((message?.document || message?.photo) && message.chat?.type === 'private' && db) {
+    const known = message.from ? (await languagesOf(db, [message.from.id])).get(message.from.id) : undefined;
+    const lang = known ?? langFrom(message.from?.language_code);
+    if (await handleLabelMessage(db, env, telegram, message, lang)) return;
+  }
   // A testing's lab report, sent in reply to the bot asking for it.
   if ((message?.document || message?.photo) && message.reply_to_message && message.chat?.type === 'private' && db) {
     const known = message.from ? (await languagesOf(db, [message.from.id])).get(message.from.id) : undefined;

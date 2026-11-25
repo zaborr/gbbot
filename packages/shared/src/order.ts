@@ -181,6 +181,15 @@ export const order = z.object({
   carrier: z.string().nullable(),
   /** Last message from the shop to the customer about this order. */
   statusNote: z.string().nullable(),
+  /** Shipping label asked of the customer: when, the note, and whether it arrived. */
+  label: z
+    .object({
+      requestedAt: z.string(),
+      note: z.string().nullable(),
+      receivedAt: z.string().nullable(),
+      fileName: z.string().nullable(),
+    })
+    .nullable(),
   /** Confirmed money received, net of refunds. */
   amountPaid: moneyAmount,
   /**
@@ -241,3 +250,14 @@ export interface PendingRefund {
   reasons: RefundReason[];
   updatedAt: string;
 }
+
+/** Asking customers for their shipping labels: one order, or every paid order without one. */
+export const labelRequest = z.object({ note: z.string().trim().max(500).nullable().default(null) });
+export const labelRequests = z.object({
+  note: z.string().trim().max(500).nullable().default(null),
+  /** Only the orders of this shipping zone (by name); null: all. */
+  zone: z.string().max(200).nullable().default(null),
+  /** Only count them. */
+  dryRun: z.boolean().default(false),
+});
+export type LabelRequests = z.infer<typeof labelRequests>;

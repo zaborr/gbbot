@@ -40,11 +40,14 @@ import {
   addToBlacklistRequest,
   blacklistWho,
   updateTestingEnabledRequest,
+  labelRequest,
+  labelRequests,
 } from '@tma-shop/shared';
 import type { Context } from 'hono';
 import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth, requireOwner } from '../auth/middleware.js';
 import { imageUrl, saveImage } from '../services/images.js';
+import { labelFile, requestLabel, requestLabels, sendLabelTo } from '../services/labels.js';
 import { testingAdminRoutes } from './testing.js';
 import { announceTestingTiers, listTestings, markTestings, setTestingEnabled } from '../services/testing.js';
 import { unpaidExtras } from '../services/testingExtra.js';
@@ -751,6 +754,35 @@ export function adminRoutes(): Hono<AppBindings> {
       o.userId !== null && blocked.has(o.userId) ? { ...o, customerBlocked: true } : o,
     );
   };
+  // Shipping labels: asking one customer, or every paid order without one (or counting them).
+  app.post('/orders/label-requests', zValidator('json', labelRequests), async (c) =>
+    c.json(await requestLabels(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('json'))),
+  );
+  app.post(
+    '/orders/:id/label-request',
+    zValidator('param', z.object({ id: z.uuid() })),
+    zValidator('json', labelRequest),
+    async (c) =>
+      c.json(
+        await requestLabel(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('param').id, c.req.valid('json').note),
+      ),
+  );
+  app.get('/orders/:id/label', zValidator('param', z.object({ id: z.uuid() })), async (c) => {
+    const file = await labelFile(c.get('db'), c.get('shopId'), c.req.valid('param').id);
+    return new Response(new Uint8Array(file.data), {
+      headers: {
+        'Content-Type': file.mime,
+        'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`,
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
+  });
+  app.post('/orders/:id/label/send', zValidator('param', z.object({ id: z.uuid() })), async (c) => {
+    await sendLabelTo(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('param').id, c.get('claims').sub);
+    return c.json({ ok: true });
+  });
+
   app.get('/orders', async (c) =>
     c.json(
       await markTestings(c.get('db'), c.get('shopId'), await markBlocked(c, await listAllOrders(c.get('db'), c.get('shopId')))),
