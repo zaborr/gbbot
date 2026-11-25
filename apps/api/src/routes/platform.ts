@@ -30,7 +30,13 @@ import {
   moveShop,
 } from '../services/shop.js';
 import { getRetention, runRetention, updateRetention } from '../services/retention.js';
-import { getPlatformClub, getPlatformVipClub, updatePlatformClub, updatePlatformVipClub } from '../services/vip.js';
+import {
+  getPlatformClub,
+  getPlatformVipClub,
+  updatePlatformClub,
+  updatePlatformVipClub,
+  withNames,
+} from '../services/vip.js';
 import { getOrganizers, getShopTeam, updateOrganizers } from '../services/team.js';
 import { ApiError } from '../lib/errors.js';
 import { botSwitches, shops } from '../db/schema.js';
@@ -283,15 +289,15 @@ export function platformRoutes(): Hono<AppBindings> {
   app.post('/retention/run', async (c) => c.json(await runRetention(c.get('db'))));
 
   // The platform-wide VIP club (shops can count its members as their VIPs).
-  app.get('/vip-club', async (c) => c.json(await getPlatformVipClub(c.get('db'))));
+  app.get('/vip-club', async (c) => c.json(await withNames(c.get('db'), await getPlatformVipClub(c.get('db')))));
   app.put('/vip-club', zValidator('json', updateVipClubRequest), async (c) =>
-    c.json(await updatePlatformVipClub(c.get('db'), c.get('env'), c.req.valid('json'))),
+    c.json(await withNames(c.get('db'), await updatePlatformVipClub(c.get('db'), c.get('env'), c.req.valid('json')))),
   );
 
   // The platform-wide guests (shops can count them as their guests).
-  app.get('/guests', async (c) => c.json(await getPlatformClub(c.get('db'), 'guest')));
+  app.get('/guests', async (c) => c.json(await withNames(c.get('db'), await getPlatformClub(c.get('db'), 'guest'))));
   app.put('/guests', zValidator('json', updateVipClubRequest), async (c) =>
-    c.json(await updatePlatformClub(c.get('db'), c.get('env'), c.req.valid('json'), 'guest')),
+    c.json(await withNames(c.get('db'), await updatePlatformClub(c.get('db'), c.get('env'), c.req.valid('json'), 'guest'))),
   );
 
   return app;

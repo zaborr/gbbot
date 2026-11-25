@@ -1781,7 +1781,7 @@ export const en = {
   'vip.intro': "VIPs are the people in these Telegram groups or channels and those in the list below. VIP-only GBs are shown only to them (and to the GB's team).",
   'vip.invalidMembers': 'Not valid: {list}',
   'vip.members': 'Members list',
-  'vip.membersFooter': 'One a line or comma-separated: @username or Telegram ID. The @username is kept as the ID the first time they open the app.',
+  'vip.membersFooter': 'One per line: @username or Telegram ID. After # you can write who it is (e.g. 123456789 # Ana). The @username is saved as an ID the first time they open the app, keeping the note; for those who have opened it, their name is filled in.',
   'vip.noGroups': 'No groups yet.',
   'vip.useGlobal': 'Members of the general VIP club are VIPs here too',
   'wallets.accept': 'Accept',

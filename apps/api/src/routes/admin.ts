@@ -115,7 +115,7 @@ import {
 } from '../services/blacklist.js';
 import { tr } from '../i18n/messages.js';
 import { describeCustomer } from '../services/customers.js';
-import { shopClubView, shopVipClubView, updateShopClub, updateShopVipClub } from '../services/vip.js';
+import { shopClubView, shopVipClubView, updateShopClub, updateShopVipClub, withNames } from '../services/vip.js';
 import { cloneProducts, listCloneSources } from '../services/clone.js';
 import { closePreview, closeShop, reopenShop, scheduleClosing } from '../services/closing.js';
 import { announceGoalMilestones, updateGoal } from '../services/goal.js';
@@ -477,17 +477,20 @@ export function adminRoutes(): Hono<AppBindings> {
   );
 
   // The shop's own VIP club.
-  app.get('/shop/vip-club', (c) => c.json(shopVipClubView(c.get('shop'))));
+  app.get('/shop/vip-club', async (c) => c.json(await withNames(c.get('db'), shopVipClubView(c.get('shop')))));
   app.put('/shop/vip-club', zValidator('json', updateVipClubRequest), async (c) =>
     c.json(
-      await updateShopVipClub(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('json')),
+      await withNames(c.get('db'), await updateShopVipClub(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('json'))),
     ),
   );
   // The shop's guests: they see it when it is "VIP and guests only".
-  app.get('/shop/guests', (c) => c.json(shopClubView(c.get('shop'), 'guest')));
+  app.get('/shop/guests', async (c) => c.json(await withNames(c.get('db'), shopClubView(c.get('shop'), 'guest'))));
   app.put('/shop/guests', zValidator('json', updateVipClubRequest), async (c) =>
     c.json(
-      await updateShopClub(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('json'), 'guest'),
+      await withNames(
+        c.get('db'),
+        await updateShopClub(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('json'), 'guest'),
+      ),
     ),
   );
   app.put('/shop/profile', zValidator('json', shopProfileInput), async (c) =>

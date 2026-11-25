@@ -80,11 +80,29 @@ export function listMatch(
 /** The club with `username` replaced by `userId` (usernames can change, ids cannot). */
 export function claimUsername(club: VipClub, username: string, userId: number): VipClub {
   const name = username.toLowerCase();
+  // Who it was stays: their note (or the @username itself) goes to the id.
+  const { [name]: noteOfName, ...notes } = club.notes ?? {};
   return {
     ...club,
     usernames: club.usernames.filter((u) => u !== name),
     userIds: club.userIds.includes(userId) ? club.userIds : [...club.userIds, userId],
+    notes: { ...notes, [String(userId)]: notes[String(userId)] ?? noteOfName ?? `@${name}` },
   };
+}
+
+/** The club with the names of members who opened the app, for the organisers' list. */
+export async function withNames<T extends VipClub>(db: Database, club: T): Promise<T & { names: Record<string, string> }> {
+  const names: Record<string, string> = {};
+  if (club.userIds.length > 0) {
+    const rows = await db
+      .select({ id: users.telegramId, firstName: users.firstName, username: users.username })
+      .from(users)
+      .where(inArray(users.telegramId, club.userIds));
+    for (const r of rows) {
+      names[String(r.id)] = [r.firstName, r.username ? `@${r.username}` : null].filter(Boolean).join(' · ');
+    }
+  }
+  return { ...club, names };
 }
 
 function normalizeClub(club: VipClub | null | undefined): VipClub {
@@ -92,6 +110,7 @@ function normalizeClub(club: VipClub | null | undefined): VipClub {
     groups: club?.groups ?? [],
     userIds: club?.userIds ?? [],
     usernames: club?.usernames ?? [],
+    notes: club?.notes ?? {},
   };
 }
 
@@ -320,6 +339,14 @@ async function clubFromRequest(
     groups: await resolveGroups(telegram, botToken(env), input.groups, current.groups),
     userIds: [...new Set(input.userIds)],
     usernames: [...new Set(input.usernames.map((u) => u.toLowerCase()))],
+    // Only notes of members still listed.
+    notes: Object.fromEntries(
+      Object.entries(input.notes ?? {}).filter(
+        ([key, note]) =>
+          note.trim() !== '' &&
+          (input.userIds.map(String).includes(key) || input.usernames.map((u) => u.toLowerCase()).includes(key.toLowerCase())),
+      ),
+    ),
   };
 }
 

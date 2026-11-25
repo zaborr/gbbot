@@ -6,6 +6,7 @@ import {
   parseVipMembers,
   type UpdateVipClubRequest,
   type VipClub,
+  type VipClubWithNames,
 } from '@tma-shop/shared';
 import { Input, Textarea } from './Field.js';
 import { ErrorBanner, useAdminActions } from '../pages/admin/common.js';
@@ -23,7 +24,7 @@ export function VipClubEditor({
   title,
   kind = 'vip',
 }: {
-  club: VipClub;
+  club: VipClubWithNames<VipClub>;
   /** VIP club, or guest list (same shape, other texts). */
   kind?: 'vip' | 'guest';
   /** Screen title (the admin menu's words). */
@@ -35,7 +36,7 @@ export function VipClubEditor({
   const actions = useAdminActions(() => undefined);
   const [groups, setGroups] = useState(club.groups.map((g) => ({ ref: String(g.chatId), title: g.title })));
   const [newGroup, setNewGroup] = useState('');
-  const [members, setMembers] = useState(formatVipMembers(club));
+  const [members, setMembers] = useState(formatVipMembers(club, club.names));
   const [global, setGlobal] = useState(useGlobalClub ?? true);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -65,6 +66,7 @@ export function VipClubEditor({
         groups: [...groups.map((g) => g.ref), ...(pendingGroup ? [pendingGroup] : [])],
         userIds: parsed.userIds,
         usernames: parsed.usernames,
+        notes: parsed.notes,
         ...(useGlobalClub === undefined ? {} : { useGlobalClub: global }),
       });
       if (pendingGroup) {

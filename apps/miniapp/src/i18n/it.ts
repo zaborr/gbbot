@@ -1783,7 +1783,7 @@ export const it: Record<MessageKey, string> = {
   'vip.intro': 'Sono VIP le persone di questi gruppi o canali Telegram e quelle della lista qui sotto. I GB solo VIP si mostrano solo a loro (e al team del GB).',
   'vip.invalidMembers': 'Non validi: {list}',
   'vip.members': 'Elenco dei membri',
-  'vip.membersFooter': 'Uno per riga o separati da virgole: @utente o ID Telegram. L\'@utente si salva come ID la prima volta che apre l\'app.',
+  'vip.membersFooter': 'Uno per riga: @utente o ID di Telegram. Dopo # puoi scrivere chi è (es. 123456789 # Ana). L\'@utente si salva come ID la prima volta che apre l\'app, mantenendo la nota; a chi l\'ha già aperta si aggiunge il nome.',
   'vip.noGroups': 'Ancora nessun gruppo.',
   'vip.useGlobal': 'Anche i membri del club VIP generale sono VIP qui',
   'wallets.accept': 'Accetta',
