@@ -1,9 +1,9 @@
-import type { LabelRequests } from '@tma-shop/shared';
+import type { LabelRequests, Lang } from '@tma-shop/shared';
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { orderLabels, orders, shops, users, type OrderLabelState } from '../db/schema.js';
-import { tr, type Lang } from '../i18n/messages.js';
+import { tr } from '../i18n/messages.js';
 import { ApiError } from '../lib/errors.js';
 import { TelegramApi } from '../telegram/api.js';
 import { botToken } from './activeBot.js';
