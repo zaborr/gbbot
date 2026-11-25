@@ -259,7 +259,6 @@ export async function claimPendingRoles(
       .where(eq(platformSettings.id, 1));
     setSupervisors(supervisorIds);
   }
-  const platform = await platformRow(db);
   if (platform?.organizerUsernames.includes(name)) {
     await db
       .update(platformSettings)
