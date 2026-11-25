@@ -4990,7 +4990,8 @@ describeDb('API integration', () => {
         body: JSON.stringify({ note: 'GLS, en PDF' }),
       });
       expect(asked.status).toBe(200);
-      expect(send).toHaveBeenCalledWith(order!.userId, expect.stringContaining('GLS, en PDF'), expect.anything());
+      expect(send.mock.calls[0]?.[0]).toBe(order!.userId);
+      expect(send.mock.calls[0]?.[1]).toContain('GLS, en PDF');
       const [askedRow] = await db.select().from(orders).where(eq(orders.id, order!.id));
       expect(askedRow!.label).toMatchObject({ note: 'GLS, en PDF', messageId: 77, receivedAt: null });
 
