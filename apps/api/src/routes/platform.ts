@@ -14,6 +14,7 @@ import {
   creatorPasswordRequest,
   updateOrganizersRequest,
   updateVipClubRequest,
+  updateSupervisorsRequest,
 } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import type { Database } from '../db/client.js';
@@ -37,7 +38,7 @@ import {
   updatePlatformVipClub,
   withNames,
 } from '../services/vip.js';
-import { getOrganizers, getShopTeam, updateOrganizers } from '../services/team.js';
+import { getOrganizers, getShopTeam, getSupervisors, updateOrganizers, updateSupervisors } from '../services/team.js';
 import { ApiError } from '../lib/errors.js';
 import { botSwitches, shops } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
@@ -262,6 +263,12 @@ export function platformRoutes(): Hono<AppBindings> {
     const { people, releaseShops } = c.req.valid('json');
     return c.json(await updateOrganizers(c.get('db'), people, releaseShops ?? false));
   });
+
+  // Supervisors: administrators of every GB, nothing of the platform's.
+  app.get('/supervisors', async (c) => c.json(await getSupervisors(c.get('db'))));
+  app.put('/supervisors', zValidator('json', updateSupervisorsRequest), async (c) =>
+    c.json(await updateSupervisors(c.get('db'), c.req.valid('json').people)),
+  );
 
   // Deleting a shop with its orders: first see what goes, then confirm by name.
   app.get('/shops/:id/contents', zValidator('param', idParam), async (c) =>

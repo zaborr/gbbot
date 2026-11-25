@@ -57,6 +57,7 @@ import { PlatformRetentionPage } from './pages/platform/PlatformRetentionPage.js
 import { PlatformVipPage } from './pages/platform/PlatformVipPage.js';
 import { PlatformGuestsPage } from './pages/platform/PlatformGuestsPage.js';
 import { PlatformOrganizersPage } from './pages/platform/PlatformOrganizersPage.js';
+import { PlatformSupervisorsPage } from './pages/platform/PlatformSupervisorsPage.js';
 import { PlatformNoticesPage } from './pages/platform/PlatformNoticesPage.js';
 import { PlatformBotsPage } from './pages/platform/PlatformBotsPage.js';
 import { PlatformCreatorAccountPage } from './pages/platform/PlatformCreatorAccountPage.js';
@@ -117,6 +118,7 @@ function Shell(): React.JSX.Element {
       <Route path="/platform/vip" element={<PlatformVipPage />} />
       <Route path="/platform/guests" element={<PlatformGuestsPage />} />
       <Route path="/platform/organizers" element={<PlatformOrganizersPage />} />
+      <Route path="/platform/supervisors" element={<PlatformSupervisorsPage />} />
       <Route path="/platform/notices" element={<PlatformNoticesPage />} />
       <Route path="/platform/blacklist" element={<PlatformBlacklistPage />} />
       <Route path="/platform/testing-reports" element={<PlatformTestingReportsPage />} />

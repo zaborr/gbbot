@@ -329,6 +329,16 @@ export const updateOrganizersRequest = z.object({
 });
 export type UpdateOrganizersRequest = z.infer<typeof updateOrganizersRequest>;
 
+/** The platform's supervisors: administrators of every GB. */
+export const supervisorsView = z.object({
+  supervisors: z.array(person),
+  pendingUsernames: z.array(z.string()),
+});
+export type SupervisorsView = z.infer<typeof supervisorsView>;
+
+export const updateSupervisorsRequest = z.object({ people: z.array(personRef).max(50) });
+export type UpdateSupervisorsRequest = z.infer<typeof updateSupervisorsRequest>;
+
 /** Saving what checkout asks for. */
 export const updateCheckoutFieldsRequest = checkoutFields;
 
