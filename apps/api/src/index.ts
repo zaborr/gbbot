@@ -1,3 +1,4 @@
+import { loadSupervisors } from './services/team.js';
 import { serve } from '@hono/node-server';
 import { loadEnv } from './config/env.js';
 import { createDb, createPool } from './db/client.js';
@@ -30,6 +31,10 @@ await loadActiveBot(db, env).catch((error: unknown) => {
   console.error('Could not load the active bot, using BOT_TOKEN:', error);
 });
 void configureBot(env);
+// Who supervises every GB (kept in memory for the permission checks).
+await loadSupervisors(db).catch((error: unknown) => {
+  console.error('Could not load the supervisors:', error);
+});
 
 // Every 3 hours (and now): cancel unpaid orders past their deadline, then
 // delete personal data past its retention period. One run, one database wake-up.

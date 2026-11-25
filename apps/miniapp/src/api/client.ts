@@ -38,6 +38,7 @@ import type {
   VipClub,
   OrganizerShopInput,
   OrganizersView,
+  SupervisorsView,
   OwnerSettingsInput,
   ShopTeam,
   ProductsCsvPreview,
@@ -433,6 +434,17 @@ export class ApiClient {
   /** Owner, admins (with names) and @usernames still to come. */
   platformGetTeam(shopId: string): Promise<ShopTeam> {
     return this.request<ShopTeam>(`/platform/shops/${shopId}/team`);
+  }
+
+  platformGetSupervisors(): Promise<SupervisorsView> {
+    return this.request<SupervisorsView>('/platform/supervisors');
+  }
+
+  platformUpdateSupervisors(people: string[]): Promise<SupervisorsView> {
+    return this.request<SupervisorsView>('/platform/supervisors', {
+      method: 'PUT',
+      body: JSON.stringify({ people }),
+    });
   }
 
   platformGetOrganizers(): Promise<OrganizersView> {

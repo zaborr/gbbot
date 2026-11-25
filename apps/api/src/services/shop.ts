@@ -43,9 +43,22 @@ export function teamIds(shop: Pick<ShopRow, 'ownerIds' | 'adminIds'>): number[] 
 }
 
 /** A GB's administrators and managers, plus platform super-admins. */
+/**
+ * The platform's supervisors (administrators of every GB), kept here so the
+ * check stays synchronous: loaded at start-up and set again when saved.
+ */
+const supervisors = new Set<number>();
+export function setSupervisors(ids: readonly number[]): void {
+  supervisors.clear();
+  for (const id of ids) supervisors.add(id);
+}
+export function isSupervisor(userId: number | undefined): boolean {
+  return userId !== undefined && supervisors.has(userId);
+}
+
 export function canManageShop(env: Env, shop: ShopRow, userId: number | undefined): boolean {
   if (userId === undefined) return false;
-  return isSuperAdmin(env, userId) || teamIds(shop).includes(userId);
+  return isSuperAdmin(env, userId) || isSupervisor(userId) || teamIds(shop).includes(userId);
 }
 
 /** Finds the GB a request is for: `ref` (the `X-Shop` header) is its id or link name. */

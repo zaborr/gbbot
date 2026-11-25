@@ -368,6 +368,13 @@ export const platformSettings = pgTable('platform_settings', {
   organizerIds: jsonb('organizer_ids').$type<number[]>().notNull().default([]),
   /** Organisers added by @username not seen yet (lowercase, no "@"). */
   organizerUsernames: jsonb('organizer_usernames').$type<string[]>().notNull().default([]),
+  /**
+   * Supervisors: administrators of every GB (as a GB's administrators, not its
+   * owners), with nothing of the platform's.
+   */
+  supervisorIds: jsonb('supervisor_ids').$type<number[]>().notNull().default([]),
+  /** Supervisors added by @username not seen yet (lowercase, no "@"). */
+  supervisorUsernames: jsonb('supervisor_usernames').$type<string[]>().notNull().default([]),
   /** People who must not see any GB. */
   blacklist: jsonb('blacklist').$type<Blacklist>().notNull().default({ userIds: [], usernames: [] }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

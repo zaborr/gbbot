@@ -4934,6 +4934,33 @@ describeDb('API integration', () => {
     expect((await request(`/api/images/${id}`)).status).toBe(404);
   });
 
+  it('lets supervisors run every GB, but not what is only its owners\' or the platform\'s', async () => {
+    const SUPERVISOR = 555008001;
+    const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`, 'content-type': 'application/json' };
+    const sup = { Authorization: `Bearer ${await authToken(SUPERVISOR, 'Sue', 'sue_super')}` };
+    // Not yet: no way into the GB's administration.
+    expect([403, 404]).toContain((await request('/api/admin/orders', { headers: sup })).status);
+    const set = await request('/api/platform/supervisors', {
+      method: 'PUT',
+      headers: admin,
+      body: JSON.stringify({ people: [String(SUPERVISOR)] }),
+    });
+    expect(set.status).toBe(200);
+    expect(((await set.json()) as { supervisors: Array<{ telegramId: number }> }).supervisors.map((p) => p.telegramId)).toEqual([
+      SUPERVISOR,
+    ]);
+    try {
+      expect((await request('/api/admin/orders', { headers: sup })).status).toBe(200);
+      // Only the GB's owners: its team.
+      expect((await request('/api/admin/shop/team', { headers: sup })).status).toBe(403);
+      // Nothing of the platform's.
+      expect((await request('/api/platform/supervisors', { headers: sup })).status).toBe(403);
+    } finally {
+      await request('/api/platform/supervisors', { method: 'PUT', headers: admin, body: JSON.stringify({ people: [] }) });
+    }
+    expect([403, 404]).toContain((await request('/api/admin/orders', { headers: sup })).status);
+  });
+
   it('enforces admin-only routes', async () => {
     const customer = await authToken(CUSTOMER_ID, 'Alice');
     const denied = await request('/api/admin/orders', {

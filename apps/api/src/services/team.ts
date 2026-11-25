@@ -3,6 +3,7 @@ import {
   splitPersonRefs,
   type OrganizerTag,
   type OrganizersView,
+  type SupervisorsView,
   type Person,
   type ShopTeam,
 } from '@tma-shop/shared';
@@ -13,7 +14,7 @@ import { tr, type BotMessageKey } from '../i18n/messages.js';
 import { notifyPlatform } from './webNotices.js';
 import { describeWebAdmin, isWebAdminId, webMark } from './webAdmins.js';
 import type { SessionClaims } from '../auth/jwt.js';
-import { isSuperAdmin, type ShopRow } from './shop.js';
+import { isSuperAdmin, isSupervisor, setSupervisors, type ShopRow } from './shop.js';
 
 /**
  * Who runs what:
@@ -119,7 +120,7 @@ async function platformRow(db: Database) {
  * admins, organisers, administrators and managers of a GB).
  */
 export async function managesSomething(db: Database, env: Env, userId: number): Promise<boolean> {
-  if (isSuperAdmin(env, userId) || (await isOrganizer(db, userId))) return true;
+  if (isSuperAdmin(env, userId) || isSupervisor(userId) || (await isOrganizer(db, userId))) return true;
   const member = JSON.stringify([userId]);
   const row = await db.query.shops.findFirst({
     where: sql`${shops.ownerIds} @> ${member}::jsonb OR ${shops.adminIds} @> ${member}::jsonb`,
@@ -182,6 +183,33 @@ export async function updateOrganizers(
   return getOrganizers(db);
 }
 
+/** Loads the supervisors into memory (at start-up). */
+export async function loadSupervisors(db: Database): Promise<void> {
+  setSupervisors((await platformRow(db))?.supervisorIds ?? []);
+}
+
+export async function getSupervisors(db: Database): Promise<SupervisorsView> {
+  const row = await platformRow(db);
+  const ids = row?.supervisorIds ?? [];
+  const people = await loadPeople(db, ids);
+  return {
+    supervisors: ids.map((id) => toPerson(id, people)),
+    pendingUsernames: row?.supervisorUsernames ?? [],
+  };
+}
+
+/** Replaces the supervisors: administrators of every GB, from now on. */
+export async function updateSupervisors(db: Database, refs: readonly string[]): Promise<SupervisorsView> {
+  const { ids, pending } = await resolvePeople(db, refs);
+  const values = { supervisorIds: ids, supervisorUsernames: pending, updatedAt: new Date() };
+  await db
+    .insert(platformSettings)
+    .values({ id: 1, ...values })
+    .onConflictDoUpdate({ target: platformSettings.id, set: values });
+  setSupervisors(ids);
+  return getSupervisors(db);
+}
+
 /**
  * On sign-in: someone added by @username to a GB's admins or to the
  * organisers gets the role for good, under their id.
@@ -221,6 +249,16 @@ export async function claimPendingRoles(
       .where(eq(shops.id, shop.id));
   }
   const platform = await platformRow(db);
+  if (platform?.supervisorUsernames.includes(name)) {
+    const supervisorIds = platform.supervisorIds.includes(userId)
+      ? platform.supervisorIds
+      : [...platform.supervisorIds, userId];
+    await db
+      .update(platformSettings)
+      .set({ supervisorUsernames: platform.supervisorUsernames.filter((u) => u !== name), supervisorIds })
+      .where(eq(platformSettings.id, 1));
+    setSupervisors(supervisorIds);
+  }
   if (platform?.organizerUsernames.includes(name)) {
     await db
       .update(platformSettings)
