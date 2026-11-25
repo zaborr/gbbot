@@ -54,16 +54,23 @@ export function VipClubEditor({
     setSaved(false);
   };
 
+  // A group written but not added with its button still counts when saving.
+  const pendingGroup = groupValid && !groups.some((g) => g.ref === groupRef) ? groupRef : null;
+
   const save = async (): Promise<void> => {
     setBusy(true);
     setSaved(false);
     await actions.run(async () => {
       await onSave({
-        groups: groups.map((g) => g.ref),
+        groups: [...groups.map((g) => g.ref), ...(pendingGroup ? [pendingGroup] : [])],
         userIds: parsed.userIds,
         usernames: parsed.usernames,
         ...(useGlobalClub === undefined ? {} : { useGlobalClub: global }),
       });
+      if (pendingGroup) {
+        setGroups((prev) => [...prev, { ref: pendingGroup, title: '' }]);
+        setNewGroup('');
+      }
       setSaved(true);
     });
     setBusy(false);
@@ -72,7 +79,6 @@ export function VipClubEditor({
   return (
     <List>
       {title && <PageTitle title={title} />}
-      <ErrorBanner message={actions.error} />
 
       <Section>
         <Cell multiline>{t(kind === 'guest' ? 'guests.intro' : 'vip.intro')}</Cell>
@@ -154,7 +160,17 @@ export function VipClubEditor({
         </Section>
       )}
 
-      <Section>
+      <Section
+        footer={
+          parsed.invalid.length > 0
+            ? t('vip.fixMembers', { list: parsed.invalid.slice(0, 5).join(', ') })
+            : groupRef !== '' && !groupValid
+              ? t('vip.badGroup')
+              : undefined
+        }
+      >
+        {/* Next to the button: an error at the top of a long page goes unseen. */}
+        <ErrorBanner message={actions.error} />
         <div style={{ padding: 16 }}>
           <Button
             stretched
