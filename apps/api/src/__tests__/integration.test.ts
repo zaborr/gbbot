@@ -3535,7 +3535,8 @@ describeDb('API integration', () => {
     expect(bobOpens.status).toBe(200);
     expect(((await bobOpens.json()) as { isVip: boolean }).isVip).toBe(true);
     const [row] = await db.select().from(shops).where(eq(shops.id, shopRef));
-    expect(row?.vipClub).toEqual({ groups: [], userIds: [BOB_ID], usernames: [] });
+    // Who it was stays as a note on the id.
+    expect(row?.vipClub).toEqual({ groups: [], userIds: [BOB_ID], usernames: [], notes: { [BOB_ID]: '@bob_vip' } });
 
     // Admins always see it.
     expect((await listed(admin)).some((s) => s.id === shopRef)).toBe(true);
@@ -3612,7 +3613,7 @@ describeDb('API integration', () => {
     expect(danOpens.status).toBe(200);
     expect(((await danOpens.json()) as { isVip: boolean }).isVip).toBe(false);
     const [row] = await db.select().from(shops).where(eq(shops.id, shopRef));
-    expect(row?.guestList).toEqual({ groups: [], userIds: [DAN_ID], usernames: [] });
+    expect(row?.guestList).toEqual({ groups: [], userIds: [DAN_ID], usernames: [], notes: { [DAN_ID]: '@dan_guest' } });
     expect((await open(alice)).status).toBe(404);
 
     // "Only VIP" again: guests no longer get in.
