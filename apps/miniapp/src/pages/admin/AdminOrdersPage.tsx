@@ -13,9 +13,10 @@ import { ErrorView } from '../../components/ErrorView.js';
 import { AdminOnly, AdminStatusChip, formatDate, itemsSummary, needsAttention } from './common.js';
 import { useShopPath } from '../../providers/ShopProvider.js';
 import { CopyOrders } from '../../components/CopyOrders.js';
+import { LabelRequestsSection, labelMissing } from '../../components/OrderLabel.js';
 import { t, tn, type MessageKey } from '../../i18n/index.js';
 
-type FilterKey = 'all' | 'attention' | 'unpaid' | 'paid' | 'shipped' | 'fulfilled' | 'cancelled' | 'testing';
+type FilterKey = 'all' | 'attention' | 'unpaid' | 'paid' | 'label' | 'shipped' | 'fulfilled' | 'cancelled' | 'testing';
 
 const FILTERS: Record<FilterKey, { label: MessageKey; match: (order: Order) => boolean }> = {
   all: { label: 'catalog.all', match: () => true },
@@ -24,6 +25,8 @@ const FILTERS: Record<FilterKey, { label: MessageKey; match: (order: Order) => b
   unpaid: { label: 'filter.unpaid', match: (o) => goodsStatus(o) === 'pending' },
   // From outside: nothing to send.
   paid: { label: 'filter.toShip', match: (o) => goodsStatus(o) === 'paid' && !o.external },
+  // Asked for a shipping label that has not arrived.
+  label: { label: 'label.filter', match: labelMissing },
   shipped: { label: 'orderStatus.shipped', match: (o) => goodsStatus(o) === 'shipped' },
   fulfilled: { label: 'orderStatus.fulfilled', match: (o) => goodsStatus(o) === 'fulfilled' },
   cancelled: { label: 'orderStatus.cancelled', match: (o) => o.status === 'cancelled' },
@@ -101,6 +104,8 @@ function AdminOrders(): React.JSX.Element {
           onChange={(e) => setSearch(e.target.value)}
         />
       </Section>
+
+      <LabelRequestsSection orders={all} onDone={() => setReloadKey((k) => k + 1)} />
 
       <Section header={tn(visible.length, 'count.orders.one', 'count.orders.other')}>
         {visible.length === 0 && <Cell>{t('adminOrders.empty')}</Cell>}

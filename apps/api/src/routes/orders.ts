@@ -1,3 +1,4 @@
+import { saveLabel } from '../services/labels.js';
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
@@ -105,6 +106,16 @@ export function orderRoutes(): Hono<AppBindings> {
     const order = await getOrder(c.get('db'), c.get('shopId'), c.req.valid('param').id, sub);
     if (!order) throw ApiError.notFound('Order not found');
     return c.json(order);
+  });
+
+  // The shipping label the organisers asked for: the file as the body.
+  app.post('/:id/label', zValidator('param', idParam), async (c) => {
+    const { sub } = c.get('claims');
+    const mime = (c.req.header('content-type') ?? '').split(';')[0]!.trim().toLowerCase();
+    const fileName = decodeURIComponent(c.req.header('x-file-name') ?? '');
+    const data = Buffer.from(await c.req.arrayBuffer());
+    await saveLabel(c.get('db'), c.get('env'), c.req.valid('param').id, sub, { mime, fileName, data });
+    return c.json({ ok: true });
   });
 
   app.delete('/:id', zValidator('param', idParam), async (c) => {

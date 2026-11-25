@@ -330,6 +330,12 @@ export const orders = pgTable('orders', {
   carrier: text('carrier'),
   /** Last message from the shop to the customer about this order. */
   statusNote: text('status_note'),
+  /**
+   * Shipping label asked of the customer (for zones without a shipping
+   * method): when, with what note, the bot's message (a reply to it brings the
+   * file) and when it arrived. The file is in order_labels.
+   */
+  label: jsonb('label').$type<OrderLabelState | null>(),
   /** Confirmed money received, net of refunds (minor units of `currency`). */
   amountPaid: integer('amount_paid').notNull().default(0),
   /** Amount covered by the transaction currently awaiting verification. */
@@ -896,3 +902,24 @@ export const images = pgTable(
   },
   (table) => [index('images_shop_idx').on(table.shopId)],
 );
+
+export interface OrderLabelState {
+  requestedAt: string;
+  note: string | null;
+  /** The bot's message asking for it: a reply to it is the label. */
+  messageId: number | null;
+  receivedAt: string | null;
+  fileName: string | null;
+}
+
+/** The shipping label a customer sent for an order (one per order: a new one replaces it). */
+export const orderLabels = pgTable('order_labels', {
+  orderId: uuid('order_id')
+    .primaryKey()
+    .references(() => orders.id, { onDelete: 'cascade' }),
+  mime: text('mime').notNull(),
+  fileName: text('file_name').notNull(),
+  data: bytea('data').notNull(),
+  size: integer('size').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

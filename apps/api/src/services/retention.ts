@@ -2,6 +2,7 @@ import { and, eq, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import type { RetentionReport, RetentionSettings, RetentionStatus } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import { carts, orders, platformSettings, users } from '../db/schema.js';
+import { dropLabels } from './labels.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -77,6 +78,11 @@ export async function runRetention(db: Database, now = new Date()): Promise<Rete
       ),
     )
     .returning({ id: orders.id });
+  // Their shipping labels carry the address: gone with it.
+  await dropLabels(
+    db,
+    anonymized.map((o) => o.id),
+  );
 
   const cartsDeleted = await db
     .delete(carts)

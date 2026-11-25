@@ -7,13 +7,14 @@ import { base32Decode, createWebAdmin, removeWebAdmin, resetWebAdmin, totpCode }
 import { addWebNotice } from '../services/webNotices.js';
 import type { Env } from '../config/env.js';
 import { createDb, createPool, type Database } from '../db/client.js';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import {
   cartItems,
   carts,
   categories,
   labs,
   orderItems,
+  orderLabels,
   orders,
   productVariants,
   products,
@@ -4959,6 +4960,64 @@ describeDb('API integration', () => {
       await request('/api/platform/supervisors', { method: 'PUT', headers: admin, body: JSON.stringify({ people: [] }) });
     }
     expect([403, 404]).toContain((await request('/api/admin/orders', { headers: sup })).status);
+  });
+
+  it('asks a customer for the shipping label, which reaches the organisers', async () => {
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(and(eq(orders.shopId, shopId), isNotNull(orders.userId)))
+      .limit(1);
+    expect(order).toBeDefined();
+    const before = { status: order!.status, label: order!.label };
+    await db.update(orders).set({ status: 'paid' }).where(eq(orders.id, order!.id));
+    const send = vi.spyOn(TelegramApi.prototype, 'sendMessage').mockResolvedValue({ message_id: 77 });
+    const doc = vi.spyOn(TelegramApi.prototype, 'sendDocument').mockResolvedValue(true);
+    const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`, 'content-type': 'application/json' };
+    try {
+      // Counting first: this order is among those without a label.
+      const counted = await request('/api/admin/orders/label-requests', {
+        method: 'POST',
+        headers: admin,
+        body: JSON.stringify({ dryRun: true }),
+      });
+      expect(((await counted.json()) as { count: number }).count).toBeGreaterThan(0);
+      expect(send).not.toHaveBeenCalled();
+
+      const asked = await request(`/api/admin/orders/${order!.id}/label-request`, {
+        method: 'POST',
+        headers: admin,
+        body: JSON.stringify({ note: 'GLS, en PDF' }),
+      });
+      expect(asked.status).toBe(200);
+      expect(send.mock.calls[0]?.[0]).toBe(order!.userId);
+      expect(send.mock.calls[0]?.[1]).toContain('GLS, en PDF');
+      const [askedRow] = await db.select().from(orders).where(eq(orders.id, order!.id));
+      expect(askedRow!.label).toMatchObject({ note: 'GLS, en PDF', messageId: 77, receivedAt: null });
+
+      const pdf = Buffer.from('%PDF-1.4 label');
+      const customer = { Authorization: `Bearer ${await authToken(order!.userId!, 'Buyer')}` };
+      const up = await request(`/api/orders/${order!.id}/label`, {
+        method: 'POST',
+        headers: { ...customer, 'content-type': 'application/pdf', 'x-file-name': 'gls.pdf' },
+        body: pdf,
+      });
+      expect(up.status).toBe(200);
+      expect(doc).toHaveBeenCalledWith(expect.any(Number), 'gls.pdf', pdf, 'application/pdf', expect.any(String));
+      const file = await request(`/api/admin/orders/${order!.id}/label`, { headers: admin });
+      expect(file.status).toBe(200);
+      expect(Buffer.from(await file.arrayBuffer()).equals(pdf)).toBe(true);
+      const view = (await (await request(`/api/orders/${order!.id}`, { headers: customer })).json()) as {
+        label: { receivedAt: string | null; fileName: string | null };
+      };
+      expect(view.label.receivedAt).not.toBeNull();
+      expect(view.label.fileName).toBe('gls.pdf');
+    } finally {
+      send.mockRestore();
+      doc.mockRestore();
+      await db.delete(orderLabels).where(eq(orderLabels.orderId, order!.id));
+      await db.update(orders).set(before).where(eq(orders.id, order!.id));
+    }
   });
 
   it('enforces admin-only routes', async () => {
