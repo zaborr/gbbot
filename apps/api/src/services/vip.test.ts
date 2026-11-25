@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { parseVipMembers } from '@tma-shop/shared';
+import { formatVipMembers, parseVipMembers } from '@tma-shop/shared';
 import { TelegramApi } from '../telegram/api.js';
 import {
   botIdOf,
@@ -21,7 +21,20 @@ describe('VIP club', () => {
       userIds: [12345],
       usernames: ['ana_vip', 'bob_x'],
       invalid: ['@x', '-5'],
+      notes: {},
     });
+  });
+
+  it('keeps who each member is, after "#", and back again', () => {
+    const parsed = parseVipMembers('123456789  # Ana · @ana\n@Pepe # el de la tienda\n555');
+    expect(parsed).toMatchObject({
+      userIds: [123456789, 555],
+      usernames: ['pepe'],
+      notes: { '123456789': 'Ana · @ana', pepe: 'el de la tienda' },
+    });
+    expect(
+      formatVipMembers({ userIds: [123456789, 555], usernames: ['pepe'], notes: { '123456789': 'Ana' } }, { '555': 'Luis' }),
+    ).toBe('123456789  # Ana\n555  # Luis\n@pepe');
   });
 
   it('matches people by id or @username and keeps the id', () => {
@@ -32,7 +45,10 @@ describe('VIP club', () => {
       groups: [],
       userIds: [111, 222],
       usernames: [],
+      notes: { '222': '@ana_vip' },
     });
+    // Their note goes with them.
+    expect(claimUsername({ ...club, notes: { ana_vip: 'Ana' } }, 'ana_vip', 222).notes).toEqual({ '222': 'Ana' });
   });
 
   it('understands Telegram membership answers', () => {
