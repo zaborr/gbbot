@@ -3561,6 +3561,8 @@ describeDb('API integration', () => {
     });
     expect(own.status).toBe(200);
     expect(await own.json()).toEqual({
+      names: {},
+      notes: {},
       groups: [],
       userIds: [],
       usernames: ['carol_x'],
@@ -3636,7 +3638,14 @@ describeDb('API integration', () => {
       headers: { ...adminAuth, 'X-Shop': shopRef },
       body: JSON.stringify({ groups: [], userIds: [], usernames: [], useGlobalClub: true }),
     });
-    expect(await own.json()).toEqual({ groups: [], userIds: [], usernames: [], useGlobalClub: true });
+    expect(await own.json()).toEqual({
+      groups: [],
+      userIds: [],
+      usernames: [],
+      notes: {},
+      names: {},
+      useGlobalClub: true,
+    });
     expect((await listed(alice)).some((s) => s.id === shopRef)).toBe(true);
     expect((await listed(dan)).some((s) => s.id === shopRef)).toBe(false);
 
