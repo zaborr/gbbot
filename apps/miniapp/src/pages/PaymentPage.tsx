@@ -1,3 +1,4 @@
+import { OrderAddressSection } from '../components/OrderAddressSection.js';
 import { CustomerLabelSection } from '../components/OrderLabel.js';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -165,6 +166,9 @@ export function PaymentPage(): React.JSX.Element {
       {shop.data.testingEnabled && <OrderTestingLink order={current} onOpen={() => navigate(to('/testing'))} />}
 
       {!done && <StatusSection order={current} autoCancelHours={shop.data.autoCancelHours} />}
+
+      {/* An order the organisers made: its address, from here. */}
+      <OrderAddressSection order={current} shop={shop.data} onSaved={reload} />
 
       {/* The shipping label the organisers asked for. */}
       <CustomerLabelSection order={current} onSent={reload} />

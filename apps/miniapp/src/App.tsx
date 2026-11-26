@@ -1,3 +1,4 @@
+import { AdminCreateOrderPage } from './pages/admin/AdminCreateOrderPage.js';
 import { useEffect, useState } from 'react';
 import { HashRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { retrieveLaunchParams } from '@telegram-apps/sdk-react';
@@ -153,6 +154,7 @@ function Shell(): React.JSX.Element {
         <Route path="admin/checkout-fields" element={<AdminCheckoutFieldsPage />} />
         <Route path="admin/address-key" element={<AdminAddressKeyPage />} />
         <Route path="admin/orders" element={<AdminOrdersPage />} />
+        <Route path="admin/orders/new" element={<AdminCreateOrderPage />} />
         <Route path="admin/orders/:id" element={<AdminOrderPage />} />
         <Route path="admin/buyers" element={<AdminBuyersPage />} />
         <Route path="admin/buyers/:userId" element={<AdminBuyerPage />} />

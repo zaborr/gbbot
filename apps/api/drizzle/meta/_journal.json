@@ -603,6 +603,13 @@
       "when": 1797364800000,
       "tag": "0085_extra_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1797451200000,
+      "tag": "0086_pending_orders",
+      "breakpoints": true
     }
   ]
 }

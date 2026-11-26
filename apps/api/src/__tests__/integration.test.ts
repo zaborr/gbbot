@@ -7,7 +7,7 @@ import { base32Decode, createWebAdmin, removeWebAdmin, resetWebAdmin, totpCode }
 import { addWebNotice } from '../services/webNotices.js';
 import type { Env } from '../config/env.js';
 import { createDb, createPool, type Database } from '../db/client.js';
-import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import {
   cartItems,
   carts,
@@ -5030,6 +5030,51 @@ describeDb('API integration', () => {
       doc.mockRestore();
       await db.delete(orderLabels).where(eq(orderLabels.orderId, order!.id));
       await db.update(orders).set(before).where(eq(orders.id, order!.id));
+    }
+  });
+
+  it('lets the organisers make an order for someone, and keeps it for who has not opened the bot', async () => {
+    const [product] = await db
+      .select()
+      .from(products)
+      .where(and(eq(products.shopId, shopId), eq(products.isActive, true), sql`${products.options} = '[]'::jsonb`))
+      .limit(1);
+    expect(product).toBeDefined();
+    const shopRow = (await db.query.shops.findFirst({ where: eq(shops.id, shopId) }))!;
+    const zone = shopRow.shippingZones.find((z) => z.isActive) ?? null;
+    const send = vi.spyOn(TelegramApi.prototype, 'sendMessage').mockResolvedValue(true);
+    const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`, 'content-type': 'application/json' };
+    const body = (who: string) =>
+      JSON.stringify({
+        who,
+        items: [{ productId: product!.id, quantity: 2, unitPrice: 1234 }],
+        shippingZoneId: zone?.id ?? null,
+        notify: true,
+      });
+    const made: string[] = [];
+    try {
+      await authToken(555009001, 'Olga', 'olga_buyer');
+      const res = await request('/api/admin/orders/create', { method: 'POST', headers: admin, body: body('@Olga_Buyer') });
+      expect(res.status).toBe(201);
+      const result = (await res.json()) as { order: { id: string; status: string; items: Array<{ unitPrice: number; quantity: number }> } };
+      made.push(result.order.id);
+      expect(result.order.status).toBe('pending');
+      expect(result.order.items[0]).toMatchObject({ unitPrice: 1234, quantity: 2 });
+      expect(send.mock.calls.some((call) => call[0] === 555009001)).toBe(true);
+
+      // Never opened the bot: kept, and made when they do.
+      const kept = await request('/api/admin/orders/create', { method: 'POST', headers: admin, body: body('@later_buyer') });
+      expect(((await kept.json()) as { pending: boolean }).pending).toBe(true);
+      await authToken(555009002, 'Lia', 'later_buyer');
+      const [later] = await db.select().from(orders).where(eq(orders.userId, 555009002));
+      expect(later).toBeDefined();
+      made.push(later!.id);
+      const left = (await (await request('/api/admin/orders/pending', { headers: admin })).json()) as unknown[];
+      expect(left).toEqual([]);
+    } finally {
+      send.mockRestore();
+      await db.delete(orderItems).where(inArray(orderItems.orderId, made.length ? made : ['00000000-0000-0000-0000-000000000000']));
+      if (made.length) await db.delete(orders).where(inArray(orders.id, made));
     }
   });
 

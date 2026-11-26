@@ -17,6 +17,7 @@ import {
 import { relations } from 'drizzle-orm';
 import type {
   LabTest,
+  AdminCreateOrderRequest,
   LabProgress,
   Blacklist,
   TestingFeeMode,
@@ -925,3 +926,19 @@ export const orderLabels = pgTable('order_labels', {
   size: integer('size').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** An order the organisers made for someone who has not opened the bot yet: made when they do. */
+export const pendingOrders = pgTable(
+  'pending_orders',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: uuid('shop_id')
+      .notNull()
+      .references(() => shops.id, { onDelete: 'cascade' }),
+    /** Lowercase @username (no "@") or the Telegram ID as text. */
+    who: text('who').notNull(),
+    request: jsonb('request').$type<AdminCreateOrderRequest>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('pending_orders_who_idx').on(table.who)],
+);
