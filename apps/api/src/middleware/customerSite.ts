@@ -19,7 +19,7 @@ export const customerSiteOnly = createMiddleware<AppBindings>(async (c, next) =>
   }
   const header = c.req.header('Authorization');
   if (header?.startsWith('Bearer ')) {
-    let ck: number | undefined;
+    let ck: string | undefined;
     try {
       ck = (await authenticate(header.slice(7), c.get('env'), c.get('db'))).ck;
     } catch {
