@@ -127,7 +127,7 @@ import { addVipBy, shopClubView, shopVipClubView, updateShopClub, updateShopVipC
 import { cloneProducts, listCloneSources } from '../services/clone.js';
 import { closePreview, closeShop, reopenShop, scheduleClosing } from '../services/closing.js';
 import { announceGoalMilestones, updateGoal } from '../services/goal.js';
-import { describeUser, getShopTeam, managesSomething, notifySuperAdmins } from '../services/team.js';
+import { describeUser, getShopTeam, notifySuperAdmins } from '../services/team.js';
 import { restoreSnapshot, takeSnapshot } from '../services/snapshot.js';
 import { buyerReachable, getBuyer, listBuyers, messageBuyer } from '../services/buyers.js';
 import { audienceIds, checkReach, listBroadcasts, reachStatus, startBroadcast } from '../services/broadcast.js';
@@ -792,11 +792,6 @@ export function adminRoutes(): Hono<AppBindings> {
     }
     const db = c.get('db');
     const env = c.get('env');
-    // Not for anyone who manages something: a key session acts as them, and they
-    // have their own web account (Plataforma → Cuentas web) instead.
-    if (await managesSomething(db, env, userId)) {
-      throw new ApiError(403, 'manager_key', 'This person manages GBs: give them a web account, not a key');
-    }
     const given = await giveKey(db, shop.id, userId, sub);
     if (vip !== 'none') await addVipBy(db, shop, userId, vip);
     // On record: who gave whom a key, where.

@@ -13,7 +13,11 @@ describe('secret box', () => {
   it('refuses another key or tampered data', () => {
     const sealed = seal(key, '123:ABC');
     expect(open(secretKey({ JWT_SECRET: 'x', BOTS_KEY: 'other' }), sealed)).toBeNull();
-    expect(open(key, `${sealed.slice(0, -2)}AA`)).toBeNull();
+    // One byte of the data changed (always a real change, unlike swapping the last characters).
+    const parts = sealed.split('.');
+    const data = Buffer.from(parts[3]!, 'base64url');
+    data[0] = data[0]! ^ 0xff;
+    expect(open(key, [...parts.slice(0, 3), data.toString('base64url')].join('.'))).toBeNull();
     expect(open(key, 'garbage')).toBeNull();
   });
 });

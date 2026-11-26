@@ -146,9 +146,14 @@ export function meRoutes(): Hono<AppBindings> {
   });
 
   // A customer on the web: what the bot told them (also while the bot is down).
-  app.get('/notices', requireAuth, async (c) =>
-    c.json(await noticesOf(c.get('db'), c.get('claims').sub, c.get('claims').ck)),
-  );
+  app.get('/notices', requireAuth, async (c) => {
+    const { sub, ck } = c.get('claims');
+    // Someone who manages GBs, signed in with a key (to buy): what the bot tells
+    // them includes their GBs' business, which whoever gave the key must not read.
+    // Their inbox is in their web account.
+    if (ck !== undefined && (await managesSomething(c.get('db'), c.get('env'), sub))) return c.json([]);
+    return c.json(await noticesOf(c.get('db'), sub, ck));
+  });
 
   return app;
 }

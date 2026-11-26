@@ -5211,10 +5211,20 @@ describeDb('API integration', () => {
     expect((await request('/api/me/security-phrase', { headers: web })).status).toBe(403);
     expect((await request('/api/organizer/shops', { method: 'POST', headers: { ...web, 'content-type': 'application/json' }, body: '{}' })).status).toBe(403);
     expect((await request('/api/web-accounts', { headers: web })).status).toBe(403);
-    // No key for someone who manages GBs (it would act as them).
+    // Someone who manages GBs may get a key too, to buy: no management, no inbox.
     const toAdmin = await request('/api/admin/web-keys', { method: 'POST', headers: admin, body: JSON.stringify({ userId: ADMIN_ID }) });
-    expect(toAdmin.status).toBe(403);
-    expect(((await toAdmin.json()) as { error: { code: string } }).error.code).toBe('manager_key');
+    expect(toAdmin.status).toBe(201);
+    const adminKey = ((await toAdmin.json()) as { key: string }).key;
+    const asBuyer = (await (
+      await request('/api/auth/key', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: adminKey }) })
+    ).json()) as { token: string };
+    const buyer = { Authorization: `Bearer ${asBuyer.token}` };
+    await db.insert(customerNotices).values({ userId: ADMIN_ID, text: 'team-business' });
+    expect(await (await request('/api/me/notices', { headers: buyer })).json()).toEqual([]);
+    expect((await request('/api/orders', { headers: buyer })).status).toBe(200);
+    expect([403, 404]).toContain((await request('/api/admin/orders', { headers: buyer })).status);
+    expect((await request('/api/platform/supervisors', { headers: buyer })).status).toBe(403);
+    await request(`/api/admin/web-keys/${ADMIN_ID}`, { method: 'DELETE', headers: admin });
     // A customer-only domain: the key and its session work; an admin's session does not.
     const site = { 'X-Gb-Site': 'customer' };
     expect((await request('/api/orders', { headers: { ...web, ...site } })).status).toBe(200);
