@@ -5248,6 +5248,22 @@ describeDb('API integration', () => {
       body: JSON.stringify({ userId: 555010002, vip: 'shop' }),
     });
     expect(given.status).toBe(201);
+    // The links in the message: the main domain, then the customer-only ones;
+    // without the main domain when WEB_KEY_MAIN_LINK=false.
+    const links = async (extra: Record<string, unknown>): Promise<{ url: string; more: string[] }> => {
+      const res = await createApp({ env: { ...testEnv, WEB_DOMAINS: ['a.example.net', 'b.example.org'], ...extra }, db }).request(
+        '/api/admin/web-keys',
+        { method: 'POST', headers: { ...admin, 'X-Shop': shopId }, body: JSON.stringify({ userId: 555010002 }) },
+      );
+      expect(res.status).toBe(201);
+      return (await res.json()) as { url: string; more: string[] };
+    };
+    const withMain = await links({});
+    expect(withMain.url).not.toContain('a.example.net');
+    expect(withMain.more.map((u) => new URL(u).hostname)).toEqual(['a.example.net', 'b.example.org']);
+    const withoutMain = await links({ WEB_KEY_MAIN_LINK: false });
+    expect(new URL(withoutMain.url).hostname).toBe('a.example.net');
+    expect(withoutMain.more.map((u) => new URL(u).hostname)).toEqual(['b.example.org']);
     const shopRow = (await db.query.shops.findFirst({ where: eq(shops.id, shopId) }))!;
     expect(shopRow.vipClub.userIds).toContain(555010002);
     expect(shopRow.vipClub.notes?.['555010002']).toBe('web');

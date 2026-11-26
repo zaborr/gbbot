@@ -86,6 +86,15 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+  /**
+   * "false": the message with a customer's web key leaves the main domain out
+   * and links to the customer-only domains (WEB_DOMAINS) only. Ignored with no
+   * WEB_DOMAINS.
+   */
+  WEB_KEY_MAIN_LINK: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
   /** How long a web session lasts. */
   WEB_SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(8 * 3600),
   /**
