@@ -85,6 +85,8 @@ export const paymentLogEntry = z.object({
   network: z.string().nullable(),
   txHash: z.string().nullable(),
   at: z.string(),
+  /** The organiser who marked it by hand (only the organisers see it). */
+  by: z.object({ id: z.number(), name: z.string() }).optional(),
 });
 export type PaymentLogEntry = z.infer<typeof paymentLogEntry>;
 

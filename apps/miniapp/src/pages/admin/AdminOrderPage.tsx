@@ -234,11 +234,13 @@ function AdminOrder(): React.JSX.Element {
                       rate: `1 ${o.currency} = ${entry.paid.rate / RATE_SCALE} ${entry.paid.token}`,
                     })
                   : null,
+                // Marked by hand: by whom.
+                entry.by ? t('adminOrder.markedBy', { name: entry.by.name }) : null,
               ]
                 .filter(Boolean)
                 .join(' · ')}
               description={
-                entry.txHash ? <span style={breakAll}>{entry.txHash}</span> : undefined
+                entry.txHash && entry.txHash !== 'manual' ? <span style={breakAll}>{entry.txHash}</span> : undefined
               }
               after={`${entry.type === 'refund' ? '−' : '+'}${money(entry.amount)}`}
               multiline

@@ -420,7 +420,8 @@ export async function getOrder(
   const order = await db.query.orders.findFirst({ where: and(...filters) });
   if (!order) return undefined;
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
-  return toOrderDTO(order, items);
+  // Without a customer: the organisers asking.
+  return toOrderDTO(order, items, userId === undefined);
 }
 
 export async function listAllOrders(db: Database, shopId: string): Promise<Order[]> {
@@ -429,7 +430,7 @@ export async function listAllOrders(db: Database, shopId: string): Promise<Order
     .from(orders)
     .where(eq(orders.shopId, shopId))
     .orderBy(desc(orders.createdAt));
-  return attachItems(db, rows);
+  return attachItems(db, rows, true);
 }
 
 export async function setOrderStatus(
@@ -468,6 +469,8 @@ export async function markOrderPaid(
     received?: number;
     /** Paid in the other token: what arrived, in minor units of that token. */
     receivedInToken?: number;
+    /** The organiser who marked it paid by hand. */
+    by?: { id: number; name: string };
   } = {},
 ): Promise<Order> {
   return db.transaction(async (tx) => {
@@ -516,6 +519,7 @@ export async function markOrderPaid(
       network: order.paymentNetwork,
       txHash: order.paymentTxHash ?? reference,
       at: new Date().toISOString(),
+      ...(options.by ? { by: options.by } : {}),
     };
 
     const [updated] = await tx
@@ -619,6 +623,8 @@ export interface StatusChange {
   trackingNumber?: string | undefined;
   carrier?: string | undefined;
   force?: boolean | undefined;
+  /** The organiser making the change (kept when it marks a payment). */
+  by?: { id: number; name: string } | undefined;
 }
 
 /**
@@ -651,6 +657,7 @@ export async function changeOrderStatus(
     const order = await markOrderPaid(db, orderId, row.paymentTxHash ?? 'manual', {
       checkStock: !change.force,
       note,
+      ...(change.by ? { by: change.by } : {}),
     });
     return { order, previous };
   }
@@ -1221,7 +1228,12 @@ export async function approveOrderChange(
 }
 
 /** Records that the admin sent back the overpaid amount (`amountPaid > total`). */
-export async function recordRefund(db: Database, shopId: string, orderId: string): Promise<Order> {
+export async function recordRefund(
+  db: Database,
+  shopId: string,
+  orderId: string,
+  by?: { id: number; name: string },
+): Promise<Order> {
   return db.transaction(async (tx) => {
     const order = await lockOrder(tx, and(eq(orders.shopId, shopId), eq(orders.id, orderId)));
     if (!order) throw ApiError.notFound('Order not found');
@@ -1236,6 +1248,7 @@ export async function recordRefund(db: Database, shopId: string, orderId: string
       network: null,
       txHash: null,
       at: new Date().toISOString(),
+      ...(by ? { by } : {}),
     };
     const [updated] = await tx
       .update(orders)
@@ -1253,7 +1266,7 @@ export async function recordRefund(db: Database, shopId: string, orderId: string
 }
 
 /** Adds the items to each order, with one query for all of them. */
-async function attachItems(db: Database, rows: OrderRow[]): Promise<Order[]> {
+async function attachItems(db: Database, rows: OrderRow[], organisers = false): Promise<Order[]> {
   if (rows.length === 0) return [];
   const items = await db
     .select()
@@ -1265,7 +1278,7 @@ async function attachItems(db: Database, rows: OrderRow[]): Promise<Order[]> {
     if (list) list.push(item);
     else byOrder.set(item.orderId, [item]);
   }
-  return rows.map((row) => toOrderDTO(row, byOrder.get(row.id) ?? []));
+  return rows.map((row) => toOrderDTO(row, byOrder.get(row.id) ?? [], organisers));
 }
 
 /**
