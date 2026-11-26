@@ -56,13 +56,28 @@ const envSchema = z.object({
   RPC_SOLANA_URL: z.url().default('https://api.mainnet-beta.solana.com'),
   CORS_ORIGIN: z.string().default('*'),
   /**
-   * Web sign-in (username, password and authenticator code) is accepted only
-   * through the Tor .onion address. Set to "false" to allow it anywhere.
+   * Web sign-in (username, password and authenticator code) of admins: on the
+   * main domain and the .onion address. Set to "true" to allow it only through
+   * the .onion address. Never on the customer-only domains (WEB_DOMAINS).
    */
   WEB_LOGIN_ONION_ONLY: z
     .enum(['true', 'false'])
-    .default('true')
+    .default('false')
     .transform((value) => value === 'true'),
+  /**
+   * More domains for customers only (spaces or commas between them): the web
+   * fallback for when the bot is down, if the main domain is blocked. Admins
+   * cannot sign in there. Empty = none.
+   */
+  WEB_DOMAINS: z
+    .string()
+    .default('')
+    .transform((value) =>
+      value
+        .split(/[\s,]+/)
+        .map((d) => d.trim().replace(/^https?:\/\//, '').replace(/\/+$/, ''))
+        .filter((d) => d !== '' && !d.endsWith('.invalid')),
+    ),
   /** How long a web session lasts. */
   WEB_SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(8 * 3600),
   /**

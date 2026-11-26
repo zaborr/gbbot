@@ -1,6 +1,9 @@
-# One domain for everything; Caddy gets and renews the HTTPS certificate.
+# The main domain: the Mini App, the bot's webhook, customers and admins on the web.
+# Caddy gets and renews the HTTPS certificates of every domain here.
 {$DOMAIN} {
 	encode gzip zstd
+	# Only the customer-only domains below may say so.
+	request_header -X-Gb-Site
 
 	# Security headers. No frame blocking: Telegram Web opens the Mini App in an iframe.
 	header {
@@ -31,11 +34,42 @@
 	}
 }
 
+# More domains, for customers only (WEB_DOMAINS in .env): the web for when the bot
+# is down, if the main domain is blocked. No web administration and no webhook; the
+# API also refuses any sign-in but a customer's key there (X-Gb-Site).
+{$WEB_DOMAINS:http://customer.invalid} {
+	encode gzip zstd
+	request_header X-Gb-Site customer
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		Content-Security-Policy "frame-ancestors 'self'"
+		-Server
+	}
+
+	@admin path /admin /admin/*
+	redir @admin / 302
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle /webhook/* {
+		respond 404
+	}
+	handle {
+		reverse_proxy miniapp:80
+	}
+}
+
 # Internal site for an onion service running on the server (web administration).
 # Plain HTTP on a port that only the server itself can reach: the onion service
 # already encrypts and authenticates the connection. Not the bot's webhook.
 http://:8080 {
 	encode gzip zstd
+	request_header -X-Gb-Site
 
 	header {
 		X-Content-Type-Options "nosniff"

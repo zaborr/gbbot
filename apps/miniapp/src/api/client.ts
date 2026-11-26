@@ -783,7 +783,7 @@ export class ApiClient {
     return this.request(`/admin/web-keys/${userId}`);
   }
 
-  adminGiveWebKey(userId: number, vip: 'none' | 'shop' | 'platform'): Promise<{ key: string; expiresAt: string; url: string }> {
+  adminGiveWebKey(userId: number, vip: 'none' | 'shop' | 'platform'): Promise<{ key: string; expiresAt: string; url: string; more: string[] }> {
     return this.request('/admin/web-keys', { method: 'POST', body: JSON.stringify({ userId, vip }) });
   }
 

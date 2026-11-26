@@ -659,20 +659,32 @@ describeDb('API integration', () => {
     await db.update(products).set({ minQuantity: 1 }).where(eq(products.id, productId));
   });
 
-  it('signs platform admins in on the web, only through the onion address', async () => {
+  it('signs platform admins in on the web, not on the customer-only domains', async () => {
     const creds = await createWebAdmin(db, `web${Date.now() % 100000}`);
     const secret = base32Decode(creds.totpSecret);
     const code = (offset = 0): string => totpCode(secret, Math.floor(Date.now() / 30_000) + offset);
-    const signIn = (host: string, body: Record<string, string>): Promise<Response> =>
+    const signIn = (host: string, body: Record<string, string>, site?: string): Promise<Response> =>
       Promise.resolve(
         app.request(`http://${host}/api/auth/web`, {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          headers: { 'content-type': 'application/json', ...(site ? { 'X-Gb-Site': site } : {}) },
           body: JSON.stringify(body),
         }),
       );
 
-    expect((await signIn('gb.example.com', { username: creds.username, password: creds.password, code: code() })).status).toBe(403);
+    // A customer-only domain: no admin sign-in, not even with the right code.
+    expect(
+      (await signIn('other.example.net', { username: creds.username, password: creds.password, code: code() }, 'customer'))
+        .status,
+    ).toBe(403);
+    // Only through the onion address when so configured.
+    const onionOnly = createApp({ env: { ...testEnv, WEB_LOGIN_ONION_ONLY: true }, db });
+    const clear = await onionOnly.request('http://gb.example.com/api/auth/web', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: creds.username, password: creds.password, code: code() }),
+    });
+    expect(clear.status).toBe(403);
     expect((await signIn('abc.onion', { username: creds.username, password: 'nope', code: code() })).status).toBe(401);
 
     const now = code();
@@ -5118,6 +5130,11 @@ describeDb('API integration', () => {
     expect([403, 404]).toContain((await request('/api/admin/orders', { headers: web })).status);
     expect((await request('/api/platform/supervisors', { headers: web })).status).toBe(403);
     expect((await request('/api/me/notices', { headers: web })).status).toBe(200);
+    // A customer-only domain: the key and its session work; an admin's session does not.
+    const site = { 'X-Gb-Site': 'customer' };
+    expect((await request('/api/orders', { headers: { ...web, ...site } })).status).toBe(200);
+    expect((await request('/api/admin/orders', { headers: { ...admin, ...site } })).status).toBe(403);
+    expect((await request('/api/auth', { method: 'POST', headers: { 'content-type': 'application/json', ...site }, body: '{"initData":"x"}' })).status).toBe(403);
     // Taken back: the session ends.
     expect((await request('/api/admin/web-keys/555010001', { method: 'DELETE', headers: admin })).status).toBe(200);
     expect((await request('/api/orders', { headers: web })).status).toBe(401);

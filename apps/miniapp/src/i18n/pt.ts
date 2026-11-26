@@ -665,6 +665,7 @@ export const pt: Record<MessageKey, string> = {
   'custKey.footer': 'Para quando o bot está em baixo: a chave abre a conta dele na web, só neste GB, durante 30 dias. Só se mostra uma vez: copie-a e envie-lha. Uma chave nova substitui a anterior.',
   'custKey.give': '🔑 Dar acesso web',
   'custKey.message': 'Entre no GB pela web: {url}\nA sua chave: {key}',
+  'custKey.more': 'Se não abrir, experimente:\n{urls}',
   'custKey.name': 'Nome',
   'custKey.neverUsed': 'nunca',
   'custKey.newCustomer': '➕ Novo cliente (web)',
