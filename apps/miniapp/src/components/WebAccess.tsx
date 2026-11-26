@@ -13,7 +13,7 @@ const errorText = (err: unknown): string => (err instanceof ApiClientError ? err
 export function WebAccessSection({ userId }: { userId: number }): React.JSX.Element {
   const [reloadKey, setReloadKey] = useState(0);
   const current = useAsync(() => api.adminWebKey(userId), [userId, reloadKey]);
-  const [given, setGiven] = useState<{ key: string; url: string } | null>(null);
+  const [given, setGiven] = useState<{ key: string; url: string; more: string[] } | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [sure, setSure] = useState(false);
@@ -42,13 +42,16 @@ export function WebAccessSection({ userId }: { userId: number }): React.JSX.Elem
       {given && (
         <Cell
           multiline
-          subtitle={given.url}
+          subtitle={[given.url, ...given.more].join('\n')}
           after={
             <Button
               size="s"
               mode="bezeled"
               onClick={() =>
-                void copyText(t('custKey.message', { url: given.url, key: given.key })).then((ok) =>
+                void copyText(
+                  t('custKey.message', { url: given.url, key: given.key }) +
+                    (given.more.length ? `\n${t('custKey.more', { urls: given.more.join('\n') })}` : ''),
+                ).then((ok) =>
                   setNote(ok ? t('sheet.copied') : t('sheet.copyFailed')),
                 )
               }
@@ -75,7 +78,7 @@ export function WebAccessSection({ userId }: { userId: number }): React.JSX.Elem
           onClick={() =>
             run('give', async () => {
               const r = await api.adminGiveWebKey(userId, vip);
-              setGiven({ key: r.key, url: r.url });
+              setGiven({ key: r.key, url: r.url, more: r.more ?? [] });
               setReloadKey((k) => k + 1);
             })
           }

@@ -5,6 +5,7 @@ import type { AppBindings, AppDeps } from './context.js';
 import { ApiError, errorResponse } from './lib/errors.js';
 import { withShop } from './middleware/shop.js';
 import { rateLimit } from './middleware/rateLimit.js';
+import { customerSiteOnly } from './middleware/customerSite.js';
 import { requireDisclaimer } from './auth/middleware.js';
 import { authRoutes } from './routes/auth.js';
 import { catalogRoutes } from './routes/catalog.js';
@@ -63,6 +64,8 @@ export function createApp(deps: AppDeps): Hono<AppBindings> {
   // Requests per minute per client (the webhook is not limited: Telegram
   // proves itself with its secret, and a limit could lose bot messages).
   app.use('/api/*', rateLimit);
+  // The customer-only domains (WEB_DOMAINS): Caddy marks their requests.
+  app.use('/api/*', customerSiteOnly);
 
   // Telegram webhook is not shop-scoped (it reconciles by order id).
   app.route('/webhook', webhookRoutes());

@@ -88,11 +88,12 @@ export function authRoutes(): Hono<AppBindings> {
   });
 
   // Web accounts (platform admins, or managers linked to their Telegram user):
-  // only through the .onion address unless WEB_LOGIN_ONION_ONLY=false.
+  // on the main domain and the .onion address; only the .onion address with
+  // WEB_LOGIN_ONION_ONLY=true. Never on the customer-only domains (see app.ts).
   app.post('/web', zValidator('json', webAuthRequest), async (c) => {
     const env = c.get('env');
     const host = new URL(c.req.url).hostname;
-    if (env.WEB_LOGIN_ONION_ONLY !== false && !host.endsWith('.onion')) {
+    if (env.WEB_LOGIN_ONION_ONLY === true && !host.endsWith('.onion')) {
       throw new ApiError(403, 'onion_only', 'Web sign-in is only available through the Tor address');
     }
     const { username, password, code } = c.req.valid('json');

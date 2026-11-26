@@ -663,6 +663,7 @@ export const en = {
   'custKey.footer': 'For when the bot is down: the key opens their account on the web, in this GB only, for 30 days. It is shown only once: copy it and send it to them. A new key replaces the old one.',
   'custKey.give': '🔑 Give web access',
   'custKey.message': 'Enter the GB on the web: {url}\nYour key: {key}',
+  'custKey.more': 'If it does not open, try:\n{urls}',
   'custKey.name': 'Name',
   'custKey.neverUsed': 'never',
   'custKey.newCustomer': '➕ New customer (web)',

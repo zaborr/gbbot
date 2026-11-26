@@ -793,7 +793,9 @@ export function adminRoutes(): Hono<AppBindings> {
     const given = await giveKey(c.get('db'), shop.id, userId, sub);
     if (vip !== 'none') await addVipBy(c.get('db'), shop, userId, vip);
     const base = (c.get('env').PUBLIC_URL ?? new URL(c.req.url).origin).replace(/\/+$/, '');
-    return c.json({ ...given, url: `${base}/s/${shop.slug}` }, 201);
+    // The same GB on the customer-only domains, in case the first does not open.
+    const more = (c.get('env').WEB_DOMAINS ?? []).map((d) => `https://${d}/s/${shop.slug}`);
+    return c.json({ ...given, url: `${base}/s/${shop.slug}`, more }, 201);
     },
   );
   app.delete('/web-keys/:userId', zValidator('param', z.object({ userId: z.coerce.number().int() })), async (c) => {
