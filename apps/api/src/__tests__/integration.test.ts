@@ -5134,6 +5134,11 @@ describeDb('API integration', () => {
       body: JSON.stringify({ telegramId: 555010001, username: 'web_only', firstName: 'Wendy' }),
     });
     expect(added.status).toBe(201);
+    // Found again by their @username, any case, with or without the @.
+    const lookup = await request('/api/admin/customers/lookup?username=%40Web_Only', { headers: admin });
+    expect(((await lookup.json()) as { telegramId: number }[]).map((u) => u.telegramId)).toEqual([555010001]);
+    const nobody = await request('/api/admin/customers/lookup?username=nobody_here', { headers: admin });
+    expect(await nobody.json()).toEqual([]);
     const given = await request('/api/admin/web-keys', { method: 'POST', headers: admin, body: JSON.stringify({ userId: 555010001 }) });
     expect(given.status).toBe(201);
     const { key, url } = (await given.json()) as { key: string; url: string };

@@ -114,20 +114,22 @@ export function WebAccessSection({ userId }: { userId: number }): React.JSX.Elem
 /** Someone new, by their Telegram ID (from @userinfobot), so they can be given a key. */
 export function NewCustomerSection(): React.JSX.Element {
   const [open, setOpen] = useState(false);
-  const [added, setAdded] = useState<number | null>(null);
-  const [id, setId] = useState('');
+  const [added, setAdded] = useState<{ id: number; name: string } | null>(null);
   const [username, setUsername] = useState('');
+  // null: not searched yet; [] : nobody with that @username (then by ID).
+  const [found, setFound] = useState<{ telegramId: number; username: string | null; firstName: string }[] | null>(null);
+  const [id, setId] = useState('');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   if (added !== null) {
-    // Added: their key right here (they have no orders yet to find them by).
+    // Their key right here (they may have no orders yet to find them by).
     return (
       <>
         <Section>
-          <Cell multiline>{t('custKey.addedWho', { name: name.trim() || username.trim() || '—', id: added })}</Cell>
+          <Cell multiline>{t('custKey.addedWho', { name: added.name, id: added.id })}</Cell>
         </Section>
-        <WebAccessSection userId={added} />
+        <WebAccessSection userId={added.id} />
       </>
     );
   }
@@ -138,6 +140,81 @@ export function NewCustomerSection(): React.JSX.Element {
       </Section>
     );
   }
+  const close = (): void => {
+    setOpen(false);
+    setFound(null);
+    setNote(null);
+  };
+  const cancel = (
+    <Button stretched mode="bezeled" onClick={close}>
+      {t('common.cancel')}
+    </Button>
+  );
+
+  // 1. By @username.
+  if (found === null) {
+    const handle = username.trim().replace(/^@/, '');
+    return (
+      <Section header={t('custKey.newCustomer')} footer={note ?? t('custKey.searchFooter')}>
+        <Input
+          header={t('custKey.usernameSearch')}
+          placeholder="@usuario"
+          autoCapitalize="none"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+        />
+        <div style={{ display: 'flex', gap: 8, padding: 16 }}>
+          {cancel}
+          <Button
+            stretched
+            disabled={handle.length < 2}
+            loading={busy}
+            onClick={() => {
+              setBusy(true);
+              setNote(null);
+              void api
+                .adminFindCustomer(handle)
+                .then(setFound)
+                .catch((err: unknown) => setNote(errorText(err)))
+                .finally(() => setBusy(false));
+            }}
+          >
+            {t('custKey.search')}
+          </Button>
+        </div>
+      </Section>
+    );
+  }
+
+  // 2a. Found: confirm who it is.
+  if (found.length > 0) {
+    return (
+      <Section header={t('custKey.newCustomer')} footer={t('custKey.foundFooter')}>
+        {found.map((u) => (
+          <Cell
+            key={u.telegramId}
+            multiline
+            subtitle={`${u.username ? `@${u.username} · ` : ''}${u.telegramId}`}
+            after={
+              <Button size="s" onClick={() => setAdded({ id: u.telegramId, name: u.firstName })}>
+                {t('custKey.thisOne')}
+              </Button>
+            }
+          >
+            {u.firstName}
+          </Cell>
+        ))}
+        <div style={{ display: 'flex', gap: 8, padding: 16 }}>
+          {cancel}
+          <Button stretched mode="bezeled" onClick={() => setFound([])}>
+            {t('custKey.notThem')}
+          </Button>
+        </div>
+      </Section>
+    );
+  }
+
+  // 2b. Not in the bot: by their Telegram ID.
   const valid = /^\d{3,15}$/.test(id.trim());
   return (
     <Section header={t('custKey.newCustomer')} footer={note ?? t('custKey.newCustomerFooter')}>
@@ -147,18 +224,9 @@ export function NewCustomerSection(): React.JSX.Element {
         value={id}
         onChange={(e) => setId(e.target.value.replace(/\D/g, ''))}
       />
-      <Input
-        header={t('custKey.username')}
-        placeholder="@usuario"
-        autoCapitalize="none"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-      />
       <Input header={t('custKey.name')} value={name} onChange={(e) => setName(e.target.value)} />
       <div style={{ display: 'flex', gap: 8, padding: 16 }}>
-        <Button stretched mode="bezeled" onClick={() => setOpen(false)}>
-          {t('common.cancel')}
-        </Button>
+        {cancel}
         <Button
           stretched
           disabled={!valid}
@@ -167,9 +235,10 @@ export function NewCustomerSection(): React.JSX.Element {
             setBusy(true);
             setNote(null);
             const telegramId = Number(id.trim());
+            const handle = username.trim().replace(/^@/, '') || null;
             void api
-              .adminAddCustomer({ telegramId, username: username.trim() || null, firstName: name.trim() })
-              .then(() => setAdded(telegramId))
+              .adminAddCustomer({ telegramId, username: handle, firstName: name.trim() })
+              .then(() => setAdded({ id: telegramId, name: name.trim() || (handle ? `@${handle}` : '—') }))
               .catch((err: unknown) => setNote(errorText(err)))
               .finally(() => setBusy(false));
           }}

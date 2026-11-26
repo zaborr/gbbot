@@ -802,6 +802,22 @@ export function adminRoutes(): Hono<AppBindings> {
     await revokeKeys(c.get('db'), c.get('shopId'), c.req.valid('param').userId);
     return c.json({ ok: true });
   });
+  // Someone already in the bot, by the last @username it saw (whoever had it).
+  app.get(
+    '/customers/lookup',
+    zValidator('query', z.object({ username: z.string().trim().min(2).max(40) })),
+    async (c) => {
+      const name = c.req.valid('query').username.replace(/^@/, '').toLowerCase();
+      const found = await c
+        .get('db')
+        .select({ telegramId: users.telegramId, username: users.username, firstName: users.firstName })
+        .from(users)
+        .where(sql`lower(${users.username}) = ${name}`)
+        .limit(5);
+      return c.json(found);
+    },
+  );
+
   app.post(
     '/customers',
     zValidator(

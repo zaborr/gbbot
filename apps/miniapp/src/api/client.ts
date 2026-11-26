@@ -791,6 +791,10 @@ export class ApiClient {
     return this.request<{ ok: boolean }>(`/admin/web-keys/${userId}`, { method: 'DELETE' });
   }
 
+  adminFindCustomer(username: string): Promise<{ telegramId: number; username: string | null; firstName: string }[]> {
+    return this.request(`/admin/customers/lookup?username=${encodeURIComponent(username)}`);
+  }
+
   adminAddCustomer(input: { telegramId: number; username: string | null; firstName: string }): Promise<{ ok: boolean }> {
     return this.request<{ ok: boolean }>('/admin/customers', { method: 'POST', body: JSON.stringify(input) });
   }
