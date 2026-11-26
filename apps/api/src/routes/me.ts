@@ -146,7 +146,9 @@ export function meRoutes(): Hono<AppBindings> {
   });
 
   // A customer on the web: what the bot told them (also while the bot is down).
-  app.get('/notices', requireAuth, async (c) => c.json(await noticesOf(c.get('db'), c.get('claims').sub)));
+  app.get('/notices', requireAuth, async (c) =>
+    c.json(await noticesOf(c.get('db'), c.get('claims').sub, c.get('claims').ck)),
+  );
 
   return app;
 }

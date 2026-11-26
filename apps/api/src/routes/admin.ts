@@ -112,7 +112,7 @@ import { buildReport } from '../export/report.js';
 import { TelegramApi } from '../telegram/api.js';
 import { isWebSession, webMark } from '../services/webAdmins.js';
 import type { SessionClaims } from '../auth/jwt.js';
-import { notifyShopTeam } from '../services/webNotices.js';
+import { notifyPlatform, notifyShopTeam } from '../services/webNotices.js';
 import {
   addToShopBlacklist,
   blockedAmong,
@@ -127,7 +127,7 @@ import { addVipBy, shopClubView, shopVipClubView, updateShopClub, updateShopVipC
 import { cloneProducts, listCloneSources } from '../services/clone.js';
 import { closePreview, closeShop, reopenShop, scheduleClosing } from '../services/closing.js';
 import { announceGoalMilestones, updateGoal } from '../services/goal.js';
-import { getShopTeam, notifySuperAdmins } from '../services/team.js';
+import { describeUser, getShopTeam, managesSomething, notifySuperAdmins } from '../services/team.js';
 import { restoreSnapshot, takeSnapshot } from '../services/snapshot.js';
 import { buyerReachable, getBuyer, listBuyers, messageBuyer } from '../services/buyers.js';
 import { audienceIds, checkReach, listBroadcasts, reachStatus, startBroadcast } from '../services/broadcast.js';
@@ -790,8 +790,18 @@ export function adminRoutes(): Hono<AppBindings> {
     if (vip === 'platform' && !isSuperAdmin(c.get('env'), sub) && !isSupervisor(sub)) {
       throw ApiError.forbidden('Only platform admins and supervisors can make someone VIP in every GB');
     }
-    const given = await giveKey(c.get('db'), shop.id, userId, sub);
-    if (vip !== 'none') await addVipBy(c.get('db'), shop, userId, vip);
+    const db = c.get('db');
+    const env = c.get('env');
+    // Not for anyone who manages something: a key session acts as them, and they
+    // have their own web account (Plataforma → Cuentas web) instead.
+    if (await managesSomething(db, env, userId)) {
+      throw new ApiError(403, 'manager_key', 'This person manages GBs: give them a web account, not a key');
+    }
+    const given = await giveKey(db, shop.id, userId, sub);
+    if (vip !== 'none') await addVipBy(db, shop, userId, vip);
+    // On record: who gave whom a key, where.
+    const [who, whom] = await Promise.all([describeUser(db, sub), describeUser(db, userId)]);
+    await notifyPlatform(db, env, (lang) => tr(lang, 'web.keyGiven', { who, whom, shop: shop.name }), shop.id);
     const base = (c.get('env').PUBLIC_URL ?? new URL(c.req.url).origin).replace(/\/+$/, '');
     // The same GB on the customer-only domains, in case the first does not open.
     const more = (c.get('env').WEB_DOMAINS ?? []).map((d) => `https://${d}/s/${shop.slug}`);

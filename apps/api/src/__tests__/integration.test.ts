@@ -12,6 +12,7 @@ import {
   cartItems,
   carts,
   categories,
+  customerNotices,
   labs,
   orderItems,
   groupMembers,
@@ -5159,7 +5160,22 @@ describeDb('API integration', () => {
     expect((await request('/api/orders', { headers: web })).status).toBe(200);
     expect([403, 404]).toContain((await request('/api/admin/orders', { headers: web })).status);
     expect((await request('/api/platform/supervisors', { headers: web })).status).toBe(403);
-    expect((await request('/api/me/notices', { headers: web })).status).toBe(200);
+    // Their inbox: only what came while this key exists.
+    await db.insert(customerNotices).values([
+      { userId: 555010001, text: 'before-key', createdAt: new Date(Date.now() - 3600_000) },
+      { userId: 555010001, text: 'after-key' },
+    ]);
+    const inbox = (await (await request('/api/me/notices', { headers: web })).json()) as { text: string }[];
+    expect(inbox.map((n) => n.text)).toEqual(['after-key']);
+    // Nothing of theirs beyond the customer side of this GB.
+    expect((await request('/api/me/web-access', { method: 'POST', headers: { ...web, 'content-type': 'application/json' }, body: '{"username":"takeover"}' })).status).toBe(403);
+    expect((await request('/api/me/security-phrase', { headers: web })).status).toBe(403);
+    expect((await request('/api/organizer/shops', { method: 'POST', headers: { ...web, 'content-type': 'application/json' }, body: '{}' })).status).toBe(403);
+    expect((await request('/api/web-accounts', { headers: web })).status).toBe(403);
+    // No key for someone who manages GBs (it would act as them).
+    const toAdmin = await request('/api/admin/web-keys', { method: 'POST', headers: admin, body: JSON.stringify({ userId: ADMIN_ID }) });
+    expect(toAdmin.status).toBe(403);
+    expect(((await toAdmin.json()) as { error: { code: string } }).error.code).toBe('manager_key');
     // A customer-only domain: the key and its session work; an admin's session does not.
     const site = { 'X-Gb-Site': 'customer' };
     expect((await request('/api/orders', { headers: { ...web, ...site } })).status).toBe(200);
