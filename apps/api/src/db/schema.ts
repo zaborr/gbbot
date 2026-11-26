@@ -983,3 +983,18 @@ export const customerNotices = pgTable(
   },
   (table) => [index('customer_notices_user_idx').on(table.userId, table.createdAt)],
 );
+
+/**
+ * Who was last seen in a VIP/guest group (only "is a member", never more): so
+ * VIPs stay VIPs when Telegram cannot be asked (the bot down). Gone after a
+ * while, and as soon as Telegram says they left.
+ */
+export const groupMembers = pgTable(
+  'group_members',
+  {
+    chatId: bigint('chat_id', { mode: 'number' }).notNull(),
+    userId: bigint('user_id', { mode: 'number' }).notNull(),
+    checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.chatId, table.userId] })],
+);

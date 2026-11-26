@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, lt } from 'drizzle-orm';
 import {
   EMPTY_VIP_CLUB,
   type ShopVipClub,
@@ -8,7 +8,7 @@ import {
 } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
-import { platformSettings, shops, users } from '../db/schema.js';
+import { groupMembers, platformSettings, shops, users } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 import { TelegramApi, type TelegramChatMember } from '../telegram/api.js';
 import type { ShopRow } from './shop.js';
@@ -51,6 +51,8 @@ export async function isGroupMember(
   chatId: number,
   userId: number,
   now = Date.now(),
+  /** Keeps (and falls back on) the last "is a member" across restarts and outages. */
+  db?: Database,
 ): Promise<boolean> {
   const key = `${chatId}:${userId}`;
   const cached = membershipCache.get(key);
@@ -58,12 +60,56 @@ export async function isGroupMember(
   let member = false;
   try {
     member = isMemberStatus(await telegram.getChatMember(chatId, userId));
+    if (db) await rememberMember(db, chatId, userId, member);
   } catch (error) {
-    // Bot removed from the group, group deleted, Telegram down…: not VIP for now.
+    // Bot down, removed from the group, Telegram unreachable…: what was last
+    // known stays (a VIP does not lose it because the bot cannot ask).
     console.warn(`VIP check in chat ${chatId} failed:`, error instanceof Error ? error.message : error);
+    member = cached?.member ?? (db ? await lastKnownMember(db, chatId, userId, now) : false);
   }
   membershipCache.set(key, { member, until: now + (member ? MEMBER_TTL_MS : NOT_MEMBER_TTL_MS) });
   return member;
+}
+
+/** How long the last "is a member" is trusted when Telegram cannot be asked. */
+const LAST_KNOWN_MS = 30 * 24 * 60 * 60 * 1000;
+
+async function rememberMember(db: Database, chatId: number, userId: number, member: boolean): Promise<void> {
+  if (member) {
+    await db
+      .insert(groupMembers)
+      .values({ chatId, userId, checkedAt: new Date() })
+      .onConflictDoUpdate({ target: [groupMembers.chatId, groupMembers.userId], set: { checkedAt: new Date() } });
+  } else {
+    await db.delete(groupMembers).where(and(eq(groupMembers.chatId, chatId), eq(groupMembers.userId, userId)));
+  }
+}
+
+async function lastKnownMember(db: Database, chatId: number, userId: number, now: number): Promise<boolean> {
+  const row = await db.query.groupMembers.findFirst({
+    where: and(eq(groupMembers.chatId, chatId), eq(groupMembers.userId, userId)),
+  });
+  return Boolean(row && now - row.checkedAt.getTime() < LAST_KNOWN_MS);
+}
+
+/** Old "was a member" answers go (kept 30 days at most). */
+export async function forgetOldMembers(db: Database, now = Date.now()): Promise<void> {
+  await db.delete(groupMembers).where(lt(groupMembers.checkedAt, new Date(now - LAST_KNOWN_MS)));
+}
+
+/**
+ * The organisers mark someone VIP when giving them web access: in the GB's
+ * club, or (platform admins and supervisors) in the general one, for every GB
+ * that uses it. Noted as "web".
+ */
+export async function addVipBy(db: Database, shop: ShopRow, userId: number, scope: 'shop' | 'platform'): Promise<void> {
+  const add = (club: VipClub): VipClub => ({
+    ...club,
+    userIds: club.userIds.includes(userId) ? club.userIds : [...club.userIds, userId],
+    notes: { ...(club.notes ?? {}), [String(userId)]: club.notes?.[String(userId)] ?? 'web' },
+  });
+  if (scope === 'platform') await savePlatformClub(db, add(await getPlatformClub(db, 'vip')));
+  else await saveShopClub(db, shop.id, 'vip', add(ownClub(shop, 'vip')));
 }
 
 /** How someone appears in a club's hand-made list, if at all. */
@@ -206,7 +252,7 @@ export function createClubChecker(
     const chatIds = new Set(own.groups.map((g) => g.chatId));
     if (usesPlatform) for (const g of platform.groups) chatIds.add(g.chatId);
     for (const chatId of chatIds) {
-      if (await isGroupMember(telegram, chatId, userId)) return true;
+      if (await isGroupMember(telegram, chatId, userId, Date.now(), db)) return true;
     }
     return false;
   };
@@ -255,7 +301,7 @@ export async function vipsAmong(
     await Promise.all(
       rest.slice(i, i + 8).map(async (id) => {
         for (const chatId of chatIds) {
-          if (await isGroupMember(telegram, chatId, id)) {
+          if (await isGroupMember(telegram, chatId, id, Date.now(), db)) {
             result.add(id);
             return;
           }

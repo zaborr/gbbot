@@ -17,7 +17,9 @@ export function WebAccessSection({ userId }: { userId: number }): React.JSX.Elem
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [sure, setSure] = useState(false);
+  const [vip, setVip] = useState<'none' | 'shop' | 'platform'>('none');
   const key = current.data?.key ?? null;
+  const everywhere = current.data?.canVipEverywhere ?? false;
 
   const run = (what: string, work: () => Promise<void>): void => {
     setBusy(what);
@@ -58,6 +60,13 @@ export function WebAccessSection({ userId }: { userId: number }): React.JSX.Elem
           <code style={{ fontSize: 16, wordBreak: 'break-all' }}>{given.key}</code>
         </Cell>
       )}
+      <div className="gb-tabs" role="radiogroup" style={{ padding: '8px 16px' }}>
+        {(['none', 'shop', ...(everywhere ? (['platform'] as const) : [])] as const).map((v) => (
+          <Button key={v} size="s" mode={vip === v ? 'filled' : 'bezeled'} onClick={() => setVip(v)}>
+            {t(v === 'none' ? 'custKey.vipNone' : v === 'shop' ? 'custKey.vipShop' : 'custKey.vipAll')}
+          </Button>
+        ))}
+      </div>
       <div style={{ display: 'flex', gap: 8, padding: 16 }}>
         <Button
           stretched
@@ -65,7 +74,7 @@ export function WebAccessSection({ userId }: { userId: number }): React.JSX.Elem
           loading={busy === 'give'}
           onClick={() =>
             run('give', async () => {
-              const r = await api.adminGiveWebKey(userId);
+              const r = await api.adminGiveWebKey(userId, vip);
               setGiven({ key: r.key, url: r.url });
               setReloadKey((k) => k + 1);
             })
