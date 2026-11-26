@@ -6,8 +6,14 @@ import { inviteNotJoined, listNotJoined, remindUnpaid } from '../services/testin
 import { addParticipant, removeInvite } from '../services/testingAdd.js';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { createTestingRequest, labProgressRequest, langFrom, MAX_DONATION_HOURS, updateTestingRequest   decideExtraRequest,
+import {
+  createTestingRequest,
+  decideExtraRequest,
+  labProgressRequest,
+  langFrom,
+  MAX_DONATION_HOURS,
   openExtraRequest,
+  updateTestingRequest,
 } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { drawBlocker, launchDraw, substituteDonor } from '../services/testingDraw.js';
