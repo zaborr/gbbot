@@ -879,7 +879,7 @@ function PotSection({ testing, steps }: { testing: Testing; steps: ReturnType<ty
       >
         {steps.map((step) => (
           <Cell
-            key={step.tier.id}
+            key={step.id}
             before={
               <span className="gb-testing-tier-icon" aria-hidden="true">
                 {step.upgradedTo ? '⬆️' : step.reached ? '✅' : step === next ? '⏳' : '🔒'}
@@ -1458,7 +1458,7 @@ function OpenExtra({ testing, onChange }: { testing: Testing; onChange: () => vo
           >
             {steps
               .slice(0, i + 1)
-              .map((s2) => s2.tier.name)
+              .map((s2) => testing.tiers.find((tier) => tier.id === s2.id)?.name ?? '')
               .join(' + ')}
           </Cell>
         ))
