@@ -40,6 +40,7 @@ import {
   addToBlacklistRequest,
   blacklistWho,
   updateTestingEnabledRequest,
+  adminCreateOrderRequest,
   labelRequest,
   labelRequests,
 } from '@tma-shop/shared';
@@ -48,6 +49,7 @@ import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth, requireOwner } from '../auth/middleware.js';
 import { imageUrl, saveImage } from '../services/images.js';
 import { labelFile, requestLabel, requestLabels, sendLabelTo } from '../services/labels.js';
+import { createOrderFor, listPendingOrders, removePendingOrder } from '../services/adminOrders.js';
 import { testingAdminRoutes } from './testing.js';
 import { announceTestingTiers, listTestings, markTestings, setTestingEnabled } from '../services/testing.js';
 import { unpaidExtras } from '../services/testingExtra.js';
@@ -754,6 +756,16 @@ export function adminRoutes(): Hono<AppBindings> {
       o.userId !== null && blocked.has(o.userId) ? { ...o, customerBlocked: true } : o,
     );
   };
+  // An order made by the organisers for someone; those waiting for them to open the bot.
+  app.post('/orders/create', zValidator('json', adminCreateOrderRequest), async (c) =>
+    c.json(await createOrderFor(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('json')), 201),
+  );
+  app.get('/orders/pending', async (c) => c.json(await listPendingOrders(c.get('db'), c.get('shopId'))));
+  app.delete('/orders/pending/:id', zValidator('param', z.object({ id: z.uuid() })), async (c) => {
+    await removePendingOrder(c.get('db'), c.get('shopId'), c.req.valid('param').id);
+    return c.json({ ok: true });
+  });
+
   // Shipping labels: asking one customer, or every paid order without one (or counting them).
   app.post('/orders/label-requests', zValidator('json', labelRequests), async (c) =>
     c.json(await requestLabels(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('json'))),

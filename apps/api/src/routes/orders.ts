@@ -30,6 +30,7 @@ import {
   listOrders,
   requestOrderChange,
   submitCryptoPayment,
+  setOrderAddress,
 } from '../services/orders.js';
 import {
   buildChangeRequestMessage,
@@ -107,6 +108,17 @@ export function orderRoutes(): Hono<AppBindings> {
     if (!order) throw ApiError.notFound('Order not found');
     return c.json(order);
   });
+
+  // The address of an order the organisers made (it had none).
+  app.post(
+    '/:id/address',
+    zValidator('param', idParam),
+    zValidator('json', z.object({ encryptedAddress: z.string().min(1).max(20000) })),
+    async (c) =>
+      c.json(
+        await setOrderAddress(c.get('db'), c.get('shop'), c.req.valid('param').id, c.get('claims').sub, c.req.valid('json').encryptedAddress),
+      ),
+  );
 
   // The shipping label the organisers asked for: the file as the body.
   app.post('/:id/label', zValidator('param', idParam), async (c) => {

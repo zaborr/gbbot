@@ -261,3 +261,25 @@ export const labelRequests = z.object({
   dryRun: z.boolean().default(false),
 });
 export type LabelRequests = z.infer<typeof labelRequests>;
+
+/** The organisers make an order for someone (by @username or Telegram ID). */
+export const adminCreateOrderRequest = z.object({
+  who: z.string().trim().min(1).max(64),
+  items: z
+    .array(
+      z.object({
+        productId: z.uuid(),
+        variantId: z.uuid().nullable().default(null),
+        quantity: z.number().int().min(1).max(10000),
+        /** A price set by hand (minor units); null: the usual (VIP if they are). */
+        unitPrice: z.number().int().min(0).nullable().default(null),
+      }),
+    )
+    .min(1)
+    .max(100),
+  shippingZoneId: z.string().max(100).nullable().default(null),
+  /** Paid already (outside the bot): marked paid at once. */
+  paid: z.boolean().default(false),
+  notify: z.boolean().default(true),
+});
+export type AdminCreateOrderRequest = z.infer<typeof adminCreateOrderRequest>;

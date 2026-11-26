@@ -105,6 +105,10 @@ function AdminOrders(): React.JSX.Element {
         />
       </Section>
 
+      <Section>
+        <Cell onClick={() => navigate(to('/admin/orders/new'))}>{t('adminCreate.open')}</Cell>
+      </Section>
+
       <LabelRequestsSection orders={all} onDone={() => setReloadKey((k) => k + 1)} />
 
       <Section header={tn(visible.length, 'count.orders.one', 'count.orders.other')}>

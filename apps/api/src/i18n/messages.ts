@@ -313,6 +313,10 @@ const en = {
   'testing.extraChoose': '🧪 {shop}: the time to join the testing of {product} is over. If tests are missing, choose which and open the payment round among everyone, from the app.',
   'testing.digest.closePay': 'paying the payment round: close it when it is time',
   'testing.digest.extraDecide': 'someone did not pay: choose what follows',
+  'order.createdForYou': '🛒 {shop}: the organisers made an order for you (#{ref}). Open it to check it and pay it.',
+  'order.createdForYouShip': '🛒 {shop}: the organisers made an order for you (#{ref}). Open it to check it, add your delivery address and pay it.',
+  'order.createdForYouPaid': '🛒 {shop}: the organisers made an order for you (#{ref}), already paid.',
+  'order.viewButton': '🛒 View order',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -618,6 +622,10 @@ const es: Record<BotMessageKey, string> = {
   'testing.extraChoose': '🧪 {shop}: ha terminado el plazo para unirse al testing de {product}. Si faltan tramos, elige cuáles y abre la fase de pago entre todos desde la app.',
   'testing.digest.closePay': 'pagando la fase de pago: ciérrala cuando toque',
   'testing.digest.extraDecide': 'alguien no ha pagado: elige qué hacer',
+  'order.createdForYou': '🛒 {shop}: los organizadores te han creado un pedido (#{ref}). Ábrelo para revisarlo y pagarlo.',
+  'order.createdForYouShip': '🛒 {shop}: los organizadores te han creado un pedido (#{ref}). Ábrelo para revisarlo, añadir tu dirección de envío y pagarlo.',
+  'order.createdForYouPaid': '🛒 {shop}: los organizadores te han creado un pedido (#{ref}), ya pagado.',
+  'order.viewButton': '🛒 Ver pedido',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -921,6 +929,10 @@ const it: Record<BotMessageKey, string> = {
   'testing.extraChoose': '🧪 {shop}: è finito il termine per unirsi al testing di {product}. Se mancano livelli, scegli quali e apri la fase di pagamento tra tutti dall\'app.',
   'testing.digest.closePay': 'pagamento in corso: chiudilo quando è il momento',
   'testing.digest.extraDecide': 'qualcuno non ha pagato: scegli cosa fare',
+  'order.createdForYou': '🛒 {shop}: gli organizzatori ti hanno creato un ordine (#{ref}). Aprilo per controllarlo e pagarlo.',
+  'order.createdForYouShip': '🛒 {shop}: gli organizzatori ti hanno creato un ordine (#{ref}). Aprilo per controllarlo, aggiungere l\'indirizzo di spedizione e pagarlo.',
+  'order.createdForYouPaid': '🛒 {shop}: gli organizzatori ti hanno creato un ordine (#{ref}), già pagato.',
+  'order.viewButton': '🛒 Vedi ordine',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -1224,6 +1236,10 @@ const pt: Record<BotMessageKey, string> = {
   'testing.extraChoose': '🧪 {shop}: acabou o prazo para entrar no testing de {product}. Se faltam níveis, escolha quais e abra a fase de pagamento entre todos na app.',
   'testing.digest.closePay': 'a pagar a fase de pagamento: feche-a quando for altura',
   'testing.digest.extraDecide': 'alguém não pagou: escolha o que fazer',
+  'order.createdForYou': '🛒 {shop}: os organizadores criaram-lhe um pedido (#{ref}). Abra-o para o rever e pagar.',
+  'order.createdForYouShip': '🛒 {shop}: os organizadores criaram-lhe um pedido (#{ref}). Abra-o para o rever, adicionar a morada de envio e pagar.',
+  'order.createdForYouPaid': '🛒 {shop}: os organizadores criaram-lhe um pedido (#{ref}), já pago.',
+  'order.viewButton': '🛒 Ver pedido',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

@@ -756,6 +756,34 @@ export class ApiClient {
   }
 
   /** The time to join and give opens again (closed, or settled with nothing reached). */
+  adminCreateOrder(input: {
+    who: string;
+    items: Array<{ productId: string; variantId: string | null; quantity: number; unitPrice: number | null }>;
+    shippingZoneId: string | null;
+    paid: boolean;
+    notify: boolean;
+  }): Promise<{ order: Order | null; notified: boolean; pending: boolean }> {
+    return this.request<{ order: Order | null; notified: boolean; pending: boolean }>('/admin/orders/create', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  adminPendingOrders(): Promise<Array<{ id: string; who: string; createdAt: string; request: { items: Array<{ quantity: number }> } }>> {
+    return this.request('/admin/orders/pending');
+  }
+
+  adminRemovePendingOrder(id: string): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/orders/pending/${id}`, { method: 'DELETE' });
+  }
+
+  setOrderAddress(orderId: string, encryptedAddress: string): Promise<Order> {
+    return this.request<Order>(`/orders/${orderId}/address`, {
+      method: 'POST',
+      body: JSON.stringify({ encryptedAddress }),
+    });
+  }
+
   /** The shipping label the organisers asked for: the file as it is. */
   uploadOrderLabel(orderId: string, file: File): Promise<{ ok: boolean }> {
     return this.request<{ ok: boolean }>(`/orders/${orderId}/label`, {

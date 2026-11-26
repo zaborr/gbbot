@@ -336,6 +336,40 @@ export async function listOrders(db: Database, shopId: string, userId: number): 
 const DETAILS_OPEN: readonly OrderStatus[] = ['pending', 'awaiting_payment', 'paid'];
 
 /**
+ * An order without delivery details that needs them (made by the organisers
+ * for the customer): the customer adds their address, encrypted on their
+ * device with the GB's current key.
+ */
+export async function setOrderAddress(
+  db: Database,
+  shop: Pick<ShopRow, 'id' | 'addressKeyFingerprint'>,
+  orderId: string,
+  userId: number,
+  encrypted: string,
+): Promise<Order> {
+  const order = await db.query.orders.findFirst({
+    where: and(eq(orders.shopId, shop.id), eq(orders.id, orderId), eq(orders.userId, userId)),
+  });
+  if (!order) throw ApiError.notFound('Order not found');
+  if (!DETAILS_OPEN.includes(order.status)) {
+    throw ApiError.conflict('order_sent', 'This order was already sent: write to the organiser');
+  }
+  if (order.encryptedAddress) throw ApiError.conflict('address_set', 'This order already has an address');
+  const envelope = parseEnvelope(encrypted);
+  if (!envelope) throw ApiError.badRequest('address_required', 'Enter your delivery address');
+  if (envelope.kid !== shop.addressKeyFingerprint) {
+    throw ApiError.conflict('stale_key', 'The shop updated its security key. Please reopen the shop and try again.');
+  }
+  const [updated] = await db
+    .update(orders)
+    .set({ encryptedAddress: encrypted, addressKeyFingerprint: envelope.kid, updatedAt: new Date() })
+    .where(eq(orders.id, order.id))
+    .returning();
+  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+  return toOrderDTO(updated!, items);
+}
+
+/**
  * The customer adds details (email, phone, notes) to their order, encrypted on
  * their device with the GB's key. What the order had is never touched.
  */

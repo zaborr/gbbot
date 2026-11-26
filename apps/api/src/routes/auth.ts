@@ -5,6 +5,7 @@ import type { AppBindings } from '../context.js';
 import { validateInitData } from '../auth/init-data.js';
 import { signSession } from '../auth/jwt.js';
 import { claimInvites } from '../services/testingAdd.js';
+import { claimPendingOrders } from '../services/adminOrders.js';
 import { getUser, upsertUser } from '../services/users.js';
 import { claimPendingRoles } from '../services/team.js';
 import { claimBlacklisted } from '../services/blacklist.js';
@@ -35,6 +36,10 @@ export function authRoutes(): Hono<AppBindings> {
     // Added by @username to a GB's admins or to the organisers: the role is theirs now.
     await claimPendingRoles(db, userRow.telegramId, userRow.username);
     await claimBlacklisted(db, userRow.telegramId, userRow.username);
+    // Orders made for them before they had opened the bot: made now.
+    await claimPendingOrders(db, env, userRow.telegramId, userRow.username).catch((error) =>
+      console.error('Could not claim pending orders:', error),
+    );
     // Put in a testing by hand before they had opened the bot: in now.
     await claimInvites(db, env, userRow.telegramId, userRow.username).catch((error) =>
       console.error('Could not claim testing invites:', error),
