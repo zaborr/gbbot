@@ -125,7 +125,7 @@ export function NewCustomerSection(): React.JSX.Element {
     return (
       <>
         <Section>
-          <Cell multiline>{t('custKey.addedWho', { name, id: added })}</Cell>
+          <Cell multiline>{t('custKey.addedWho', { name: name.trim() || username.trim() || '—', id: added })}</Cell>
         </Section>
         <WebAccessSection userId={added} />
       </>
@@ -138,18 +138,25 @@ export function NewCustomerSection(): React.JSX.Element {
       </Section>
     );
   }
-  const valid = /^\d{3,15}$/.test(id.trim()) && name.trim() !== '';
+  const valid = /^\d{3,15}$/.test(id.trim());
   return (
     <Section header={t('custKey.newCustomer')} footer={note ?? t('custKey.newCustomerFooter')}>
-      <Input header={t('custKey.telegramId')} inputMode="numeric" value={id} onChange={(e) => setId(e.target.value)} />
-      <Input
-        header={t('custKey.username')}
-        placeholder="@usuario"
-        autoCapitalize="none"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-      />
-      <Input header={t('custKey.name')} value={name} onChange={(e) => setName(e.target.value)} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '16px 16px 0' }}>
+        <Input
+          header={t('custKey.telegramId')}
+          inputMode="numeric"
+          value={id}
+          onChange={(e) => setId(e.target.value.replace(/\D/g, ''))}
+        />
+        <Input
+          header={t('custKey.username')}
+          placeholder="@usuario"
+          autoCapitalize="none"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+        />
+        <Input header={t('custKey.name')} value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
       <div style={{ display: 'flex', gap: 8, padding: 16 }}>
         <Button stretched mode="bezeled" onClick={() => setOpen(false)}>
           {t('common.cancel')}

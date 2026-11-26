@@ -809,7 +809,8 @@ export function adminRoutes(): Hono<AppBindings> {
       z.object({
         telegramId: z.number().int().positive(),
         username: z.string().trim().max(40).nullable().default(null),
-        firstName: z.string().trim().min(1).max(64),
+        // Optional: someone who already exists keeps their data; a new one without it shows the ID.
+        firstName: z.string().trim().max(64).default(''),
       }),
     ),
     async (c) => {
