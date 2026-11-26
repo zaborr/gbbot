@@ -1,4 +1,4 @@
-import { openExtra } from '../services/testingExtra.js';
+import { closeExtraPay, decideExtra, openExtra, remindExtraNow } from '../services/testingExtra.js';
 import { announceNewTesting, moveTestingWindow, reopenTesting } from '../services/testingDonations.js';
 import { Hono } from 'hono';
 import { withNext } from '../services/testingNext.js';
@@ -6,7 +6,15 @@ import { inviteNotJoined, listNotJoined, remindUnpaid } from '../services/testin
 import { addParticipant, removeInvite } from '../services/testingAdd.js';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { createTestingRequest, labProgressRequest, langFrom, MAX_DONATION_HOURS, updateTestingRequest } from '@tma-shop/shared';
+import {
+  createTestingRequest,
+  decideExtraRequest,
+  labProgressRequest,
+  langFrom,
+  MAX_DONATION_HOURS,
+  openExtraRequest,
+  updateTestingRequest,
+} from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { drawBlocker, launchDraw, substituteDonor } from '../services/testingDraw.js';
 import { cancelTesting, markLabProgress, requestReport, settleTesting } from '../services/testingSettle.js';
@@ -77,16 +85,24 @@ export function testingAdminRoutes(): Hono<AppBindings> {
     return c.json({ ok: true });
   });
   // The time to join and give opens again (closed, or settled with nothing reached).
-  // Opening the extra round by hand: it never started, or it got nothing.
-  app.post(
-    '/:id/extra',
-    zValidator('param', idParam),
-    zValidator('json', z.object({ hours: z.number().int().min(1).max(24 * 14) })),
-    async (c) => {
-      await openExtra(c.get('db'), c.get('env'), c.get('shopId'), c.req.valid('param').id, c.req.valid('json').hours);
-      return c.json({ ok: true });
-    },
+  // Opening the payment round by hand (its kind; among everyone, how many tests).
+  app.post('/:id/extra', zValidator('param', idParam), zValidator('json', openExtraRequest), async (c) => {
+    await openExtra(c.get('db'), c.get('env'), c.get('shopId'), c.req.valid('param').id, c.req.valid('json'));
+    return c.json({ ok: true });
+  });
+  // While paying: remind those who have not paid, or close paying.
+  app.post('/:id/extra/remind', zValidator('param', idParam), async (c) =>
+    c.json(await remindExtraNow(c.get('db'), c.get('env'), c.get('shopId'), c.req.valid('param').id)),
   );
+  app.post('/:id/extra/close', zValidator('param', idParam), async (c) => {
+    await closeExtraPay(c.get('db'), c.get('env'), c.get('shopId'), c.req.valid('param').id);
+    return c.json({ ok: true });
+  });
+  // Closed with shares unpaid: what follows.
+  app.post('/:id/extra/decide', zValidator('param', idParam), zValidator('json', decideExtraRequest), async (c) => {
+    await decideExtra(c.get('db'), c.get('env'), c.get('shopId'), c.req.valid('param').id, c.req.valid('json').choice);
+    return c.json({ ok: true });
+  });
   app.post(
     '/:id/reopen',
     zValidator('param', idParam),

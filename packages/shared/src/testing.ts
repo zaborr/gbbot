@@ -100,6 +100,8 @@ export const createTestingRequest = z.object({
   extraMin: z.number().int().min(0).max(100_000_000).default(0),
   /** 0: no sign-up of its own, it is shared out as soon as the time to give ends (caps are set during it). */
   extraSignupHours: z.number().int().min(0).max(MAX_DONATION_HOURS).default(0),
+  /** The payment round: each with their cap (`cap`), or what is missing among everyone in it (`all`). */
+  extraMode: z.enum(['cap', 'all']).default('cap'),
   extraPayHours: z.number().int().min(1).max(MAX_DONATION_HOURS).default(48),
   /** People who bought elsewhere can join from the GB, paying the same fee. */
   allowExternal: z.boolean().default(false),
@@ -172,6 +174,10 @@ export type TestingStep =
   | 'unpaid'
   /** No test reached and the extra round never opened, or ended with nothing: open it (or close). */
   | 'extra'
+  /** The payment round is being paid: the organisers close it when it is time. */
+  | 'close_pay'
+  /** Paying closed with shares unpaid: the organisers decide what follows. */
+  | 'extra_decide'
   | 'draw'
   | 'wait_block'
   | 'vials'
@@ -233,6 +239,7 @@ export const testing = z.object({
   extraMin: z.number().int(),
   extraSignupHours: z.number().int(),
   extraPayHours: z.number().int(),
+  extraMode: z.enum(['cap', 'all']),
   /** The extra round, once it started (with money: what is missing is shown to those in it). */
   extra: z.custom<TestingExtraView>().nullable(),
   /**
@@ -453,7 +460,18 @@ export function textBar(share: number, width = 10): string {
 /** The extra round as stored. */
 export interface TestingExtraState {
   /** signup → pay → (someone did not pay: round, where the rest say if they go on → topup) → done. */
-  stage: 'signup' | 'pay' | 'round' | 'topup' | 'done';
+  stage: 'signup' | 'pay' | 'decide' | 'round' | 'topup' | 'done';
+  /** Each with their cap (default), or among everyone in the testing. */
+  mode?: 'cap' | 'all';
+  /** Among everyone: how many of the missing tests it is for (chosen by the organisers). */
+  want?: number;
+  /** Paying stays open until the organisers close it (no deadline); reminders every day. */
+  open?: boolean;
+  /** When paying started and when the last reminder went. */
+  since?: string;
+  remindedAt?: string;
+  /** What the organisers put in themselves when some did not pay. */
+  covered?: number;
   /** In the second round: what is missing after someone did not pay. */
   gap?: number;
   /** When the stage ends. */
@@ -465,7 +483,7 @@ export interface TestingExtraState {
   basePot?: number;
   reminded?: boolean;
   /** Once done: the tests it got, what was paid and what went back. */
-  outcome?: { tiers: string[]; collected: number; refunded: number };
+  outcome?: { tiers: string[]; collected: number; refunded: number; covered?: number };
 }
 
 /** The extra round as the customer (or organiser) sees it. */
@@ -485,7 +503,23 @@ export interface TestingExtraView {
   outcome: TestingExtraState['outcome'] | null;
   /** Second round: what is missing, and what each would pay more depending on how many go on. */
   round: { gap: number; options: Array<{ count: number; amount: number }> } | null;
+  mode: 'cap' | 'all';
+  /** While paying (organisers): how many paid of those asked, and how much came in of what is needed. */
+  progress: { paid: number; of: number; collected: number; need: number; unpaid: string[] } | null;
+  /** Paying stays open until the organisers close it. */
+  open: boolean;
 }
+
+/** The organisers open the payment round by hand: its kind, and for `all`, how many tests it covers. */
+export const openExtraRequest = z.object({
+  hours: z.number().int().min(1).max(24 * 14).default(24),
+  mode: z.enum(['cap', 'all']).default('cap'),
+  tiers: z.number().int().min(1).max(20).default(1),
+});
+export type OpenExtraRequest = z.infer<typeof openExtraRequest>;
+
+/** Paying closed with shares unpaid: ask those who paid to cover it, cover it, or go on with what there is. */
+export const decideExtraRequest = z.object({ choice: z.enum(['round', 'cover', 'continue']) });
 
 /** Going on (paying the difference) or leaving, in the second round of the extra round. */
 /** Joining from outside: no order of the product here. */

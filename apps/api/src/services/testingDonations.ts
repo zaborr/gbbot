@@ -494,6 +494,12 @@ export async function closeDonationWindows(db: Database, env: Env, now = new Dat
         amount: formatMoney(given, row.currency),
       }),
     ).catch((error: unknown) => console.error('Donations notice failed:', error));
+    // Among everyone: the organisers choose the tests and open it.
+    if (fresh && fresh.extraEnabled && fresh.extraMode === 'all' && fresh.extra === null) {
+      await notifyShopTeam(db, env, shop, (lang) => tr(lang, 'testing.extraChoose', { shop: shop.name, product: what })).catch(
+        (error: unknown) => console.error('Extra round notice failed:', error),
+      );
+    }
   }
 }
 

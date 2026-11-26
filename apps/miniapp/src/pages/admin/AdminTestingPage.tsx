@@ -56,10 +56,6 @@ const newTier = (): TierDraft => ({
 
 const FEE_MODES: TestingFeeMode[] = ['mandatory', 'mandatory_non_vip', 'optional'];
 
-/** Hours typed for a stage: whole, from 1 to the most allowed. */
-const hoursField = (text: string): boolean =>
-  /^\d+$/.test(text.trim()) && Number(text) >= 1 && Number(text) <= MAX_DONATION_HOURS;
-
 /** Sign-up hours of the extra round: 0 (one time with the gifts) is fine. */
 const signupField = (text: string): boolean =>
   /^\d+$/.test(text.trim()) && Number(text) >= 0 && Number(text) <= MAX_DONATION_HOURS;
@@ -149,7 +145,8 @@ function TestingForm({
   const [extraMinText, setExtraMinText] = useState(testing && testing.extraMin > 0 ? toMajor(testing.extraMin) : '');
   // 0: one time for giving and setting caps; the extra round is shared out when it ends.
   const [signupHours, setSignupHours] = useState(String(testing?.extraSignupHours ?? 0));
-  const [payHours, setPayHours] = useState(String(testing?.extraPayHours ?? 48));
+  const [payHours] = useState(String(testing?.extraPayHours ?? 48));
+  const [extraMode, setExtraMode] = useState<'cap' | 'all'>(testing?.extraMode ?? 'cap');
   const [tiers, setTiers] = useState<TierDraft[]>(
     money
       ? money.tiers.map((tier) => ({
@@ -237,7 +234,7 @@ function TestingForm({
             ? t('testing.badDonationHours', { max: MAX_DONATION_HOURS })
             : !vialsOk
               ? t('testing.badVialsPerUnit')
-              : extraEnabled && (!signupField(signupHours) || !hoursField(payHours))
+              : extraEnabled && !signupField(signupHours)
                 ? t('testing.badExtraHours', { max: MAX_DONATION_HOURS })
                 : extraEnabled && cents(contribution) === 0 && extraMinCents === 0
                   ? t('testing.needExtraMin')
@@ -258,6 +255,7 @@ function TestingForm({
         extraMin: extraMinCents,
         extraSignupHours: Number(signupHours) || 0,
         extraPayHours: Number(payHours) || 48,
+        extraMode,
         allowExternal,
       };
       if (testing) {
@@ -342,6 +340,7 @@ function TestingForm({
           extraMin: 0,
           extraSignupHours: Number(signupHours) || 0,
           extraPayHours: 48,
+          extraMode,
           extra: testing?.extra ?? null,
           extraPre: testing?.extraPre ?? null,
           extraReportSentAt: testing?.extraReportSentAt ?? null,
@@ -692,6 +691,24 @@ function TestingForm({
           {t('testing.extraEnable')}
         </Cell>
         {extraEnabled && (
+          <>
+            <div className="gb-tabs" role="tablist" style={{ padding: '8px 16px' }}>
+              {(['cap', 'all'] as const).map((m) => (
+                <Button
+                  key={m}
+                  size="s"
+                  mode={extraMode === m ? 'filled' : 'bezeled'}
+                  disabled={!editable || Boolean(testing?.extra)}
+                  onClick={() => setExtraMode(m)}
+                >
+                  {t(m === 'cap' ? 'testing.extraModeCap' : 'testing.extraModeAll')}
+                </Button>
+              ))}
+            </div>
+            <Cell multiline>{t(extraMode === 'cap' ? 'testing.extraModeCapHelp' : 'testing.extraModeAllHelp')}</Cell>
+          </>
+        )}
+        {extraEnabled && extraMode === 'cap' && (
           <Input
             header={t('testing.extraMinField', { currency })}
             type="text"
@@ -703,33 +720,17 @@ function TestingForm({
             onChange={(e) => setExtraMinText(e.target.value)}
           />
         )}
-        {extraEnabled && (
-          <div className="gb-testing-tier-row">
-            <div style={{ flex: 1 }}>
-              <Input
-                header={t('testing.extraSignupHours')}
-                type="text"
-                inputMode="numeric"
-                placeholder="0"
-                status={signupField(signupHours) ? 'default' : 'error'}
-                value={signupHours}
-                disabled={!editable || Boolean(testing?.extra)}
-                onChange={(e) => setSignupHours(e.target.value)}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <Input
-                header={t('testing.extraPayHours')}
-                type="text"
-                inputMode="numeric"
-                placeholder="48"
-                status={hoursField(payHours) ? 'default' : 'error'}
-                value={payHours}
-                disabled={!editable || Boolean(testing?.extra)}
-                onChange={(e) => setPayHours(e.target.value)}
-              />
-            </div>
-          </div>
+        {extraEnabled && extraMode === 'cap' && (
+          <Input
+            header={t('testing.extraSignupHours')}
+            type="text"
+            inputMode="numeric"
+            placeholder="0"
+            status={signupField(signupHours) ? 'default' : 'error'}
+            value={signupHours}
+            disabled={!editable || Boolean(testing?.extra)}
+            onChange={(e) => setSignupHours(e.target.value)}
+          />
         )}
       </Section>
 
@@ -769,6 +770,7 @@ function TestingForm({
           {preview && <TestingCard testing={preview} preview />}
           {money && <PotSection testing={testing} steps={steps} />}
           {testing.next?.step === 'extra' && <OpenExtra testing={testing} onChange={onChange} />}
+          <PayingControls testing={testing} onChange={onChange} />
           {testing.extra && testing.next?.step !== 'extra' && <ExtraStatus testing={testing} />}
           {testing.extraPre && (
             <Section header={t('extra.title')} footer={t('testing.extraPreAdminFooter')}>
@@ -1401,38 +1403,142 @@ function CancelSection({ testing, onChange }: { testing: Testing; onChange: () =
 }
 
 /**
- * No test reached and the extra round never opened (or got nothing): what
- * happened, and opening it for a few hours. Closing or cancelling stay below.
+ * The payment round to open (it never opened, got nothing, or waits for the
+ * organisers to choose the tests): its kind, and what each would pay.
  */
 function OpenExtra({ testing, onChange }: { testing: Testing; onChange: () => void }): React.JSX.Element {
   const actions = useAdminActions(onChange);
+  const [mode, setMode] = useState<'cap' | 'all'>(testing.extraMode);
   const [hours, setHours] = useState(String(testing.extraSignupHours > 0 ? testing.extraSignupHours : 24));
+  const steps = (testing.money?.steps ?? []).filter((step) => step.missing > 0);
+  const [want, setWant] = useState(1);
+  const people = testing.money?.entries ?? 0;
   const n = Number(hours);
-  const bad = !Number.isInteger(n) || n < 1 || n > 24 * 14;
-  const missing = testing.money?.steps.find((step) => step.missing > 0)?.missing ?? 0;
+  const badHours = mode === 'cap' && (!Number.isInteger(n) || n < 1 || n > 24 * 14);
+  const fmt = (amount: number): string => formatPrice(amount, testing.currency);
+  const missing = steps[0]?.missing ?? 0;
   return (
-    <Section header={t('testing.openExtra.title')} footer={t('testing.openExtra.footer')}>
+    <Section
+      header={t('testing.openExtra.title')}
+      footer={t(mode === 'cap' ? 'testing.openExtra.footer' : 'testing.openExtra.footerAll')}
+    >
       <ErrorBanner message={actions.error} />
-      <Cell multiline>
-        {t(testing.extra ? 'testing.openExtra.gotNothing' : 'testing.openExtra.notStarted', {
-          missing: formatPrice(missing, testing.currency),
-        })}
-      </Cell>
-      <Input
-        header={t('testing.openExtra.hours')}
-        type="text"
-        inputMode="numeric"
-        status={bad ? 'error' : 'default'}
-        value={hours}
-        onChange={(e) => setHours(e.target.value)}
-      />
+      {testing.extra && (
+        <Cell multiline>{t('testing.openExtra.gotNothing', { missing: fmt(missing) })}</Cell>
+      )}
+      <div className="gb-tabs" role="tablist" style={{ padding: '8px 16px' }}>
+        {(['cap', 'all'] as const).map((m) => (
+          <Button key={m} size="s" mode={mode === m ? 'filled' : 'bezeled'} onClick={() => setMode(m)}>
+            {t(m === 'cap' ? 'testing.extraModeCap' : 'testing.extraModeAll')}
+          </Button>
+        ))}
+      </div>
+      {mode === 'cap' ? (
+        <Input
+          header={t('testing.openExtra.hours')}
+          type="text"
+          inputMode="numeric"
+          status={badHours ? 'error' : 'default'}
+          value={hours}
+          onChange={(e) => setHours(e.target.value)}
+        />
+      ) : (
+        steps.map((step, i) => (
+          <Cell
+            key={step.id}
+            Component="label"
+            multiline
+            before={<input type="radio" name="gb-extra-want" checked={want === i + 1} onChange={() => setWant(i + 1)} />}
+            after={
+              <span className="gb-testing-money">
+                {people > 0 ? t('testing.openExtra.each', { amount: fmt(Math.ceil(step.missing / people)) }) : '—'}
+              </span>
+            }
+            subtitle={t('testing.openExtra.upTo', { amount: fmt(step.missing), people })}
+          >
+            {steps
+              .slice(0, i + 1)
+              .map((s2) => testing.tiers.find((tier) => tier.id === s2.id)?.name ?? '')
+              .join(' + ')}
+          </Cell>
+        ))
+      )}
       <div style={{ padding: 16 }}>
         <Button
           stretched
-          disabled={bad}
-          onClick={() => void actions.twoTap('openExtra', () => api.adminOpenTestingExtra(testing.id, n))}
+          disabled={badHours || (mode === 'all' && (people === 0 || steps.length === 0))}
+          onClick={() =>
+            void actions.twoTap('openExtra', () =>
+              api.adminOpenTestingExtra(testing.id, { hours: mode === 'cap' ? n : 24, mode, tiers: want }),
+            )
+          }
         >
           {actions.tapLabel('openExtra', t(testing.extra ? 'testing.openExtra.again' : 'testing.openExtra.open'))}
+        </Button>
+      </div>
+    </Section>
+  );
+}
+
+/** Paying with no deadline: how it goes, reminding, closing; once closed with some unpaid, what follows. */
+function PayingControls({ testing, onChange }: { testing: Testing; onChange: () => void }): React.JSX.Element | null {
+  const actions = useAdminActions(onChange);
+  const [note, setNote] = useState<string | null>(null);
+  const extra = testing.extra;
+  if (!extra || !extra.progress) return null;
+  const p = extra.progress;
+  const fmt = (amount: number): string => formatPrice(amount, testing.currency);
+  if (extra.stage === 'decide') {
+    const gap = Math.max(p.need - p.collected, 0);
+    const choices = [
+      ['round', 'testing.decide.round'],
+      ['cover', 'testing.decide.cover'],
+      ['continue', 'testing.decide.continue'],
+    ] as const;
+    return (
+      <Section header={t('testing.decide.title')} footer={t('testing.decide.footer')}>
+        <ErrorBanner message={actions.error} />
+        <Cell multiline>
+          {t('testing.decide.what', { missing: fmt(gap), who: p.unpaid.join(', ') || '—' })}
+        </Cell>
+        {choices.map(([choice, label]) => (
+          <div key={choice} style={{ padding: '4px 16px' }}>
+            <Button
+              stretched
+              mode="bezeled"
+              onClick={() => void actions.twoTap(`decide-${choice}`, () => api.adminDecideExtra(testing.id, choice))}
+            >
+              {actions.tapLabel(`decide-${choice}`, t(label, { amount: fmt(gap) }))}
+            </Button>
+          </div>
+        ))}
+        <div style={{ height: 12 }} />
+      </Section>
+    );
+  }
+  if (extra.stage !== 'pay' || !extra.open) return null;
+  return (
+    <Section header={t('testing.paying.title')} footer={note ?? t('testing.paying.footer')}>
+      <ErrorBanner message={actions.error} />
+      <Cell multiline after={<span className="gb-testing-money">{`${fmt(p.collected)} / ${fmt(p.need)}`}</span>}>
+        {t('testing.paying.progress', { paid: p.paid, of: p.of })}
+      </Cell>
+      {p.unpaid.length > 0 && <Cell multiline subtitle={t('testing.paying.missing')}>{p.unpaid.join(', ')}</Cell>}
+      <div style={{ display: 'flex', gap: 8, padding: 16 }}>
+        <Button
+          stretched
+          mode="bezeled"
+          onClick={() =>
+            void actions.run(async () => {
+              const { sent } = await api.adminRemindExtra(testing.id);
+              setNote(t('testing.paying.reminded', { count: sent }));
+            })
+          }
+        >
+          {t('testing.paying.remind')}
+        </Button>
+        <Button stretched onClick={() => void actions.twoTap('closePay', () => api.adminCloseExtraPay(testing.id))}>
+          {actions.tapLabel('closePay', t('testing.paying.close'))}
         </Button>
       </div>
     </Section>
@@ -1447,7 +1553,10 @@ function ExtraStatus({ testing }: { testing: Testing }): React.JSX.Element | nul
   const until = formatDateTime(extra.until);
   return (
     <Section header={t('testing.extraStatusTitle')}>
-      <Cell multiline subtitle={extra.stage === 'done' ? undefined : t('testing.extraUntil', { date: until })}>
+      <Cell
+        multiline
+        subtitle={extra.stage === 'done' || extra.stage === 'decide' || extra.open ? undefined : t('testing.extraUntil', { date: until })}
+      >
         {extra.stage === 'done' && !extra.outcome?.tiers.length
           ? t('testing.extraStage.doneNothing')
           : t(`testing.extraStage.${extra.stage}`)}

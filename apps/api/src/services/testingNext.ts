@@ -52,7 +52,14 @@ export function nextOf(
       return { ...base, phase: 'drawing', step: 'wait_block' };
     case 'closed': {
       if (!shop.closedAt) return { ...base, phase: 'open', step: 'wait_gb', until: shop.closesAt?.toISOString() ?? null };
+      if (row.extra?.stage === 'decide') return { ...base, phase: 'extra', step: 'extra_decide', action: true };
+      // Paying with no deadline: the organisers close it when it is time.
+      if (row.extra?.stage === 'pay' && row.extra.open) return { ...base, phase: 'extra', step: 'close_pay', action: false };
       if (extraGoing(row)) return { ...base, phase: 'extra', step: 'wait_extra', until: row.extra?.until ?? null };
+      // Among everyone, it waits for the organisers to choose the tests.
+      if (row.extraMode === 'all' && extraCanOpen(row) && row.extra === null && !view.tiers.every((tier) => tier.reached)) {
+        return { ...base, phase: 'extra', step: 'extra', action: true };
+      }
       if (donationsOpen(row, now)) {
         return { ...base, phase: 'window', step: 'wait_window', until: row.donationsUntil?.toISOString() ?? null };
       }

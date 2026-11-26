@@ -199,9 +199,11 @@ export function ExtraSection({
             <Cell
               multiline
               subtitle={
-                extra.stage === 'done'
+                extra.stage === 'done' || extra.stage === 'decide'
                   ? undefined
-                  : early
+                  : extra.stage === 'pay' && extra.open
+                    ? undefined
+                    : early
                     ? t('extra.preUntil', { date: formatDateTime(extra.until) })
                     : t('extra.until', { date: formatDateTime(extra.until) })
               }
@@ -279,7 +281,10 @@ export function ExtraSection({
             {extra.stage === 'pay' && mine && (
               <Cell multiline>
                 {mine.state === 'in'
-                  ? t('extra.toPay', { amount: fmt(mine.share), tiers: extra.estimate.tiers.join(', ') })
+                  ? t(extra.open ? 'extra.toPayOpen' : 'extra.toPay', {
+                      amount: fmt(mine.share),
+                      tiers: extra.estimate.tiers.join(', '),
+                    })
                   : t('extra.out')}
               </Cell>
             )}

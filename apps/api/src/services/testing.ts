@@ -407,6 +407,7 @@ function toTestingDTO(
     extraMin: row.extraMin,
     extraSignupHours: row.extraSignupHours,
     extraPayHours: row.extraPayHours,
+    extraMode: row.extraMode,
     extra: null,
     extraPre: null,
     invites: admin ? row.invites : [],
@@ -843,6 +844,7 @@ export async function insertTesting(
       extraMin: input.extraMin,
       extraSignupHours: input.extraSignupHours,
       extraPayHours: input.extraPayHours,
+      extraMode: input.extraMode,
       allowExternal: input.allowExternal,
       extraProductId: extraProduct?.id ?? null,
       donationProductId: donation?.id ?? null,
@@ -914,6 +916,7 @@ export async function updateTesting(
             extraMin: input.extraMin,
             extraSignupHours: input.extraSignupHours,
             extraPayHours: input.extraPayHours,
+            extraMode: input.extraMode,
           }),
       updatedAt: new Date(),
     })
