@@ -3,6 +3,7 @@
  *
  *   docker compose exec api node dist/cli.js web-admin add <username>
  *   docker compose exec api node dist/cli.js web-admin reset <username>
+ *   docker compose exec api node dist/cli.js web-admin link <username> <telegram id>
  *   docker compose exec api node dist/cli.js web-admin remove <username>
  *   docker compose exec api node dist/cli.js web-admin list
  *
@@ -10,6 +11,7 @@
  */
 import { createDb, createPool } from './db/client.js';
 import {
+  createLinkedWebAdmin,
   createWebAdmin,
   listWebAdmins,
   removeWebAdmin,
@@ -20,6 +22,8 @@ import {
 const USAGE = `Usage:
   node dist/cli.js web-admin add <username>     new web admin
   node dist/cli.js web-admin reset <username>   new password and authenticator (ends its sessions)
+  node dist/cli.js web-admin link <username> <telegram id>
+                                                web account of a Telegram user, with their permissions
   node dist/cli.js web-admin remove <username>  delete it
   node dist/cli.js web-admin list               who exists`;
 
@@ -41,7 +45,7 @@ They are shown only now: write them down somewhere safe.`);
 }
 
 async function main(): Promise<number> {
-  const [group, action, name] = process.argv.slice(2);
+  const [group, action, name, extra] = process.argv.slice(2);
   if (group !== 'web-admin' || !action) {
     console.log(USAGE);
     return 1;
@@ -54,6 +58,12 @@ async function main(): Promise<number> {
         if (!name) break;
         show(await createWebAdmin(db, name));
         return 0;
+      case 'link': {
+        const telegramId = Number(extra);
+        if (!name || !Number.isSafeInteger(telegramId) || telegramId <= 0) break;
+        show(await createLinkedWebAdmin(db, name, telegramId));
+        return 0;
+      }
       case 'reset':
         if (!name) break;
         show(await resetWebAdmin(db, name));

@@ -231,10 +231,10 @@ export class ApiClient {
     return this.request<WebAccountView[]>('/web-accounts');
   }
 
-  createWebAccount(username: string, role: WebRole): Promise<WebCredentials> {
+  createWebAccount(username: string, role: WebRole, telegramId?: number): Promise<WebCredentials> {
     return this.request<WebCredentials>('/web-accounts', {
       method: 'POST',
-      body: JSON.stringify({ username, role }),
+      body: JSON.stringify({ username, role, telegramId }),
     });
   }
 

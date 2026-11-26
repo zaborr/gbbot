@@ -45,6 +45,8 @@ function Accounts(): React.JSX.Element {
   const accounts = useAsync(() => api.webAccounts(), [reloadKey]);
   const [username, setUsername] = useState('');
   const [role, setRole] = useState<WebRole>('platform_limited');
+  const [telegramId, setTelegramId] = useState('');
+  const linkedId = /^\d{1,15}$/.test(telegramId.trim()) ? Number(telegramId.trim()) : undefined;
   const [creds, setCreds] = useState<WebCredentials | null>(null);
   const [busy, setBusy] = useState(false);
   const actions = useAdminActions(() => setReloadKey((k) => k + 1));
@@ -89,16 +91,25 @@ function Accounts(): React.JSX.Element {
             onChange={(e) => setUsername(e.target.value.toLowerCase())}
           />
           <RolePicker value={role} onChange={setRole} />
+          {role === 'linked' && (
+            <Input
+              header={t('webAccounts.telegramId')}
+              value={telegramId}
+              inputMode="numeric"
+              onChange={(e) => setTelegramId(e.target.value.replace(/\D/g, ''))}
+            />
+          )}
           <Button
             stretched
             loading={busy}
-            disabled={username.trim().length < 3}
+            disabled={username.trim().length < 3 || (role === 'linked' && linkedId === undefined)}
             onClick={() => {
               setBusy(true);
               void actions
                 .run(async () => {
-                  setCreds(await api.createWebAccount(username, role));
+                  setCreds(await api.createWebAccount(username, role, role === 'linked' ? linkedId : undefined));
                   setUsername('');
+                  setTelegramId('');
                 })
                 .finally(() => setBusy(false));
             }}
@@ -120,7 +131,7 @@ function RolePicker({
 }): React.JSX.Element {
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-      {(['platform', 'platform_limited'] as const).map((role) => (
+      {(['platform', 'platform_limited', 'linked'] as const).map((role) => (
         <Button
           key={role}
           size="s"

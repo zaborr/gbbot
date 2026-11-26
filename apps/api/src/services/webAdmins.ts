@@ -2,7 +2,7 @@ import { createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'no
 import { promisify } from 'node:util';
 import { asc, eq, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
-import { webAdmins } from '../db/schema.js';
+import { users, webAdmins } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 import type { SessionClaims } from '../auth/jwt.js';
 import type { WebRole } from '@tma-shop/shared';
@@ -147,6 +147,26 @@ export async function createWebAdmin(
     totpSecret,
   });
   return { username, password, totpSecret, otpauth: otpauthUri(username, totpSecret) };
+}
+
+/**
+ * A web account with the permissions of a Telegram user, made by a platform
+ * admin (the user cannot activate it in Telegram, e.g. the bot is down). One
+ * per user; someone who never opened the bot is added as a user.
+ */
+export async function createLinkedWebAdmin(
+  db: Database,
+  rawUsername: string,
+  telegramId: number,
+): Promise<NewCredentials> {
+  if (await webAccountOf(db, telegramId)) {
+    throw ApiError.conflict('web_access_exists', 'That Telegram user already has a web account');
+  }
+  await db
+    .insert(users)
+    .values({ telegramId, firstName: String(telegramId), username: null })
+    .onConflictDoNothing();
+  return createWebAdmin(db, rawUsername, { role: 'linked', telegramId });
 }
 
 /** New password and authenticator secret; every open session is closed. */

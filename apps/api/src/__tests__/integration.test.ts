@@ -774,6 +774,31 @@ describeDb('API integration', () => {
     expect((await app.request('/api/platform/shops', { headers: limitedAuth })).status).toBe(200);
     expect((await app.request('/api/web-accounts', { headers: limitedAuth })).status).toBe(403);
 
+    // A linked account made here by Telegram ID (they cannot activate it in Telegram),
+    // even for someone who never opened the bot: it acts as that Telegram user.
+    const linkedRes = await app.request('/api/web-accounts', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ username: `lnk${stamp}`, role: 'linked', telegramId: 555010020 }),
+    });
+    expect(linkedRes.status).toBe(201);
+    const linked = (await linkedRes.json()) as { username: string; password: string; totpSecret: string };
+    const { body: linkedBody } = await webSignIn(linked);
+    expect((linkedBody as unknown as { user: { telegramId: number } }).user.telegramId).toBe(555010020);
+    const twice = await app.request('/api/web-accounts', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ username: `lnk2${stamp}`, role: 'linked', telegramId: 555010020 }),
+    });
+    expect(twice.status).toBe(409);
+    const noId = await app.request('/api/web-accounts', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ username: `lnk3${stamp}`, role: 'linked' }),
+    });
+    expect(noId.status).toBe(400);
+    await removeWebAdmin(db, linked.username);
+
     // The last full account can be neither removed nor downgraded.
     expect((await app.request(`/api/web-accounts/${fullId}`, { method: 'DELETE', headers: auth })).status).toBe(409);
     const downgrade = await app.request(`/api/web-accounts/${fullId}/role`, {

@@ -65,10 +65,18 @@ export type WebAccountView = z.infer<typeof webAccountView>;
 
 /** Platform accounts are created in the panel (linked ones from Telegram). */
 export const platformWebRole = z.enum(['platform', 'platform_limited']);
-export const createWebAccountRequest = z.object({
-  username: z.string().trim().min(3).max(32),
-  role: platformWebRole,
-});
+// `linked`: tied to a Telegram user (by ID), with that user's permissions; for
+// when they cannot activate it themselves in Telegram (the bot is down).
+export const createWebAccountRequest = z
+  .object({
+    username: z.string().trim().min(3).max(32),
+    role: z.enum(['platform', 'platform_limited', 'linked']),
+    telegramId: z.number().int().positive().optional(),
+  })
+  .refine((r) => r.role !== 'linked' || r.telegramId !== undefined, {
+    message: 'A linked account needs a Telegram ID',
+    path: ['telegramId'],
+  });
 export const setWebRoleRequest = z.object({ role: platformWebRole });
 
 export const changeWebPasswordRequest = z.object({
