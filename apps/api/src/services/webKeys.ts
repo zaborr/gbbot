@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { and, desc, eq, gt, isNull, lt } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, isNull, lt } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { customerNotices, platformSettings, users, webKeys } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
@@ -132,14 +132,24 @@ export async function signInWithKey(
 }
 
 /** A customer's web inbox, newest first. */
-export async function noticesOf(db: Database, userId: number): Promise<Array<{ id: string; text: string; at: string }>> {
+export async function noticesOf(
+  db: Database,
+  userId: number,
+  keyId?: string,
+): Promise<Array<{ id: string; text: string; at: string }>> {
   await db
     .delete(customerNotices)
     .where(and(eq(customerNotices.userId, userId), lt(customerNotices.createdAt, new Date(Date.now() - NOTICE_DAYS * 24 * 3600_000))));
+  // With a key: only what came while that key existed (whoever gave it does not
+  // read what the person got before).
+  const since = keyId
+    ? (await db.query.webKeys.findFirst({ where: eq(webKeys.id, keyId), columns: { createdAt: true } }))?.createdAt
+    : undefined;
+  if (keyId && !since) return [];
   const rows = await db
     .select()
     .from(customerNotices)
-    .where(eq(customerNotices.userId, userId))
+    .where(and(eq(customerNotices.userId, userId), since ? gte(customerNotices.createdAt, since) : undefined))
     .orderBy(desc(customerNotices.createdAt))
     .limit(NOTICES_SHOWN);
   return rows.map((r) => ({ id: r.id, text: r.text, at: r.createdAt.toISOString() }));

@@ -317,6 +317,7 @@ const en = {
   'order.createdForYouShip': '🛒 {shop}: the organisers made an order for you (#{ref}). Open it to check it, add your delivery address and pay it.',
   'order.createdForYouPaid': '🛒 {shop}: the organisers made an order for you (#{ref}), already paid.',
   'order.viewButton': '🛒 View order',
+  'web.keyGiven': '🔑 {who} gave web access (a key) to {whom} in {shop}.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -626,6 +627,7 @@ const es: Record<BotMessageKey, string> = {
   'order.createdForYouShip': '🛒 {shop}: los organizadores te han creado un pedido (#{ref}). Ábrelo para revisarlo, añadir tu dirección de envío y pagarlo.',
   'order.createdForYouPaid': '🛒 {shop}: los organizadores te han creado un pedido (#{ref}), ya pagado.',
   'order.viewButton': '🛒 Ver pedido',
+  'web.keyGiven': '🔑 {who} ha dado acceso web (clave) a {whom} en {shop}.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -933,6 +935,7 @@ const it: Record<BotMessageKey, string> = {
   'order.createdForYouShip': '🛒 {shop}: gli organizzatori ti hanno creato un ordine (#{ref}). Aprilo per controllarlo, aggiungere l\'indirizzo di spedizione e pagarlo.',
   'order.createdForYouPaid': '🛒 {shop}: gli organizzatori ti hanno creato un ordine (#{ref}), già pagato.',
   'order.viewButton': '🛒 Vedi ordine',
+  'web.keyGiven': '🔑 {who} ha dato l\'accesso web (chiave) a {whom} in {shop}.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -1240,6 +1243,7 @@ const pt: Record<BotMessageKey, string> = {
   'order.createdForYouShip': '🛒 {shop}: os organizadores criaram-lhe um pedido (#{ref}). Abra-o para o rever, adicionar a morada de envio e pagar.',
   'order.createdForYouPaid': '🛒 {shop}: os organizadores criaram-lhe um pedido (#{ref}), já pago.',
   'order.viewButton': '🛒 Ver pedido',
+  'web.keyGiven': '🔑 {who} deu acesso web (chave) a {whom} em {shop}.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };
