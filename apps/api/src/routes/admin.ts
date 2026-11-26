@@ -797,10 +797,15 @@ export function adminRoutes(): Hono<AppBindings> {
     // On record: who gave whom a key, where.
     const [who, whom] = await Promise.all([describeUser(db, sub), describeUser(db, userId)]);
     await notifyPlatform(db, env, (lang) => tr(lang, 'web.keyGiven', { who, whom, shop: shop.name }), shop.id);
-    const base = (c.get('env').PUBLIC_URL ?? new URL(c.req.url).origin).replace(/\/+$/, '');
-    // The same GB on the customer-only domains, in case the first does not open.
-    const more = (c.get('env').WEB_DOMAINS ?? []).map((d) => `https://${d}/s/${shop.slug}`);
-    return c.json({ ...given, url: `${base}/s/${shop.slug}`, more }, 201);
+    const keyEnv = c.get('env');
+    const base = (keyEnv.PUBLIC_URL ?? new URL(c.req.url).origin).replace(/\/+$/, '');
+    // The main domain, then the customer-only ones (in case the first does not
+    // open); WEB_KEY_MAIN_LINK=false leaves the main domain out of the message.
+    const links = [
+      ...(keyEnv.WEB_KEY_MAIN_LINK === false && (keyEnv.WEB_DOMAINS ?? []).length > 0 ? [] : [base]),
+      ...(keyEnv.WEB_DOMAINS ?? []).map((d) => `https://${d}`),
+    ].map((origin) => `${origin}/s/${shop.slug}`);
+    return c.json({ ...given, url: links[0]!, more: links.slice(1) }, 201);
     },
   );
   app.delete('/web-keys/:userId', zValidator('param', z.object({ userId: z.coerce.number().int() })), async (c) => {
