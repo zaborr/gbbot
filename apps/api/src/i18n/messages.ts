@@ -307,6 +307,12 @@ const en = {
   'label.thanks': '✅ Got it: label of order #{ref} sent to the organisers.',
   'label.whichOrder': 'You have several orders waiting for a label: reply to the bot\'s message of the right order with the file, or upload it in that order.',
   'label.badFile': '⚠️ That file could not be kept: send a PDF or a photo of up to 10 MB.',
+  'testing.extraPayOpen': '🧪 {shop}: the payment round of {product} covers {tiers}. Your share: {amount}.\n\n⚠️ Pay it as soon as you can from your order: the organisers will close paying at any moment, and whoever has not paid by then is left without those results.',
+  'testing.extraRemindOpen': '⏰ {shop}: {paid} of {of} have already paid the payment round of {product}. You are missing: {amount}, from your order. Paying may close at any moment.',
+  'testing.extraDecide': '🧪 {shop}: paying of {product} is closed and {gap} is missing (someone did not pay). Choose in the app what follows: those who paid cover it, you cover it, or go on with what there is.',
+  'testing.extraChoose': '🧪 {shop}: the time to join the testing of {product} is over. If tests are missing, choose which and open the payment round among everyone, from the app.',
+  'testing.digest.closePay': 'paying the payment round: close it when it is time',
+  'testing.digest.extraDecide': 'someone did not pay: choose what follows',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -606,6 +612,12 @@ const es: Record<BotMessageKey, string> = {
   'label.thanks': '✅ Recibida: la etiqueta del pedido #{ref} ya está con los organizadores.',
   'label.whichOrder': 'Tienes varios pedidos esperando etiqueta: responde con el archivo al mensaje del bot del pedido que toca, o súbela en ese pedido.',
   'label.badFile': '⚠️ No se ha podido guardar ese archivo: manda un PDF o una foto de hasta 10 MB.',
+  'testing.extraPayOpen': '🧪 {shop}: la fase de pago de {product} cubre {tiers}. Tu parte: {amount}.\n\n⚠️ Págala cuanto antes desde tu pedido: los organizadores cerrarán el pago en cualquier momento, y quien no haya pagado entonces se queda sin esos resultados.',
+  'testing.extraRemindOpen': '⏰ {shop}: ya han pagado {paid} de {of} la fase de pago de {product}. Faltas tú: {amount}, desde tu pedido. El pago puede cerrarse en cualquier momento.',
+  'testing.extraDecide': '🧪 {shop}: el pago de {product} está cerrado y faltan {gap} (alguien no ha pagado). Elige en la app qué hacer: que lo cubran los que han pagado, cubrirlo vosotros o seguir con lo que hay.',
+  'testing.extraChoose': '🧪 {shop}: ha terminado el plazo para unirse al testing de {product}. Si faltan tramos, elige cuáles y abre la fase de pago entre todos desde la app.',
+  'testing.digest.closePay': 'pagando la fase de pago: ciérrala cuando toque',
+  'testing.digest.extraDecide': 'alguien no ha pagado: elige qué hacer',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -903,6 +915,12 @@ const it: Record<BotMessageKey, string> = {
   'label.thanks': '✅ Ricevuta: l\'etichetta dell\'ordine #{ref} è arrivata agli organizzatori.',
   'label.whichOrder': 'Hai diversi ordini in attesa di etichetta: rispondi con il file al messaggio del bot dell\'ordine giusto, oppure caricala in quell\'ordine.',
   'label.badFile': '⚠️ Impossibile salvare quel file: invia un PDF o una foto fino a 10 MB.',
+  'testing.extraPayOpen': '🧪 {shop}: la fase di pagamento di {product} copre {tiers}. La tua parte: {amount}.\n\n⚠️ Pagala il prima possibile dal tuo ordine: gli organizzatori chiuderanno il pagamento in qualsiasi momento, e chi non ha pagato resta senza quei risultati.',
+  'testing.extraRemindOpen': '⏰ {shop}: {paid} su {of} hanno già pagato la fase di pagamento di {product}. Manchi tu: {amount}, dal tuo ordine. Il pagamento può chiudersi in qualsiasi momento.',
+  'testing.extraDecide': '🧪 {shop}: il pagamento di {product} è chiuso e mancano {gap} (qualcuno non ha pagato). Scegli nell\'app cosa fare: lo coprono quelli che hanno pagato, lo coprite voi o si va avanti con quello che c\'è.',
+  'testing.extraChoose': '🧪 {shop}: è finito il termine per unirsi al testing di {product}. Se mancano livelli, scegli quali e apri la fase di pagamento tra tutti dall\'app.',
+  'testing.digest.closePay': 'pagamento in corso: chiudilo quando è il momento',
+  'testing.digest.extraDecide': 'qualcuno non ha pagato: scegli cosa fare',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -1200,6 +1218,12 @@ const pt: Record<BotMessageKey, string> = {
   'label.thanks': '✅ Recebida: a etiqueta do pedido #{ref} já está com os organizadores.',
   'label.whichOrder': 'Tem vários pedidos à espera de etiqueta: responda com o ficheiro à mensagem do bot do pedido certo, ou carregue-a nesse pedido.',
   'label.badFile': '⚠️ Não foi possível guardar esse ficheiro: envie um PDF ou uma foto até 10 MB.',
+  'testing.extraPayOpen': '🧪 {shop}: a fase de pagamento de {product} cobre {tiers}. A sua parte: {amount}.\n\n⚠️ Pague-a quanto antes no seu pedido: os organizadores vão fechar o pagamento a qualquer momento, e quem não tiver pago fica sem esses resultados.',
+  'testing.extraRemindOpen': '⏰ {shop}: já pagaram {paid} de {of} a fase de pagamento de {product}. Falta você: {amount}, no seu pedido. O pagamento pode fechar a qualquer momento.',
+  'testing.extraDecide': '🧪 {shop}: o pagamento de {product} está fechado e faltam {gap} (alguém não pagou). Escolha na app o que fazer: cobrem-no os que pagaram, cobrem-no vocês ou segue-se com o que há.',
+  'testing.extraChoose': '🧪 {shop}: acabou o prazo para entrar no testing de {product}. Se faltam níveis, escolha quais e abra a fase de pagamento entre todos na app.',
+  'testing.digest.closePay': 'a pagar a fase de pagamento: feche-a quando for altura',
+  'testing.digest.extraDecide': 'alguém não pagou: escolha o que fazer',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

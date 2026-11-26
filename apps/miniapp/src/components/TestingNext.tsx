@@ -18,6 +18,10 @@ export function nextText(next: TestingNext): string | null {
       return tn(next.unpaid, 'testing.next.unpaid.one', 'testing.next.unpaid.other');
     case 'extra':
       return t('testing.next.extra');
+    case 'close_pay':
+      return t('testing.next.closePay');
+    case 'extra_decide':
+      return t('testing.next.extraDecide');
     case 'draw':
       return t('testing.next.draw');
     case 'wait_block':

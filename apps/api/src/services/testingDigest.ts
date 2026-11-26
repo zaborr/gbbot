@@ -13,6 +13,8 @@ function stepText(lang: Lang, next: TestingNext): string {
   const keys: Partial<Record<NonNullable<TestingNext['step']>, BotMessageKey>> = {
     unpaid: 'testing.digest.unpaid',
     extra: 'testing.digest.extra',
+    close_pay: 'testing.digest.closePay',
+    extra_decide: 'testing.digest.extraDecide',
     draw: 'testing.digest.draw',
     vials: 'testing.digest.vials',
     report: 'testing.digest.report',

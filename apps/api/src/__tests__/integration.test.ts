@@ -2298,7 +2298,12 @@ describeDb('API integration', () => {
       for (const who of [a, b]) {
         await request(`/api/admin/orders/${who.orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
       }
+      // No deadline: time alone does not close paying; the organisers do.
       await advanceExtras(db, testEnv, new Date(t0 + 80 * 3600_000));
+      const [still] = await db.select().from(testings).where(eq(testings.id, testingId));
+      expect(still?.extra).toMatchObject({ stage: 'pay', open: true });
+      const closed = await request(`/api/admin/testings/${testingId}/extra/close`, { method: 'POST', headers: admin });
+      expect(closed.status).toBe(200);
       const [done] = await db.select().from(testings).where(eq(testings.id, testingId));
       expect(done?.extra).toMatchObject({ stage: 'done', outcome: { tiers: ['endo'], collected: 4000, refunded: 0 } });
       const status = await request(`/api/admin/testings/${testingId}/draw`, { headers: admin });
@@ -2509,8 +2514,16 @@ describeDb('API integration', () => {
       for (const who of [a, b]) {
         await request(`/api/admin/orders/${who.orderId}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ status: 'paid' }) });
       }
-      // Cid does not pay: 13.33 is missing, and the two who paid are asked.
-      await advanceExtras(db, testEnv, new Date(t0 + 80 * 3600_000));
+      // Cid does not pay: closing leaves 13.33 missing, and the organisers choose that those who paid are asked.
+      await request(`/api/admin/testings/${testingId}/extra/close`, { method: 'POST', headers: admin });
+      const [deciding] = await db.select().from(testings).where(eq(testings.id, testingId));
+      expect(deciding?.extra).toMatchObject({ stage: 'decide', gap: 1333 });
+      const decided = await request(`/api/admin/testings/${testingId}/extra/decide`, {
+        method: 'POST',
+        headers: admin,
+        body: JSON.stringify({ choice: 'round' }),
+      });
+      expect(decided.status).toBe(200);
       const [round] = await db.select().from(testings).where(eq(testings.id, testingId));
       expect(round?.extra).toMatchObject({ stage: 'round', gap: 1333 });
       const seen = ((await (await request(`/api/products/${tested}/testings`, { headers: a.headers })).json()) as Array<{

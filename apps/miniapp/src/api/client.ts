@@ -796,10 +796,25 @@ export class ApiClient {
     });
   }
 
-  adminOpenTestingExtra(id: string, hours: number): Promise<{ ok: boolean }> {
+  adminOpenTestingExtra(id: string, input: { hours: number; mode: 'cap' | 'all'; tiers: number }): Promise<{ ok: boolean }> {
     return this.request<{ ok: boolean }>(`/admin/testings/${id}/extra`, {
       method: 'POST',
-      body: JSON.stringify({ hours }),
+      body: JSON.stringify(input),
+    });
+  }
+
+  adminRemindExtra(id: string): Promise<{ sent: number }> {
+    return this.request<{ sent: number }>(`/admin/testings/${id}/extra/remind`, { method: 'POST' });
+  }
+
+  adminCloseExtraPay(id: string): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/testings/${id}/extra/close`, { method: 'POST' });
+  }
+
+  adminDecideExtra(id: string, choice: 'round' | 'cover' | 'continue'): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/testings/${id}/extra/decide`, {
+      method: 'POST',
+      body: JSON.stringify({ choice }),
     });
   }
 

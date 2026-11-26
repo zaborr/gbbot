@@ -135,6 +135,7 @@ export async function takeSnapshot(db: Database, shop: ShopRow): Promise<GbSnaps
       extraMin: t.extraMin,
       extraSignupHours: t.extraSignupHours,
       extraPayHours: t.extraPayHours,
+      extraMode: t.extraMode,
       allowExternal: t.allowExternal,
     })),
   };

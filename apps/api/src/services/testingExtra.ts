@@ -3,6 +3,7 @@ import {
   shareOut,
   tierSteps,
   type Lang,
+  type OpenExtraRequest,
   type Order,
   type TestingExtraState,
   type TestingExtraView,
@@ -33,6 +34,8 @@ type Member = typeof testingExtraMembers.$inferSelect;
 
 const formatMoney = (amount: number, currency: string): string => `${(amount / 100).toFixed(2)} ${currency}`;
 const hours = (n: number): number => n * 3600_000;
+/** Among everyone: nobody has a cap. */
+const NO_CAP = 2_000_000_000;
 
 /**
  * Signing up early: the extra round is on but not started, and the testing
@@ -102,8 +105,13 @@ async function ensureExtraProduct(db: Database, row: TestingRow): Promise<Testin
  * The organisers open the extra round by hand (it never started, or it got
  * nothing): a new time of `hours` to set caps, for everyone in the testing.
  */
-export async function openExtra(db: Database, env: Env, shopId: string, id: string, hours: number): Promise<void> {
-  if (!Number.isInteger(hours) || hours < 1 || hours > 24 * 14) throw ApiError.badRequest('bad_hours', 'Hours out of range');
+export async function openExtra(
+  db: Database,
+  env: Env,
+  shopId: string,
+  id: string,
+  input: OpenExtraRequest,
+): Promise<void> {
   const row = await db.query.testings.findFirst({ where: and(eq(testings.shopId, shopId), eq(testings.id, id)) });
   if (!row) throw ApiError.notFound('Testing not found');
   if (!extraCanOpen(row)) throw ApiError.conflict('extra_not_openable', 'The extra round cannot be opened now');
@@ -119,7 +127,7 @@ export async function openExtra(db: Database, env: Env, shopId: string, id: stri
     if (!reset) throw ApiError.conflict('extra_not_openable', 'The extra round cannot be opened now');
     fresh = reset;
   }
-  if (!(await startExtra(db, env, fresh, new Date(), hours))) {
+  if (!(await startExtra(db, env, fresh, new Date(), input.hours, { mode: input.mode, want: input.tiers }))) {
     throw ApiError.conflict('extra_nothing_missing', 'No test is missing: there is nothing to pay for');
   }
 }
@@ -131,10 +139,15 @@ export async function startExtra(
   current: TestingRow,
   now = new Date(),
   signupHours = current.extraSignupHours,
+  /** Opened by hand: its kind (and, among everyone, how many tests). Else the testing's own kind. */
+  opened?: { mode: 'cap' | 'all'; want: number },
 ): Promise<boolean> {
   if (current.extra) return false;
+  const mode = opened?.mode ?? current.extraMode;
+  // Among everyone, the organisers choose how many tests: it waits for them to open it.
+  if (mode === 'all' && !opened) return false;
   const row = current.extraEnabled ? await ensureExtraProduct(db, current) : current;
-  const early = await earlyMembers(db, row);
+  const early = mode === 'all' ? [] : await earlyMembers(db, row);
   const missing = row.extraEnabled && row.extraProductId ? await missingSteps(db, row) : [];
   if (missing.length === 0) {
     // Signed up early, but no extra round after all (covered, or turned off): nothing to pay.
@@ -156,11 +169,28 @@ export async function startExtra(
     }
     return false;
   }
+  if (mode === 'all') {
+    // Everyone in the testing is in, with no cap: shared out right away.
+    await db.delete(testingExtraMembers).where(eq(testingExtraMembers.testingId, row.id));
+    const entries = await db
+      .selectDistinct({ orderId: testingEntries.orderId, userId: testingEntries.userId })
+      .from(testingEntries)
+      .innerJoin(orders, eq(testingEntries.orderId, orders.id))
+      .where(and(eq(testingEntries.testingId, row.id), ne(orders.status, 'cancelled')));
+    const seen = new Set<string>();
+    const values = entries
+      .filter((e) => (seen.has(e.orderId) ? false : (seen.add(e.orderId), true)))
+      .map((e) => ({ testingId: row.id, orderId: e.orderId, userId: e.userId, cap: NO_CAP, state: 'signed' as const }));
+    if (values.length === 0) return false;
+    await db.insert(testingExtraMembers).values(values);
+  }
   const state: TestingExtraState = {
     stage: 'signup',
-    until: new Date(now.getTime() + hours(Math.max(signupHours, 0))).toISOString(),
+    until: new Date(now.getTime() + hours(Math.max(mode === 'all' ? 0 : signupHours, 0))).toISOString(),
     target: [],
     share: 0,
+    mode,
+    ...(mode === 'all' ? { want: Math.max(1, Math.min(opened?.want ?? 1, missing.length)) } : {}),
   };
   const [started] = await db
     .update(testings)
@@ -170,8 +200,8 @@ export async function startExtra(
   if (!started) return false;
   const shop = await db.query.shops.findFirst({ where: (s, { eq: same }) => same(s.id, row.shopId) });
   if (!shop) return true;
-  // One time for giving and setting caps: it is shared out now among those who set one.
-  if (signupHours === 0) {
+  // One time for giving and setting caps (or among everyone): it is shared out now.
+  if (signupHours === 0 || mode === 'all') {
     await shareOutExtra(db, env, shop, started, now);
     return true;
   }
@@ -367,19 +397,68 @@ export async function extraViews(
             }
           : null,
       outcome: extra.outcome ?? null,
+      mode: extra.mode ?? row.extraMode,
+      open: Boolean(extra.open),
+      progress: await progressOf(db, row, own, userId === undefined),
     });
   }
   return result;
+}
+
+/** While paying (or deciding): who paid of those asked, and what came in of what is needed. */
+async function progressOf(
+  db: Database,
+  row: TestingRow,
+  own: Member[],
+  organisers: boolean,
+): Promise<TestingExtraView['progress']> {
+  const stage = row.extra?.stage;
+  if ((stage !== 'pay' && stage !== 'decide') || !row.extraProductId) return null;
+  const asked = own.filter((m) => m.state === 'in' || m.state === 'paid' || m.state === 'failed');
+  const lines = await linesOf(
+    db,
+    row.extraProductId,
+    asked.map((m) => m.orderId),
+  );
+  const unpaidOrders = new Set(lines.filter((l) => l.donationUnpaid > 0).map((l) => l.orderId));
+  const failed = asked.filter((m) => m.state === 'failed' || unpaidOrders.has(m.orderId));
+  const { need, collected } = await targetNeed(db, row);
+  let unpaid: string[] = [];
+  if (organisers && failed.length > 0) {
+    const rows = await db
+      .select({ id: orders.id, contact: orders.contactUsername })
+      .from(orders)
+      .where(
+        inArray(
+          orders.id,
+          failed.map((m) => m.orderId),
+        ),
+      );
+    unpaid = rows.map((r) => (r.contact ? `@${r.contact}` : `#${r.id.slice(0, 8)}`));
+  }
+  return { paid: asked.length - failed.length, of: asked.length, collected, need, unpaid };
 }
 
 /** Sign-up is over: the shares are worked out and added to the orders of those in. */
 async function shareOutExtra(db: Database, env: Env, shop: ShopRow, row: TestingRow, now: Date): Promise<void> {
   const members = await db.select().from(testingExtraMembers).where(eq(testingExtraMembers.testingId, row.id));
   const missing = await missingSteps(db, row);
-  const plan = shareOut(
-    members.map((m) => ({ key: m.id, cap: m.cap })),
-    missing.map((s) => s.missing),
-  );
+  const before = row.extra as TestingExtraState;
+  // Among everyone: the tests the organisers chose, in equal parts; else as the caps allow.
+  const wanted = Math.min(before.want ?? 1, missing.length);
+  const plan =
+    before.mode === 'all'
+      ? members.length > 0 && wanted > 0
+        ? {
+            keys: members.map((m) => m.id),
+            count: wanted,
+            share: Math.ceil((missing[wanted - 1]?.missing ?? 0) / members.length),
+          }
+        : null
+      : shareOut(
+          members.map((m) => ({ key: m.id, cap: m.cap })),
+          missing.map((s) => s.missing),
+        );
   const what = await testedLabel(db, row);
   if (!plan || plan.keys.length === 0 || !row.extraProductId) {
     await db
@@ -453,6 +532,11 @@ async function shareOutExtra(db: Database, env: Env, shop: ShopRow, row: Testing
           target,
           share: plan.share,
           basePot,
+          mode: before.mode ?? 'cap',
+          ...(before.want ? { want: before.want } : {}),
+          // No deadline: paying lasts until the organisers close it.
+          open: true,
+          since: now.toISOString(),
         },
         updatedAt: new Date(),
       })
@@ -463,12 +547,11 @@ async function shareOutExtra(db: Database, env: Env, shop: ShopRow, row: Testing
   // Each one their own amount.
   for (const member of byCap) {
     await notifyTesting(db, env, shop, await audience(db, env, shop, [member.orderId]), (lang) =>
-      tr(lang, 'testing.extraPay', {
+      tr(lang, 'testing.extraPayOpen', {
         shop: shop.name,
         product: what,
         tiers: names,
         amount: formatMoney(amountOf.get(member.id) ?? plan.share, row.currency),
-        hours: row.extraPayHours,
       }),
     );
   }
@@ -558,8 +641,28 @@ async function settleExtra(db: Database, env: Env, shop: ShopRow, row: TestingRo
     await finishExtra(db, env, shop, row);
     return;
   }
-  // Someone did not pay: those who did say whether they go on.
   const gap = need - collected;
+  const extraNow = row.extra as TestingExtraState;
+  if (extraNow.open) {
+    // Closed by the organisers: they decide what follows.
+    await db
+      .update(testings)
+      .set({ extra: { ...extraNow, stage: 'decide', gap }, updatedAt: new Date() })
+      .where(eq(testings.id, row.id));
+    await notifyShopTeam(db, env, shop, (lang) =>
+      tr(lang, 'testing.extraDecide', { shop: shop.name, product: what, gap: formatMoney(gap, row.currency) }),
+    ).catch((error: unknown) => console.error('Extra round notice failed:', error));
+    return;
+  }
+  await startRound(db, env, shop, row, gap, now);
+}
+
+/** Those who paid say whether they go on, and pay the difference among them. */
+async function startRound(db: Database, env: Env, shop: ShopRow, row: TestingRow, gap: number, now: Date): Promise<void> {
+  const what = await testedLabel(db, row);
+  const paid = await membersIn(db, row, ['paid']);
+  const paidIds = paid.map((m) => m.member.id);
+  // Someone did not pay: those who did say whether they go on.
   await db
     .update(testings)
     .set({
@@ -572,7 +675,7 @@ async function settleExtra(db: Database, env: Env, shop: ShopRow, row: TestingRo
       updatedAt: new Date(),
     })
     .where(eq(testings.id, row.id));
-  const paidOrders = members.filter((m) => paidIds.includes(m.member.id)).map((m) => m.order.id);
+  const paidOrders = paid.map((m) => m.order.id);
   await notifyTesting(db, env, shop, await audience(db, env, shop, paidOrders), (lang) =>
     tr(lang, 'testing.extraRound', {
       shop: shop.name,
@@ -761,18 +864,20 @@ async function finishExtra(db: Database, env: Env, shop: ShopRow, row: TestingRo
   const totals = (await testingTotals(db, [row.id])).get(row.id);
   const price = (await vialPrices(db, [row])).get(row.id) ?? 0;
   const collected = totals?.extraPaid ?? 0;
+  const covered = (row.extra as TestingExtraState).covered ?? 0;
   let tiersDone: string[] = [];
   let unused = collected;
   if (totals && collected > 0) {
     const extra = row.extra as TestingExtraState;
     const pot = extra.basePot ?? totals.fees + totals.extras + totals.donations + row.perUnit * totals.units;
-    const steps = tierSteps({ tiers: row.tiers, pot: pot + collected, vialPrice: price, unitValue: 0 });
+    // What the organisers put in themselves counts too (it is never given back).
+    const steps = tierSteps({ tiers: row.tiers, pot: pot + collected + covered, vialPrice: price, unitValue: 0 });
     const before = tierSteps({ tiers: row.tiers, pot, vialPrice: price, unitValue: 0 });
     const baseReached = new Set(before.filter((s) => s.reached).map((s) => s.tier.id));
     const extraSteps = steps.filter((s) => s.reached && !baseReached.has(s.tier.id));
     tiersDone = extraSteps.map((s) => s.tier.id);
     const last = extraSteps[extraSteps.length - 1];
-    unused = last ? Math.min(Math.max(pot + collected - last.needed, 0), collected) : collected;
+    unused = last ? Math.min(Math.max(pot + collected + covered - last.needed, 0), collected) : collected;
   }
   let refunded = 0;
   if (unused > 0 && paidMembers.length > 0) {
@@ -807,7 +912,11 @@ async function finishExtra(db: Database, env: Env, shop: ShopRow, row: TestingRo
   await db
     .update(testings)
     .set({
-      extra: { ...(row.extra as TestingExtraState), stage: 'done', outcome: { tiers: tiersDone, collected, refunded } },
+      extra: {
+        ...(row.extra as TestingExtraState),
+        stage: 'done',
+        outcome: { tiers: tiersDone, collected, refunded, ...(covered > 0 ? { covered } : {}) },
+      },
       updatedAt: new Date(),
     })
     .where(eq(testings.id, row.id));
@@ -832,13 +941,13 @@ async function finishExtra(db: Database, env: Env, shop: ShopRow, row: TestingRo
 }
 
 /** A day into paying: those in who have not paid yet are reminded. */
-async function remindExtra(db: Database, env: Env, shop: ShopRow, row: TestingRow): Promise<void> {
+export async function remindExtra(db: Database, env: Env, shop: ShopRow, row: TestingRow, now = new Date()): Promise<number> {
   const extra = row.extra as TestingExtraState;
   await db
     .update(testings)
-    .set({ extra: { ...extra, reminded: true } })
+    .set({ extra: { ...extra, reminded: true, remindedAt: now.toISOString() } })
     .where(eq(testings.id, row.id));
-  if (!row.extraProductId) return;
+  if (!row.extraProductId) return 0;
   const unpaid = await db
     .selectDistinct({ id: orders.id, share: testingExtraMembers.share })
     .from(testingExtraMembers)
@@ -853,11 +962,63 @@ async function remindExtra(db: Database, env: Env, shop: ShopRow, row: TestingRo
       ),
     );
   const what = await testedLabel(db, row);
+  const asked = (await membersIn(db, row, ['in', 'paid'])).length;
+  const paidCount = Math.max(asked - unpaid.length, 0);
   for (const u of unpaid) {
     await notifyTesting(db, env, shop, await audience(db, env, shop, [u.id]), (lang) =>
-      tr(lang, 'testing.extraRemind', { shop: shop.name, product: what, amount: formatMoney(u.share, row.currency) }),
+      extra.open
+        ? tr(lang, 'testing.extraRemindOpen', {
+            shop: shop.name,
+            product: what,
+            amount: formatMoney(u.share, row.currency),
+            paid: paidCount,
+            of: asked,
+          })
+        : tr(lang, 'testing.extraRemind', { shop: shop.name, product: what, amount: formatMoney(u.share, row.currency) }),
     );
   }
+  return unpaid.length;
+}
+
+const DAY = hours(24);
+
+/** The organisers, while paying: remind now, close paying, or decide once closed. */
+async function ownRound(db: Database, shopId: string, id: string, stage: TestingExtraState['stage']) {
+  const row = await db.query.testings.findFirst({ where: and(eq(testings.shopId, shopId), eq(testings.id, id)) });
+  if (!row) throw ApiError.notFound('Testing not found');
+  if (row.extra?.stage !== stage) throw ApiError.conflict('extra_wrong_stage', 'The payment round is not at that point');
+  const shop = await db.query.shops.findFirst({ where: (s, { eq: same }) => same(s.id, row.shopId) });
+  if (!shop) throw ApiError.notFound('Testing not found');
+  return { row, shop };
+}
+
+export async function remindExtraNow(db: Database, env: Env, shopId: string, id: string): Promise<{ sent: number }> {
+  const { row, shop } = await ownRound(db, shopId, id, 'pay');
+  return { sent: await remindExtra(db, env, shop, row) };
+}
+
+/** The organisers close paying: who did not pay drops out; if money is missing, they decide. */
+export async function closeExtraPay(db: Database, env: Env, shopId: string, id: string): Promise<void> {
+  const { row, shop } = await ownRound(db, shopId, id, 'pay');
+  await settleExtra(db, env, shop, row, new Date());
+}
+
+/** What follows when some did not pay: those who paid cover it, the GB covers it, or it goes on as it is. */
+export async function decideExtra(
+  db: Database,
+  env: Env,
+  shopId: string,
+  id: string,
+  choice: 'round' | 'cover' | 'continue',
+): Promise<void> {
+  const { row, shop } = await ownRound(db, shopId, id, 'decide');
+  const extra = row.extra as TestingExtraState;
+  if (choice === 'round') {
+    await startRound(db, env, shop, row, extra.gap ?? 0, new Date());
+    return;
+  }
+  const next = choice === 'cover' ? { ...extra, covered: (extra.covered ?? 0) + (extra.gap ?? 0) } : extra;
+  await finishExtra(db, env, shop, { ...row, extra: next });
 }
 
 /** Every minute: moves each extra round along (sign-up → shares → paying → done). */
@@ -874,6 +1035,10 @@ export async function advanceExtras(db: Database, env: Env, now = new Date()): P
     try {
       if (extra.stage === 'signup' && until <= now) {
         await shareOutExtra(db, env, shop, row, now);
+      } else if (extra.stage === 'pay' && extra.open) {
+        // No deadline: a reminder a day to those who have not paid.
+        const last = new Date(extra.remindedAt ?? extra.since ?? extra.until).getTime();
+        if (now.getTime() - last >= DAY) await remindExtra(db, env, shop, row, now);
       } else if (extra.stage === 'pay' && until <= now) {
         await settleExtra(db, env, shop, row, now);
       } else if (extra.stage === 'round' && until <= now) {

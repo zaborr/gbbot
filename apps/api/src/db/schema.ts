@@ -464,6 +464,8 @@ export const testings = pgTable(
     /** Hours to sign up, and to pay one's share. */
     extraSignupHours: integer('extra_signup_hours').notNull().default(24),
     extraPayHours: integer('extra_pay_hours').notNull().default(48),
+    /** The payment round: each with their cap, or among everyone in the testing. */
+    extraMode: text('extra_mode').$type<'cap' | 'all'>().notNull().default('cap'),
     extra: jsonb('extra').$type<TestingExtraState>(),
     /** Its hidden product: the order line of each share. */
     extraProductId: uuid('extra_product_id').references(() => products.id, { onDelete: 'set null' }),
