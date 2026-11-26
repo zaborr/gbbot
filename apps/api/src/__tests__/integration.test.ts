@@ -5208,7 +5208,15 @@ describeDb('API integration', () => {
     expect(inbox.map((n) => n.text)).toEqual(['after-key']);
     // Nothing of theirs beyond the customer side of this GB.
     expect((await request('/api/me/web-access', { method: 'POST', headers: { ...web, 'content-type': 'application/json' }, body: '{"username":"takeover"}' })).status).toBe(403);
-    expect((await request('/api/me/security-phrase', { headers: web })).status).toBe(403);
+    // Their phrase: shown, chosen if they have none, never changed with a key.
+    expect(await (await request('/api/me/security-phrase', { headers: web })).json()).toEqual({ phrase: null });
+    const choose = (phrase: string): Promise<Response> =>
+      Promise.resolve(
+        request('/api/me/security-phrase', { method: 'PUT', headers: { ...web, 'content-type': 'application/json' }, body: JSON.stringify({ phrase }) }),
+      );
+    expect((await choose('blue lantern')).status).toBe(200);
+    expect(await (await request('/api/me/security-phrase', { headers: web })).json()).toEqual({ phrase: 'blue lantern' });
+    expect((await choose('someone elses')).status).toBe(403);
     expect((await request('/api/organizer/shops', { method: 'POST', headers: { ...web, 'content-type': 'application/json' }, body: '{}' })).status).toBe(403);
     expect((await request('/api/web-accounts', { headers: web })).status).toBe(403);
     // Someone who manages GBs may get a key too, to buy: no management, no inbox.

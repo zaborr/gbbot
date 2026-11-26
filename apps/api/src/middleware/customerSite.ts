@@ -15,6 +15,9 @@ const KEY_SESSION_PATHS: Array<[methods: string[] | '*', path: RegExp]> = [
   ['*', /^\/api\/(shop|categories|products|cart|orders)(\/|$)/],
   [['GET'], /^\/api\/(shops|bot|web\/banner|images\/[^/]+)$/],
   [['GET'], /^\/api\/me\/notices$/],
+  // Their phrase: shown (the official web knows it, a fake one does not), and
+  // chosen there if they have none; the route keeps it from being changed.
+  [['GET', 'PUT'], /^\/api\/me\/security-phrase$/],
   [['PUT'], /^\/api\/me\/language$/],
   [['POST'], /^\/api\/me\/how-to-seen$/],
 ];
