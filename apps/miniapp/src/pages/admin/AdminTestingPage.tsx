@@ -879,7 +879,7 @@ function PotSection({ testing, steps }: { testing: Testing; steps: ReturnType<ty
       >
         {steps.map((step) => (
           <Cell
-            key={step.id}
+            key={step.tier.id}
             before={
               <span className="gb-testing-tier-icon" aria-hidden="true">
                 {step.upgradedTo ? '⬆️' : step.reached ? '✅' : step === next ? '⏳' : '🔒'}
@@ -1445,7 +1445,7 @@ function OpenExtra({ testing, onChange }: { testing: Testing; onChange: () => vo
       ) : (
         steps.map((step, i) => (
           <Cell
-            key={step.tier.id}
+            key={step.id}
             Component="label"
             multiline
             before={<input type="radio" name="gb-extra-want" checked={want === i + 1} onChange={() => setWant(i + 1)} />}
