@@ -14,6 +14,7 @@ import {
   categories,
   labs,
   orderItems,
+  groupMembers,
   orderLabels,
   orders,
   productVariants,
@@ -38,7 +39,7 @@ import { goalTotals } from '../services/goal.js';
 import { cancelDrawsOnReopen, finishDraw, launchDraw } from '../services/testingDraw.js';
 import { botToken, loadActiveBot, useBot } from '../services/activeBot.js';
 import { switchBot } from '../services/botSwitch.js';
-import { resetVipCache } from '../services/vip.js';
+import { isGroupMember, resetVipCache } from '../services/vip.js';
 import { closeDonationWindows, openDonationWindows } from '../services/testingDonations.js';
 import { advanceExtras } from '../services/testingExtra.js';
 import {
@@ -5120,6 +5121,44 @@ describeDb('API integration', () => {
     // Taken back: the session ends.
     expect((await request('/api/admin/web-keys/555010001', { method: 'DELETE', headers: admin })).status).toBe(200);
     expect((await request('/api/orders', { headers: web })).status).toBe(401);
+  });
+
+  it('marks VIP when giving a key, and keeps group VIPs when Telegram cannot be asked', async () => {
+    const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`, 'content-type': 'application/json' };
+    await request('/api/admin/customers', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ telegramId: 555010002, username: null, firstName: 'Vera' }),
+    });
+    const given = await request('/api/admin/web-keys', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ userId: 555010002, vip: 'shop' }),
+    });
+    expect(given.status).toBe(201);
+    const shopRow = (await db.query.shops.findFirst({ where: eq(shops.id, shopId) }))!;
+    expect(shopRow.vipClub.userIds).toContain(555010002);
+    expect(shopRow.vipClub.notes?.['555010002']).toBe('web');
+    await db
+      .update(shops)
+      .set({ vipClub: { ...shopRow.vipClub, userIds: shopRow.vipClub.userIds.filter((id) => id !== 555010002) } })
+      .where(eq(shops.id, shopId));
+
+    // Seen in the group once; then Telegram fails (and the memory is gone): still a member.
+    resetVipCache();
+    const ok = { getChatMember: async () => ({ status: 'member' }) } as unknown as TelegramApi;
+    const down = {
+      getChatMember: async () => {
+        throw new Error('down');
+      },
+    } as unknown as TelegramApi;
+    expect(await isGroupMember(ok, -1009, 555010002, Date.now(), db)).toBe(true);
+    resetVipCache();
+    expect(await isGroupMember(down, -1009, 555010002, Date.now(), db)).toBe(true);
+    // Never seen: not a member.
+    expect(await isGroupMember(down, -1009, 555010003, Date.now(), db)).toBe(false);
+    await db.delete(groupMembers).where(eq(groupMembers.chatId, -1009));
+    resetVipCache();
   });
 
   it('enforces admin-only routes', async () => {

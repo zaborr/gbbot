@@ -777,12 +777,14 @@ export class ApiClient {
     return this.request<{ text: string | null }>('/platform/web-banner');
   }
 
-  adminWebKey(userId: number): Promise<{ key: { createdAt: string; expiresAt: string; lastUsedAt: string | null } | null }> {
+  adminWebKey(
+    userId: number,
+  ): Promise<{ key: { createdAt: string; expiresAt: string; lastUsedAt: string | null } | null; canVipEverywhere: boolean }> {
     return this.request(`/admin/web-keys/${userId}`);
   }
 
-  adminGiveWebKey(userId: number): Promise<{ key: string; expiresAt: string; url: string }> {
-    return this.request('/admin/web-keys', { method: 'POST', body: JSON.stringify({ userId }) });
+  adminGiveWebKey(userId: number, vip: 'none' | 'shop' | 'platform'): Promise<{ key: string; expiresAt: string; url: string }> {
+    return this.request('/admin/web-keys', { method: 'POST', body: JSON.stringify({ userId, vip }) });
   }
 
   adminRevokeWebKey(userId: number): Promise<{ ok: boolean }> {

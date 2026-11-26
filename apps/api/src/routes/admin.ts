@@ -91,6 +91,7 @@ import {
   deleteShopWithEverything,
   getShopAdminView,
   isSuperAdmin,
+  isSupervisor,
   shopContents,
   updateOwnerSettings,
   updateAddressKey,
@@ -122,7 +123,7 @@ import {
 } from '../services/blacklist.js';
 import { tr } from '../i18n/messages.js';
 import { describeCustomer } from '../services/customers.js';
-import { shopClubView, shopVipClubView, updateShopClub, updateShopVipClub, withNames } from '../services/vip.js';
+import { addVipBy, shopClubView, shopVipClubView, updateShopClub, updateShopVipClub, withNames } from '../services/vip.js';
 import { cloneProducts, listCloneSources } from '../services/clone.js';
 import { closePreview, closeShop, reopenShop, scheduleClosing } from '../services/closing.js';
 import { announceGoalMilestones, updateGoal } from '../services/goal.js';
@@ -767,15 +768,34 @@ export function adminRoutes(): Hono<AppBindings> {
   };
   // Web access for customers (when the bot is down): a key for someone, taking it back,
   // and adding someone new by their Telegram ID.
-  app.get('/web-keys/:userId', zValidator('param', z.object({ userId: z.coerce.number().int() })), async (c) =>
-    c.json({ key: await keyOf(c.get('db'), c.get('shopId'), c.req.valid('param').userId) }),
-  );
-  app.post('/web-keys', zValidator('json', z.object({ userId: z.number().int().positive() })), async (c) => {
+  app.get('/web-keys/:userId', zValidator('param', z.object({ userId: z.coerce.number().int() })), async (c) => {
+    const sub = c.get('claims').sub;
+    return c.json({
+      key: await keyOf(c.get('db'), c.get('shopId'), c.req.valid('param').userId),
+      // Who may mark someone VIP in every GB.
+      canVipEverywhere: isSuperAdmin(c.get('env'), sub) || isSupervisor(sub),
+    });
+  });
+  app.post(
+    '/web-keys',
+    zValidator(
+      'json',
+      z.object({ userId: z.number().int().positive(), vip: z.enum(['none', 'shop', 'platform']).default('none') }),
+    ),
+    async (c) => {
     const shop = c.get('shop');
-    const given = await giveKey(c.get('db'), shop.id, c.req.valid('json').userId, c.get('claims').sub);
+    const { userId, vip } = c.req.valid('json');
+    const sub = c.get('claims').sub;
+    // VIP in every GB (the general club): platform admins and supervisors only.
+    if (vip === 'platform' && !isSuperAdmin(c.get('env'), sub) && !isSupervisor(sub)) {
+      throw ApiError.forbidden('Only platform admins and supervisors can make someone VIP in every GB');
+    }
+    const given = await giveKey(c.get('db'), shop.id, userId, sub);
+    if (vip !== 'none') await addVipBy(c.get('db'), shop, userId, vip);
     const base = (c.get('env').PUBLIC_URL ?? new URL(c.req.url).origin).replace(/\/+$/, '');
     return c.json({ ...given, url: `${base}/s/${shop.slug}` }, 201);
-  });
+    },
+  );
   app.delete('/web-keys/:userId', zValidator('param', z.object({ userId: z.coerce.number().int() })), async (c) => {
     await revokeKeys(c.get('db'), c.get('shopId'), c.req.valid('param').userId);
     return c.json({ ok: true });
