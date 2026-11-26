@@ -113,10 +113,12 @@ export async function addCustomer(
   db: Database,
   input: { telegramId: number; username: string | null; firstName: string },
 ): Promise<void> {
-  const username = input.username?.replace(/^@/, '').trim() || null;
+  // The @username is not stored: typed by hand it is not proven, and it would let
+  // anyone pass for someone else in the search by @username. The bot fills it in
+  // when the person opens it.
   await db
     .insert(users)
-    .values({ telegramId: input.telegramId, firstName: input.firstName.trim() || String(input.telegramId), username })
+    .values({ telegramId: input.telegramId, firstName: input.firstName.trim() || String(input.telegramId), username: null })
     .onConflictDoNothing();
 }
 

@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { claimPendingRoles } from '../services/team.js';
 import { claimBlacklisted } from '../services/blacklist.js';
 import { toSessionUserDTO } from '../db/mappers.js';
+import { clientIp } from '../middleware/rateLimit.js';
 import { ApiError } from '../lib/errors.js';
 import { signInWebAdmin, webSessionId } from '../services/webAdmins.js';
 import { botToken } from '../services/activeBot.js';
@@ -98,7 +99,12 @@ export function authRoutes(): Hono<AppBindings> {
     }
     const { username, password, code } = c.req.valid('json');
     const db = c.get('db');
-    const account = await signInWebAdmin(db, username, password, code);
+    const onion = host.endsWith('.onion');
+    const account = await signInWebAdmin(db, username, password, code, {
+      from: onion ? 'onion' : clientIp(c),
+      // Full platform accounts only through the .onion address, if so configured.
+      platformAllowed: onion || env.WEB_PLATFORM_ONION_ONLY !== true,
+    });
     const ttl = env.WEB_SESSION_TTL_SECONDS ?? 8 * 3600;
 
     // A linked account acts as its Telegram user, with that user's permissions.
