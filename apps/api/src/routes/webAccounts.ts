@@ -22,6 +22,7 @@ import { notifyPlatform } from '../services/webNotices.js';
 import {
   assertNotLastFullAdmin,
   changeWebPassword,
+  createLinkedWebAdmin,
   createWebAdmin,
   describeWebAdmin,
   getWebAdmin,
@@ -123,8 +124,11 @@ export function webAccountRoutes(): Hono<AppBindings> {
   app.post('/', requireFullPlatform, zValidator('json', createWebAccountRequest), async (c) => {
     const db = c.get('db');
     const env = c.get('env');
-    const { username, role } = c.req.valid('json');
-    const creds = await createWebAdmin(db, username, { role });
+    const { username, role, telegramId } = c.req.valid('json');
+    const creds =
+      role === 'linked'
+        ? await createLinkedWebAdmin(db, username, telegramId!)
+        : await createWebAdmin(db, username, { role });
     await tellPlatform(db, env, c.get('claims').sub, 'web.accountCreated', creds, role);
     const result: WebCredentials = { ...creds, onionUrl: env.WEB_ONION_URL ?? null };
     return c.json(result, 201);
