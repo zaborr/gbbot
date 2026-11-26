@@ -78,6 +78,14 @@ const envSchema = z.object({
         .map((d) => d.trim().replace(/^https?:\/\//, '').replace(/\/+$/, ''))
         .filter((d) => d !== '' && !d.endsWith('.invalid')),
     ),
+  /**
+   * "true": full platform web accounts sign in only through the .onion address;
+   * linked ones (supervisors, organisers, GB teams) also on the main domain.
+   */
+  WEB_PLATFORM_ONION_ONLY: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
   /** How long a web session lasts. */
   WEB_SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(8 * 3600),
   /**

@@ -51,8 +51,13 @@ export function hit(key: string, limit: number, now = Date.now()): number {
   return entry.count > limit ? Math.ceil((entry.resetAt - now) / 1000) : 0;
 }
 
+/** Through Tor every visitor comes from the server itself: they share one "IP". */
+export const isOnion = (c: Context<AppBindings>): boolean => new URL(c.req.url).hostname.endsWith('.onion');
+/** Shared by everyone on the .onion address, so it gets room for many of them. */
+const ONION_FACTOR = 10;
+
 /** The client's IP as Caddy reports it (the API is only reachable through Caddy). */
-function clientIp(c: Context<AppBindings>): string {
+export function clientIp(c: Context<AppBindings>): string {
   const forwarded = c.req.header('X-Forwarded-For');
   const last = forwarded?.split(',').pop()?.trim();
   return last || c.req.header('X-Real-IP') || 'local';
@@ -67,7 +72,9 @@ export const rateLimit = createMiddleware<AppBindings>(async (c, next) => {
     const userId = await peekUserId(c.req.header('Authorization'), c.get('env'), c.get('db'));
     if (userId !== undefined) who = `user:${userId}`;
   }
-  const wait = hit(`${rule.name}|${who}`, rule.limit);
+  const onion = isOnion(c);
+  if (onion && rule.per === 'ip') who = 'onion';
+  const wait = hit(`${rule.name}|${who}`, onion && who === 'onion' ? rule.limit * ONION_FACTOR : rule.limit);
   if (wait > 0) {
     c.header('Retry-After', String(wait));
     throw new ApiError(429, 'rate_limited', 'Too many requests. Wait a moment and try again.');

@@ -262,42 +262,55 @@ const MAX_FAILURES = 5;
 const LOCK_MS = 15 * 60_000;
 
 /**
- * Checks username, password and authenticator code. After 5 wrong attempts the
- * account waits 15 minutes. Every failure gives the same answer, so nobody
- * learns which part was wrong or whether the username exists.
+ * Wrong attempts per account AND per place they come from (an IP, or "onion"
+ * for everything through Tor): someone failing on purpose locks only
+ * themselves, not the account for everyone. In memory: a restart resets it.
+ */
+const failures = new Map<string, { count: number; lockedUntil: number }>();
+
+export function resetSignInFailures(): void {
+  failures.clear();
+}
+
+/**
+ * Checks username, password and authenticator code. After 5 wrong attempts
+ * from one place the account waits 15 minutes there. Every failure gives the
+ * same answer, so nobody learns which part was wrong or whether the username
+ * exists. With `platformAllowed` false (WEB_PLATFORM_ONION_ONLY off the
+ * .onion address), only linked accounts may sign in.
  */
 export async function signInWebAdmin(
   db: Database,
   rawUsername: string,
   password: string,
   code: string,
+  { from = 'local', platformAllowed = true }: { from?: string; platformAllowed?: boolean } = {},
   now = new Date(),
 ): Promise<WebAdminRow> {
   const wrong = ApiError.unauthorized('Wrong username, password or code');
   const username = rawUsername.trim().toLowerCase();
   const row = await db.query.webAdmins.findFirst({ where: eq(webAdmins.username, username) });
-  if (!row) {
+  if (!row || (!platformAllowed && row.role !== 'linked')) {
     // Same work as a real check, so timing does not reveal missing users.
     await hashPassword(password);
     throw wrong;
   }
-  if (row.lockedUntil && row.lockedUntil > now) {
+  const key = `${row.id}|${from}`;
+  const seen = failures.get(key);
+  if (seen && seen.lockedUntil > now.getTime()) {
     throw new ApiError(429, 'account_locked', 'Too many wrong attempts. Try again in 15 minutes.');
   }
   const passwordOk = await verifyPassword(password, row.passwordHash);
   const step = passwordOk ? matchTotp(row.totpSecret, code.trim(), now.getTime()) : null;
   if (!passwordOk || step === null || step <= row.totpLastStep) {
-    const failures = row.failedAttempts + 1;
-    await db
-      .update(webAdmins)
-      .set(
-        failures >= MAX_FAILURES
-          ? { failedAttempts: 0, lockedUntil: new Date(now.getTime() + LOCK_MS) }
-          : { failedAttempts: failures },
-      )
-      .where(eq(webAdmins.id, row.id));
+    const count = (seen && seen.lockedUntil === 0 ? seen.count : 0) + 1;
+    failures.set(key, count >= MAX_FAILURES ? { count: 0, lockedUntil: now.getTime() + LOCK_MS } : { count, lockedUntil: 0 });
+    if (failures.size > 10_000) {
+      for (const [k, v] of failures) if (v.lockedUntil !== 0 && v.lockedUntil <= now.getTime()) failures.delete(k);
+    }
     throw wrong;
   }
+  failures.delete(key);
   const [updated] = await db
     .update(webAdmins)
     .set({ totpLastStep: step, failedAttempts: 0, lockedUntil: null, lastLoginAt: now })

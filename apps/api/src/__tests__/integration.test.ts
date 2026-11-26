@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import type { Pool } from 'pg';
 import { createApp } from '../app.js';
-import { base32Decode, createWebAdmin, removeWebAdmin, resetWebAdmin, totpCode } from '../services/webAdmins.js';
+import { base32Decode, createWebAdmin, removeWebAdmin, resetSignInFailures, resetWebAdmin, totpCode } from '../services/webAdmins.js';
 import { addWebNotice } from '../services/webNotices.js';
 import type { Env } from '../config/env.js';
 import { createDb, createPool, type Database } from '../db/client.js';
@@ -735,6 +735,42 @@ describeDb('API integration', () => {
     await resetWebAdmin(db, creds.username);
     expect((await app.request('/api/platform/shops', { headers: auth })).status).toBe(401);
     await removeWebAdmin(db, creds.username);
+  });
+
+  it('locks web sign-in per account and place, and can keep platform accounts on the onion address', async () => {
+    resetSignInFailures();
+    const creds = await createWebAdmin(db, `lock${Date.now() % 100000}`);
+    const code = (): string => totpCode(base32Decode(creds.totpSecret), Math.floor(Date.now() / 30_000));
+    const signIn = (ip: string, password: string, a = app): Promise<Response> =>
+      Promise.resolve(
+        a.request('http://gb.example.com/api/auth/web', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'X-Forwarded-For': ip },
+          body: JSON.stringify({ username: creds.username, password, code: code() }),
+        }),
+      );
+    // Someone failing on purpose locks only their own place.
+    for (let i = 0; i < 5; i += 1) expect((await signIn('203.0.113.9', 'nope')).status).toBe(401);
+    expect((await signIn('203.0.113.9', creds.password)).status).toBe(429);
+    expect((await signIn('198.51.100.7', creds.password)).status).toBe(200);
+    // WEB_PLATFORM_ONION_ONLY: a full platform account, not on the main domain…
+    const onionPlatform = createApp({ env: { ...testEnv, WEB_PLATFORM_ONION_ONLY: true }, db });
+    expect((await signIn('198.51.100.8', creds.password, onionPlatform)).status).toBe(401);
+    // …but through the .onion address, yes.
+    await resetWebAdmin(db, creds.username).then(async (fresh) => {
+      const res = await onionPlatform.request('http://abc.onion/api/auth/web', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          username: fresh.username,
+          password: fresh.password,
+          code: totpCode(base32Decode(fresh.totpSecret), Math.floor(Date.now() / 30_000)),
+        }),
+      });
+      expect(res.status).toBe(200);
+    });
+    await removeWebAdmin(db, creds.username);
+    resetSignInFailures();
   });
 
   it('lets full platform accounts manage web accounts', async () => {
@@ -5135,7 +5171,10 @@ describeDb('API integration', () => {
       body: JSON.stringify({ telegramId: 555010001, username: 'web_only', firstName: 'Wendy' }),
     });
     expect(added.status).toBe(201);
-    // Found again by their @username, any case, with or without the @.
+    // The @username typed by hand is not kept; the bot fills it in when they open it.
+    expect((await db.query.users.findFirst({ where: eq(users.telegramId, 555010001) }))?.username).toBeNull();
+    await db.update(users).set({ username: 'web_only' }).where(eq(users.telegramId, 555010001));
+    // Found by their @username, any case, with or without the @.
     const lookup = await request('/api/admin/customers/lookup?username=%40Web_Only', { headers: admin });
     expect(((await lookup.json()) as { telegramId: number }[]).map((u) => u.telegramId)).toEqual([555010001]);
     const nobody = await request('/api/admin/customers/lookup?username=nobody_here', { headers: admin });

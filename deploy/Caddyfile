@@ -13,7 +13,7 @@
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
 		# Only Telegram (and the site itself) may show it inside another page: no fake page
 		# can wrap the web to catch keys or passwords.
-		Content-Security-Policy "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org"
+		Content-Security-Policy "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org; script-src 'self'; object-src 'none'; base-uri 'self'"
 		-Server
 	}
 
@@ -46,7 +46,7 @@
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
-		Content-Security-Policy "frame-ancestors 'self'"
+		Content-Security-Policy "frame-ancestors 'self'; script-src 'self'; object-src 'none'; base-uri 'self'"
 		-Server
 	}
 
@@ -74,6 +74,7 @@ http://:8080 {
 	header {
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
+		Content-Security-Policy "frame-ancestors 'none'; script-src 'self'; object-src 'none'; base-uri 'self'"
 		Referrer-Policy "no-referrer"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
 		-Server
