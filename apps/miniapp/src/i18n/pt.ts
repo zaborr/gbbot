@@ -167,6 +167,7 @@ export const pt: Record<MessageKey, string> = {
   'adminOrder.lastMethod': 'Último método',
   'adminOrder.lastNote': 'Última nota ao cliente',
   'adminOrder.lastTx': 'Última transação',
+  'adminOrder.markedBy': 'marcado por {name}',
   'adminOrder.paid': 'Pago (confirmado)',
   'adminOrder.paidExchanged': 'Em {amount} ({rate})',
   'adminOrder.payment': 'Pagamento',

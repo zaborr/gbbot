@@ -104,6 +104,7 @@ import {
 } from '../services/shop.js';
 import { ApiError } from '../lib/errors.js';
 import { orders, users } from '../db/schema.js';
+import type { Database } from '../db/client.js';
 import { startPaymentCheck } from '../services/paymentCheck.js';
 import { buildReport } from '../export/report.js';
 import { TelegramApi } from '../telegram/api.js';
@@ -210,6 +211,13 @@ const categoryInput = z.object({
   title: z.string().min(1).max(128),
   sortOrder: z.number().int().default(0),
 });
+
+/** Who an organiser is, for what they mark by hand: their name and @username. */
+async function organiser(db: Database, id: number): Promise<{ id: number; name: string }> {
+  const person = await db.query.users.findFirst({ where: eq(users.telegramId, id) });
+  const name = [person?.firstName, person?.username ? `@${person.username}` : null].filter(Boolean).join(' ');
+  return { id, name: name || String(id) };
+}
 
 export function adminRoutes(): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
@@ -829,12 +837,10 @@ export function adminRoutes(): Hono<AppBindings> {
     zValidator('json', updateOrderStatusRequest),
     async (c) => {
       const shop = c.get('shop');
-      const { order, previous } = await changeOrderStatus(
-        c.get('db'),
-        shop.id,
-        c.req.valid('param').id,
-        c.req.valid('json'),
-      );
+      const { order, previous } = await changeOrderStatus(c.get('db'), shop.id, c.req.valid('param').id, {
+        ...c.req.valid('json'),
+        by: await organiser(c.get('db'), c.get('claims').sub),
+      });
       // The customer hears about it from the bot (best effort).
       if (order.status !== previous) {
         await notifyUsers(c.get('db'), botToken(c.get('env')), await customerChat(c, order), (lang) =>
@@ -999,7 +1005,9 @@ export function adminRoutes(): Hono<AppBindings> {
 
   // The admin sent the overpaid difference back to the customer.
   app.post('/orders/:id/refund', zValidator('param', idParam), async (c) =>
-    c.json(await recordRefund(c.get('db'), c.get('shopId'), c.req.valid('param').id)),
+    c.json(
+      await recordRefund(c.get('db'), c.get('shopId'), c.req.valid('param').id, await organiser(c.get('db'), c.get('claims').sub)),
+    ),
   );
 
   app.delete('/orders/:id', zValidator('param', idParam), async (c) => {

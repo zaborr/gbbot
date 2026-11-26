@@ -530,6 +530,15 @@ describeDb('API integration', () => {
       body: JSON.stringify({ status: 'paid', force: true }),
     });
     expect(confirmed.status).toBe(200);
+    // Who marked it stays for the organisers, not for the customer.
+    const adminView = (await (await request(`/api/admin/orders/${orderId}`, { headers: adminAuth })).json()) as {
+      paymentLog: Array<{ by?: { id: number } }>;
+    };
+    expect(adminView.paymentLog.at(-1)?.by?.id).toBe(ADMIN_ID);
+    const customerView = (await (await request(`/api/orders/${orderId}`, { headers: auth })).json()) as {
+      paymentLog: Array<{ by?: unknown }>;
+    };
+    expect(customerView.paymentLog.some((e) => 'by' in e)).toBe(false);
     const order = (await (await request(`/api/orders/${orderId}`, { headers: auth })).json()) as {
       total: number;
       paymentLog: Array<{ amount: number; paid?: { amount: number; token: string; rate: number } }>;

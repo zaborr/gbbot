@@ -165,6 +165,7 @@ export const en = {
   'adminOrder.lastMethod': 'Last method',
   'adminOrder.lastNote': 'Last note to the customer',
   'adminOrder.lastTx': 'Last transaction',
+  'adminOrder.markedBy': 'marked by {name}',
   'adminOrder.paid': 'Paid (confirmed)',
   'adminOrder.paidExchanged': 'In {amount} ({rate})',
   'adminOrder.payment': 'Payment',

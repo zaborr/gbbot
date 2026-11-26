@@ -236,7 +236,12 @@ export function toOrderItemDTO(row: OrderItemRow): OrderItem {
   };
 }
 
-export function toOrderDTO(row: OrderRow, items: OrderItemRow[]): Order {
+export function toOrderDTO(
+  row: OrderRow,
+  items: OrderItemRow[],
+  /** For the organisers: who marked each payment by hand stays in the log. */
+  organisers = false,
+): Order {
   return {
     id: row.id,
     shopId: row.shopId,
@@ -295,7 +300,7 @@ export function toOrderDTO(row: OrderRow, items: OrderItemRow[]): Order {
           })),
         }
       : null,
-    paymentLog: row.paymentLog,
+    paymentLog: organisers ? row.paymentLog : row.paymentLog.map(({ by: _by, ...entry }) => entry),
     closedAt: row.closedAt?.toISOString() ?? null,
     anonymizedAt: row.anonymizedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
