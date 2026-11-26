@@ -8,6 +8,9 @@
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		# Only Telegram (and the site itself) may show it inside another page: no fake page
+		# can wrap the web to catch keys or passwords.
+		Content-Security-Policy "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org"
 		-Server
 	}
 

@@ -5087,6 +5087,41 @@ describeDb('API integration', () => {
     }
   });
 
+  it('gives a customer a web key that opens only their account in that GB, until taken back', async () => {
+    const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`, 'content-type': 'application/json' };
+    // Someone new, added by their Telegram ID.
+    const added = await request('/api/admin/customers', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ telegramId: 555010001, username: 'web_only', firstName: 'Wendy' }),
+    });
+    expect(added.status).toBe(201);
+    const given = await request('/api/admin/web-keys', { method: 'POST', headers: admin, body: JSON.stringify({ userId: 555010001 }) });
+    expect(given.status).toBe(201);
+    const { key, url } = (await given.json()) as { key: string; url: string };
+    expect(url).toMatch(/\/s\//);
+    // Wrong key: no.
+    expect((await request('/api/auth/key', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: 'pato-AAAA-BBBB-CCCC-sol' }) })).status).toBe(401);
+    const signed = await request('/api/auth/key', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ key: key.toLowerCase() }),
+    });
+    expect(signed.status).toBe(200);
+    const session = (await signed.json()) as { token: string; user: { telegramId: number }; webShop: { id: string } };
+    expect(session.user.telegramId).toBe(555010001);
+    expect(session.webShop.id).toBe(shopId);
+    const web = { Authorization: `Bearer ${session.token}` };
+    // Their own orders in that GB: yes. The GB's admin or the platform: no.
+    expect((await request('/api/orders', { headers: web })).status).toBe(200);
+    expect([403, 404]).toContain((await request('/api/admin/orders', { headers: web })).status);
+    expect((await request('/api/platform/supervisors', { headers: web })).status).toBe(403);
+    expect((await request('/api/me/notices', { headers: web })).status).toBe(200);
+    // Taken back: the session ends.
+    expect((await request('/api/admin/web-keys/555010001', { method: 'DELETE', headers: admin })).status).toBe(200);
+    expect((await request('/api/orders', { headers: web })).status).toBe(401);
+  });
+
   it('enforces admin-only routes', async () => {
     const customer = await authToken(CUSTOMER_ID, 'Alice');
     const denied = await request('/api/admin/orders', {

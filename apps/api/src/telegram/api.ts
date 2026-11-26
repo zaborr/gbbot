@@ -44,6 +44,13 @@ export interface BotCommand {
   description: string;
 }
 
+/** Something that keeps a copy of what the bot says to a person (the customers' web inbox). */
+type Mirror = (chatId: number, text: string) => void;
+let mirror: Mirror | null = null;
+export function setTelegramMirror(fn: Mirror | null): void {
+  mirror = fn;
+}
+
 export class TelegramApi {
   constructor(
     private readonly botToken: string,
@@ -114,6 +121,12 @@ export class TelegramApi {
   }
 
   sendMessage(chatId: number, text: string, replyMarkup?: InlineKeyboard): Promise<unknown> {
+    // A copy for the customer's web inbox, even when Telegram cannot be reached.
+    try {
+      mirror?.(chatId, text);
+    } catch {
+      // Never in the way of the message.
+    }
     return this.call<unknown>('sendMessage', {
       chat_id: chatId,
       text,

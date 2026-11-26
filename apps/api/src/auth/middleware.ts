@@ -1,6 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import type { AppBindings } from '../context.js';
 import { ApiError } from '../lib/errors.js';
+import { webKeyValid } from '../services/webKeys.js';
 import { verifySession, type SessionClaims } from './jwt.js';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
@@ -22,6 +23,10 @@ export async function authenticate(token: string, env: Env, db: Database): Promi
   const wid = webAccountId(claims);
   if (wid !== undefined && !(await webSessionValid(db, wid, claims.ver))) {
     throw new Error('Web session revoked');
+  }
+  // A customer's web key taken back (or expired) ends their sessions.
+  if (claims.ck !== undefined && !(await webKeyValid(db, claims.ck))) {
+    throw new Error('Web key revoked');
   }
   return claims;
 }
@@ -56,7 +61,8 @@ export const requireAdmin = createMiddleware<AppBindings>(async (c, next) => {
 
 /** Requires a platform super-admin (ADMIN_TELEGRAM_IDS). Run after `requireAuth`. */
 export const requireSuperAdmin = createMiddleware<AppBindings>(async (c, next) => {
-  if (!isSuperAdmin(c.get('env'), c.get('claims').sub)) {
+  // A customer's web key never reaches the platform, whoever it belongs to.
+  if (c.get('claims').ck !== undefined || !isSuperAdmin(c.get('env'), c.get('claims').sub)) {
     throw ApiError.forbidden('Platform admin role required');
   }
   await next();

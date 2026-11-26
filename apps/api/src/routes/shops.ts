@@ -17,11 +17,14 @@ export function shopsRoutes(): Hono<AppBindings> {
     const { sub } = c.get('claims');
     const env = c.get('env');
     const db = c.get('db');
-    const shops = await listShops(db, env, sub);
-    const manages = await managesSomething(db, env, sub);
+    const claims = c.get('claims');
+    // A customer's web key: only its GB, and nothing to manage.
+    const all = await listShops(db, env, sub);
+    const shops = claims.ws !== undefined ? all.filter((s) => s.id === claims.ws) : all;
+    const manages = claims.ck === undefined && (await managesSomething(db, env, sub));
     return c.json({
       shops,
-      isSuperAdmin: isSuperAdmin(env, sub),
+      isSuperAdmin: claims.ck === undefined && isSuperAdmin(env, sub),
       isOrganizer: await isOrganizer(db, sub),
       // Managers may activate web access (Telegram sessions only).
       canUseWeb: !isWebSession(c.get('claims')) && manages,

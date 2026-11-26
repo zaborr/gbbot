@@ -9,6 +9,7 @@ import { shopPath } from '../../providers/ShopProvider.js';
 import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { ProductImage } from '../../components/ProductImage.js';
+import { WebBannerEditor } from '../../components/WebAccess.js';
 import { t, tn } from '../../i18n/index.js';
 
 /** Platform super-admin: every shop, hidden ones included. */
@@ -66,6 +67,8 @@ function Platform(): React.JSX.Element {
           <Cell onClick={() => navigate('/platform/web-accounts')}>{t('platform.webAccounts')}</Cell>
         )}
       </Section>
+
+      <WebBannerEditor />
 
       {list.length === 0 ? (
         <Placeholder header={t('shops.empty')} description={t('platform.createFirst')}>

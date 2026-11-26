@@ -24,6 +24,8 @@ interface SessionValue {
   isSuperAdmin: boolean;
   /** Web mode: signs in with username, password and authenticator code. */
   signIn: (username: string, password: string, code: string) => Promise<void>;
+  /** Web mode, customers: signs in with the key an organiser gave them; the GB it opens. */
+  signInWithKey: (key: string) => Promise<string | null>;
   /** Web mode: forgets the session in this tab. */
   signOut: () => void;
   /** Web mode: the account's role (null in Telegram). */
@@ -66,6 +68,14 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
   const signIn = useCallback(
     async (username: string, password: string, code: string): Promise<void> => {
       startWeb(await api.webAuth({ username, password, code }));
+    },
+    [startWeb],
+  );
+  const signInWithKey = useCallback(
+    async (key: string): Promise<string | null> => {
+      const session = await api.webKeyAuth(key);
+      startWeb(session);
+      return session.webShop?.slug ?? null;
     },
     [startWeb],
   );
@@ -114,11 +124,12 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
       error,
       isSuperAdmin: user?.role === 'admin',
       signIn,
+      signInWithKey,
       signOut,
       webRole,
       replaceWebToken,
     }),
-    [status, user, error, signIn, signOut, webRole, replaceWebToken],
+    [status, user, error, signIn, signInWithKey, signOut, webRole, replaceWebToken],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

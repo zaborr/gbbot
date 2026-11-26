@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import { useSession } from '../providers/SessionProvider.js';
-import { onNoticesSeen, useWebButton } from '../lib/web.js';
+import { isCustomerWeb, onNoticesSeen, useWebButton } from '../lib/web.js';
 import { Input } from './Field.js';
 import { PageTitle } from './PageTitle.js';
 import { api, ApiClientError } from '../api/client.js';
@@ -22,9 +22,10 @@ export function WebTopBar(): React.JSX.Element {
   const { user, signOut } = useSession();
   // In a browser the catalog leads to the admin screens, so going back from
   // there (or the catalog) goes to the list of GBs.
-  const toList = SHOP_ROOT.test(pathname) || SHOP_ADMIN.test(pathname);
-  // The inbox belongs to platform accounts (linked ones get the bot's messages).
-  const platform = (user?.telegramId ?? 0) < 0;
+  const toList = !isCustomerWeb() && (SHOP_ROOT.test(pathname) || SHOP_ADMIN.test(pathname));
+  // The inbox belongs to platform accounts (linked ones get the bot's messages);
+  // customers have their own (what the bot told them).
+  const platform = !isCustomerWeb() && (user?.telegramId ?? 0) < 0;
   const unread = useUnreadNotices(pathname, platform);
   return (
     <div
@@ -49,6 +50,11 @@ export function WebTopBar(): React.JSX.Element {
             🏠
           </Button>
         </>
+      )}
+      {isCustomerWeb() && (
+        <Button size="s" mode="plain" title={t('webKey.notices')} onClick={() => navigate('/notices')}>
+          🔔
+        </Button>
       )}
       {platform && (
         <Button size="s" mode="plain" onClick={() => navigate('/platform/notices')}>
@@ -207,6 +213,68 @@ export function WebSignIn(): React.JSX.Element {
           </Cell>
         </Section>
       )}
+    </List>
+  );
+}
+
+/** The message the platform puts on the web's entrance (the bot is down…). */
+export function WebBanner(): React.JSX.Element | null {
+  const banner = useAsync(() => api.webBanner(), []);
+  const text = banner.data?.text;
+  if (!text) return null;
+  return (
+    <div className="gb-web-banner" role="status">
+      📢 {text}
+    </div>
+  );
+}
+
+/** A customer on the web: the key an organiser gave them, pasted. */
+export function WebKeySignIn(): React.JSX.Element {
+  const { signInWithKey } = useSession();
+  const [key, setKey] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (): Promise<void> => {
+    setBusy(true);
+    setError(null);
+    try {
+      const slug = await signInWithKey(key.trim());
+      if (slug) window.location.hash = `#/s/${encodeURIComponent(slug)}`;
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : t('app.signInFailed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <List style={{ maxWidth: 420, margin: '0 auto' }}>
+      <WebBanner />
+      <PageTitle title={t('webKey.title')} />
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
+        <Section footer={error ?? t('webKey.footer')}>
+          <Input
+            header={t('webKey.field')}
+            placeholder="pato-XXXX-XXXX-XXXX-sol"
+            autoCapitalize="none"
+            autoComplete="off"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+          />
+          <div style={{ padding: 16 }}>
+            <Button stretched type="submit" loading={busy} disabled={key.trim().length < 8}>
+              {t('webKey.submit')}
+            </Button>
+          </div>
+        </Section>
+      </form>
     </List>
   );
 }

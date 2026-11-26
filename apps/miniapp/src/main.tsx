@@ -16,10 +16,16 @@ const container = document.getElementById('root');
 if (!container) throw new Error('Root container #root not found');
 const root = createRoot(container);
 
-// Outside Telegram, on the onion address only, the app runs in web mode
-// (sign-in of web administrators); elsewhere it asks to open it in Telegram.
-const web = !isTMA() && window.location.hostname.endsWith('.onion');
-setWebMode(web);
+// Outside Telegram the app runs in web mode (on the normal domain and the
+// onion address alike): at /admin for the organisers (username, password and
+// code), anywhere else for customers (with the key an organiser gave them).
+const web = !isTMA();
+const atAdmin = window.location.pathname.replace(/\/+$/, '') === '/admin';
+setWebMode(web, atAdmin ? 'admin' : 'customer');
+// A GB's link (/s/<gb>) opens it in the app's own paths (after the #).
+if (web && !atAdmin && /^\/s\/[^/]+/.test(window.location.pathname)) {
+  window.history.replaceState(null, '', `/#${window.location.pathname}`);
+}
 
 try {
   if (!web) init(import.meta.env.DEV);

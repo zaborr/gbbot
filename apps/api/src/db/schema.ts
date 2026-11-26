@@ -382,6 +382,8 @@ export const platformSettings = pgTable('platform_settings', {
   supervisorIds: jsonb('supervisor_ids').$type<number[]>().notNull().default([]),
   /** Supervisors added by @username not seen yet (lowercase, no "@"). */
   supervisorUsernames: jsonb('supervisor_usernames').$type<string[]>().notNull().default([]),
+  /** Shown on the web's entrance (e.g. "the bot is down: use the web"); null: none. */
+  webBanner: text('web_banner'),
   /** People who must not see any GB. */
   blacklist: jsonb('blacklist').$type<Blacklist>().notNull().default({ userIds: [], usernames: [] }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -941,4 +943,43 @@ export const pendingOrders = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('pending_orders_who_idx').on(table.who)],
+);
+
+/**
+ * Keys an organiser gives a customer to use the GB on the web (when the bot is
+ * down): only their hash is kept. One customer, one GB; they expire or are
+ * taken back.
+ */
+export const webKeys = pgTable(
+  'web_keys',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: uuid('shop_id')
+      .notNull()
+      .references(() => shops.id, { onDelete: 'cascade' }),
+    userId: bigint('user_id', { mode: 'number' })
+      .notNull()
+      .references(() => users.telegramId, { onDelete: 'cascade' }),
+    hash: text('hash').notNull().unique(),
+    createdBy: bigint('created_by', { mode: 'number' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  },
+  (table) => [index('web_keys_user_idx').on(table.userId)],
+);
+
+/** What the bot told a customer who has a web key: readable on the web even if the bot is down. */
+export const customerNotices = pgTable(
+  'customer_notices',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: bigint('user_id', { mode: 'number' })
+      .notNull()
+      .references(() => users.telegramId, { onDelete: 'cascade' }),
+    text: text('text').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('customer_notices_user_idx').on(table.userId, table.createdAt)],
 );

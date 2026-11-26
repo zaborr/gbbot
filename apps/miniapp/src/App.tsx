@@ -71,8 +71,9 @@ import {
   PlatformWebAccountsPage,
 } from './pages/platform/PlatformWebAccountsPage.js';
 import { lang, onLangChange, t } from './i18n/index.js';
-import { isWebMode } from './lib/web.js';
-import { WebMainButton, WebSignIn, WebTopBar } from './components/WebChrome.js';
+import { isCustomerWeb, isWebMode } from './lib/web.js';
+import { WebNoticesPage } from './pages/WebNoticesPage.js';
+import { WebBanner, WebKeySignIn, WebMainButton, WebSignIn, WebTopBar } from './components/WebChrome.js';
 
 /** Web mode has no customer screens (no cart, no orders): a GB opens on its admin. */
 function WebToAdmin(): React.JSX.Element {
@@ -80,9 +81,9 @@ function WebToAdmin(): React.JSX.Element {
   return <Navigate to={shopPath(shopRef, '/admin')} replace />;
 }
 
-/** A customer screen; in web mode, the GB's admin instead. */
+/** A customer screen; for the organisers on the web, the GB's admin instead. */
 const customer = (element: React.JSX.Element): React.JSX.Element =>
-  isWebMode() ? <WebToAdmin /> : element;
+  isWebMode() && !isCustomerWeb() ? <WebToAdmin /> : element;
 
 function platform(): 'ios' | 'base' {
   try {
@@ -98,7 +99,7 @@ function Shell(): React.JSX.Element {
   const { status, error } = useSession();
 
   if (status === 'loading') return <Loader />;
-  if (status === 'signin') return <WebSignIn />;
+  if (status === 'signin') return isCustomerWeb() ? <WebKeySignIn /> : <WebSignIn />;
   if (status === 'error') {
     return (
       <Placeholder header={t('app.signInFailed')} description={error ?? t('app.reopen')}>
@@ -110,6 +111,7 @@ function Shell(): React.JSX.Element {
   const routes = (
     <Routes>
       <Route path="/" element={<ShopsPage />} />
+      <Route path="/notices" element={<WebNoticesPage />} />
       <Route path="/platform" element={<PlatformPage />} />
       <Route path="/platform/shops/:id" element={<PlatformShopPage />} />
       <Route path="/platform/retention" element={<PlatformRetentionPage />} />
@@ -181,6 +183,7 @@ function Shell(): React.JSX.Element {
   return (
     <>
       <WebTopBar />
+      {isCustomerWeb() && <WebBanner />}
       {routes}
       <WebMainButton />
     </>
