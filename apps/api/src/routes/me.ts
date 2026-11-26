@@ -48,6 +48,12 @@ export function meRoutes(): Hono<AppBindings> {
   });
   app.put('/security-phrase', zValidator('json', securityPhraseRequest), async (c) => {
     const { phrase } = c.req.valid('json');
+    // With a web key: chosen if they have none (to order), never changed — whoever
+    // gave the key must not replace it with one of their own.
+    if (c.get('claims').ck !== undefined) {
+      const row = await c.get('db').query.users.findFirst({ where: eq(users.telegramId, c.get('claims').sub) });
+      if (row?.securityPhrase) throw ApiError.forbidden('Change your security phrase in Telegram');
+    }
     await c
       .get('db')
       .update(users)
