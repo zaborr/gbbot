@@ -13,6 +13,17 @@ import { shopsOpenToOutside } from '../services/testing.js';
 import { and, eq } from 'drizzle-orm';
 import { isClosedAt } from '@tma-shop/shared';
 import { orders } from '../db/schema.js';
+import type { SessionClaims } from '../auth/jwt.js';
+
+/** The caller's session when a valid token is present, else undefined. */
+async function peekClaims(header: string | undefined, env: Env, db: Database): Promise<SessionClaims | undefined> {
+  if (!header?.startsWith('Bearer ')) return undefined;
+  try {
+    return await authenticate(header.slice('Bearer '.length).trim(), env, db);
+  } catch {
+    return undefined;
+  }
+}
 
 /** Telegram id of the caller when a valid session token is present, else undefined. */
 export async function peekUserId(
@@ -20,13 +31,7 @@ export async function peekUserId(
   env: Env,
   db: Database,
 ): Promise<number | undefined> {
-  if (!header?.startsWith('Bearer ')) return undefined;
-  try {
-    const claims = await authenticate(header.slice('Bearer '.length).trim(), env, db);
-    return claims.sub;
-  } catch {
-    return undefined;
-  }
+  return (await peekClaims(header, env, db))?.sub;
 }
 
 /**
@@ -38,8 +43,12 @@ export async function peekUserId(
 export const withShop = createMiddleware<AppBindings>(async (c, next) => {
   const env = c.get('env');
   const shop = await resolveShop(c.get('db'), c.req.header('X-Shop'));
-  const userId = await peekUserId(c.req.header('Authorization'), env, c.get('db'));
-  const canManage = canManageShop(env, shop, userId);
+  const claims = await peekClaims(c.req.header('Authorization'), env, c.get('db'));
+  const userId = claims?.sub;
+  // A customer's web key reaches only its GB, and never manages it.
+  if (claims?.ws !== undefined && claims.ws !== shop.id) throw ApiError.notFound('Shop not found');
+  const keyed = claims?.ck !== undefined;
+  const canManage = !keyed && canManageShop(env, shop, userId);
   if (!shop.isVisible && !canManage) throw ApiError.notFound('Shop not found');
   // Blacklisted: for them the GB does not exist (same answer as a missing one).
   if (userId !== undefined && (await isBlocked(c.get('db'), env, shop, userId))) {
@@ -68,7 +77,7 @@ export const withShop = createMiddleware<AppBindings>(async (c, next) => {
   c.set('isVip', isVip);
   c.set('shopId', shop.id);
   c.set('canManage', canManage);
-  c.set('canOwn', canOwnShop(env, shop, userId));
+  c.set('canOwn', !keyed && canOwnShop(env, shop, userId));
   c.set(
     'disclaimerPending',
     !canManage && (await disclaimerPending(c.get('db'), shop, userId)),

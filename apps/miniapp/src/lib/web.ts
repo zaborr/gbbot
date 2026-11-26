@@ -6,22 +6,36 @@ import type { AuthResponse, WebFile } from '@tma-shop/shared';
  * Tor) instead of inside Telegram. Set once at start-up.
  */
 let web = false;
+/** Who the web is for: the organisers (at /admin) or the customers (with a key). */
+let kind: 'admin' | 'customer' = 'admin';
 
-export function setWebMode(value: boolean): void {
+export function setWebMode(value: boolean, as: 'admin' | 'customer' = 'admin'): void {
   web = value;
+  kind = as;
 }
 
 export function isWebMode(): boolean {
   return web;
 }
 
-const SESSION_KEY = 'gb:web-session';
+/** A customer on the web (signed in with a key), not an organiser. */
+export function isCustomerWeb(): boolean {
+  return web && kind === 'customer';
+}
 
-/** The web session lives only in this tab: closing it signs out. */
+const SESSION_KEY = 'gb:web-session';
+const CUSTOMER_KEY = 'gb:web-customer';
+
+/**
+ * The organisers' web session lives only in this tab (closing it signs out);
+ * a customer's stays in this browser until their key expires or they leave.
+ */
 export function webSession(): AuthResponse | null {
   try {
-    const raw = window.sessionStorage.getItem(SESSION_KEY);
-    return raw ? (JSON.parse(raw) as AuthResponse) : null;
+    const raw =
+      kind === 'customer' ? window.localStorage.getItem(CUSTOMER_KEY) : window.sessionStorage.getItem(SESSION_KEY);
+    const session = raw ? (JSON.parse(raw) as AuthResponse) : null;
+    return session && new Date(session.expiresAt).getTime() > Date.now() ? session : null;
   } catch {
     return null;
   }
@@ -29,8 +43,10 @@ export function webSession(): AuthResponse | null {
 
 export function setWebSession(session: AuthResponse | null): void {
   try {
-    if (session) window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    else window.sessionStorage.removeItem(SESSION_KEY);
+    const store = kind === 'customer' ? window.localStorage : window.sessionStorage;
+    const key = kind === 'customer' ? CUSTOMER_KEY : SESSION_KEY;
+    if (session) store.setItem(key, JSON.stringify(session));
+    else store.removeItem(key);
   } catch {
     // Storage blocked: the session lasts until the page is reloaded.
   }

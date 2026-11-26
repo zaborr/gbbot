@@ -82,6 +82,8 @@ export const authResponse = z.object({
   user: sessionUser,
   /** Web sessions: the account's role. */
   webRole: webRole.optional(),
+  /** A customer's web key: the GB it opens. */
+  webShop: z.object({ id: z.string(), slug: z.string() }).optional(),
 });
 export type AuthResponse = z.infer<typeof authResponse>;
 

@@ -12,6 +12,7 @@ import type { Database } from '../db/client.js';
 import type { Env } from '../config/env.js';
 import { requireAuth, requireTelegramUser } from '../auth/middleware.js';
 import { setPreferredLanguage } from '../services/users.js';
+import { noticesOf } from '../services/webKeys.js';
 import { toSessionUserDTO } from '../db/mappers.js';
 import { eq } from 'drizzle-orm';
 import { users } from '../db/schema.js';
@@ -143,6 +144,9 @@ export function meRoutes(): Hono<AppBindings> {
     }
     return c.body(null, 204);
   });
+
+  // A customer on the web: what the bot told them (also while the bot is down).
+  app.get('/notices', requireAuth, async (c) => c.json(await noticesOf(c.get('db'), c.get('claims').sub)));
 
   return app;
 }

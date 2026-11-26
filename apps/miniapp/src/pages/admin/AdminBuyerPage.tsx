@@ -1,3 +1,4 @@
+import { WebAccessSection } from '../../components/WebAccess.js';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
@@ -141,6 +142,8 @@ function AdminBuyer(): React.JSX.Element {
           ))}
         </Section>
       )}
+
+      <WebAccessSection userId={b.telegramId} />
 
       <Section header={t('buyers.messageTitle')} footer={t('buyers.messageFooter')}>
         <Cell

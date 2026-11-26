@@ -888,3 +888,13 @@ html[data-theme='dark'] .gb-testing-badge--hot {
 .gb-catbar > * {
   flex: 0 0 auto;
 }
+
+/* The platform's message on the web (the bot is down…). */
+.gb-web-banner {
+  margin: 8px 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--tgui--secondary_bg_color);
+  border: 1px solid var(--tgui--link_color, #2481cc);
+  white-space: pre-wrap;
+}

@@ -610,6 +610,13 @@
       "when": 1797451200000,
       "tag": "0086_pending_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1797537600000,
+      "tag": "0087_customer_web",
+      "breakpoints": true
     }
   ]
 }

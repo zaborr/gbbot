@@ -13,6 +13,10 @@ export interface SessionClaims {
   ver?: number;
   /** Web accounts: the account's id (sessions opened on the web). */
   wid?: number;
+  /** A customer on the web with an access key: the key's id (revoked keys end the session). */
+  ck?: string;
+  /** That key's GB: the session only reaches it. */
+  ws?: string;
 }
 
 const ALG = 'HS256';
@@ -33,6 +37,8 @@ export async function signSession(
     role: claims.role,
     ...(claims.ver === undefined ? {} : { ver: claims.ver }),
     ...(claims.wid === undefined ? {} : { wid: claims.wid }),
+    ...(claims.ck === undefined ? {} : { ck: claims.ck }),
+    ...(claims.ws === undefined ? {} : { ws: claims.ws }),
   })
     .setProtectedHeader({ alg: ALG })
     .setSubject(String(claims.sub))
@@ -59,5 +65,7 @@ function claimsFromPayload(payload: JWTPayload): SessionClaims {
     role,
     ...(typeof payload.ver === 'number' ? { ver: payload.ver } : {}),
     ...(typeof payload.wid === 'number' ? { wid: payload.wid } : {}),
+    ...(typeof payload.ck === 'string' ? { ck: payload.ck } : {}),
+    ...(typeof payload.ws === 'string' ? { ws: payload.ws } : {}),
   };
 }

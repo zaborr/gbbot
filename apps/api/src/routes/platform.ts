@@ -39,6 +39,7 @@ import {
   withNames,
 } from '../services/vip.js';
 import { getOrganizers, getShopTeam, getSupervisors, updateOrganizers, updateSupervisors } from '../services/team.js';
+import { setWebBanner, webBanner } from '../services/webKeys.js';
 import { ApiError } from '../lib/errors.js';
 import { botSwitches, shops } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
@@ -262,6 +263,13 @@ export function platformRoutes(): Hono<AppBindings> {
   app.put('/organizers', zValidator('json', updateOrganizersRequest), async (c) => {
     const { people, releaseShops } = c.req.valid('json');
     return c.json(await updateOrganizers(c.get('db'), people, releaseShops ?? false));
+  });
+
+  // The message on the web's entrance (the bot is down…).
+  app.get('/web-banner', async (c) => c.json({ text: await webBanner(c.get('db')) }));
+  app.put('/web-banner', zValidator('json', z.object({ text: z.string().max(1000).nullable() })), async (c) => {
+    await setWebBanner(c.get('db'), c.req.valid('json').text);
+    return c.json({ ok: true });
   });
 
   // Supervisors: administrators of every GB, nothing of the platform's.

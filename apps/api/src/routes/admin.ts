@@ -50,6 +50,7 @@ import { requireAdmin, requireAuth, requireOwner } from '../auth/middleware.js';
 import { imageUrl, saveImage } from '../services/images.js';
 import { labelFile, requestLabel, requestLabels, sendLabelTo } from '../services/labels.js';
 import { createOrderFor, listPendingOrders, removePendingOrder } from '../services/adminOrders.js';
+import { addCustomer, giveKey, keyOf, revokeKeys } from '../services/webKeys.js';
 import { testingAdminRoutes } from './testing.js';
 import { announceTestingTiers, listTestings, markTestings, setTestingEnabled } from '../services/testing.js';
 import { unpaidExtras } from '../services/testingExtra.js';
@@ -764,6 +765,37 @@ export function adminRoutes(): Hono<AppBindings> {
       o.userId !== null && blocked.has(o.userId) ? { ...o, customerBlocked: true } : o,
     );
   };
+  // Web access for customers (when the bot is down): a key for someone, taking it back,
+  // and adding someone new by their Telegram ID.
+  app.get('/web-keys/:userId', zValidator('param', z.object({ userId: z.coerce.number().int() })), async (c) =>
+    c.json({ key: await keyOf(c.get('db'), c.get('shopId'), c.req.valid('param').userId) }),
+  );
+  app.post('/web-keys', zValidator('json', z.object({ userId: z.number().int().positive() })), async (c) => {
+    const shop = c.get('shop');
+    const given = await giveKey(c.get('db'), shop.id, c.req.valid('json').userId, c.get('claims').sub);
+    const base = (c.get('env').PUBLIC_URL ?? new URL(c.req.url).origin).replace(/\/+$/, '');
+    return c.json({ ...given, url: `${base}/s/${shop.slug}` }, 201);
+  });
+  app.delete('/web-keys/:userId', zValidator('param', z.object({ userId: z.coerce.number().int() })), async (c) => {
+    await revokeKeys(c.get('db'), c.get('shopId'), c.req.valid('param').userId);
+    return c.json({ ok: true });
+  });
+  app.post(
+    '/customers',
+    zValidator(
+      'json',
+      z.object({
+        telegramId: z.number().int().positive(),
+        username: z.string().trim().max(40).nullable().default(null),
+        firstName: z.string().trim().min(1).max(64),
+      }),
+    ),
+    async (c) => {
+      await addCustomer(c.get('db'), c.req.valid('json'));
+      return c.json({ ok: true }, 201);
+    },
+  );
+
   // An order made by the organisers for someone; those waiting for them to open the bot.
   app.post('/orders/create', zValidator('json', adminCreateOrderRequest), async (c) =>
     c.json(await createOrderFor(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('json')), 201),

@@ -7,6 +7,10 @@ import { signSession } from '../auth/jwt.js';
 import { claimInvites } from '../services/testingAdd.js';
 import { claimPendingOrders } from '../services/adminOrders.js';
 import { getUser, upsertUser } from '../services/users.js';
+import { signInWithKey } from '../services/webKeys.js';
+import { shops } from '../db/schema.js';
+import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { claimPendingRoles } from '../services/team.js';
 import { claimBlacklisted } from '../services/blacklist.js';
 import { toSessionUserDTO } from '../db/mappers.js';
@@ -56,6 +60,29 @@ export function authRoutes(): Hono<AppBindings> {
       token,
       expiresAt: expiresAt.toISOString(),
       user: toSessionUserDTO(userRow, role),
+    };
+    return c.json(response);
+  });
+
+  // A customer on the web with the key an organiser gave them: their own account, in that GB.
+  app.post('/key', zValidator('json', z.object({ key: z.string().trim().min(8).max(100) })), async (c) => {
+    const env = c.get('env');
+    const db = c.get('db');
+    const found = await signInWithKey(db, c.req.valid('json').key);
+    const userRow = found ? await getUser(db, found.userId) : undefined;
+    const shop = found ? await db.query.shops.findFirst({ where: eq(shops.id, found.shopId) }) : undefined;
+    if (!found || !userRow || !shop) throw ApiError.unauthorized('This key is not valid (wrong, taken back or expired)');
+    const ttl = Math.max(60, Math.floor((found.expiresAt.getTime() - Date.now()) / 1000));
+    const { token, expiresAt } = await signSession(
+      { sub: userRow.telegramId, role: 'customer', ck: found.keyId, ws: shop.id },
+      env.JWT_SECRET,
+      ttl,
+    );
+    const response: AuthResponse = {
+      token,
+      expiresAt: expiresAt.toISOString(),
+      user: toSessionUserDTO(userRow, 'customer'),
+      webShop: { id: shop.id, slug: shop.slug },
     };
     return c.json(response);
   });

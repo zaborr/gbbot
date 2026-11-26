@@ -756,6 +756,43 @@ export class ApiClient {
   }
 
   /** The time to join and give opens again (closed, or settled with nothing reached). */
+  /** A customer on the web: the key an organiser gave them. */
+  webKeyAuth(key: string): Promise<AuthResponse> {
+    return this.request<AuthResponse>('/auth/key', { method: 'POST', body: JSON.stringify({ key }) });
+  }
+
+  webBanner(): Promise<{ text: string | null }> {
+    return this.request<{ text: string | null }>('/web/banner');
+  }
+
+  myNotices(): Promise<Array<{ id: string; text: string; at: string }>> {
+    return this.request('/me/notices');
+  }
+
+  platformSetWebBanner(text: string | null): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>('/platform/web-banner', { method: 'PUT', body: JSON.stringify({ text }) });
+  }
+
+  platformWebBanner(): Promise<{ text: string | null }> {
+    return this.request<{ text: string | null }>('/platform/web-banner');
+  }
+
+  adminWebKey(userId: number): Promise<{ key: { createdAt: string; expiresAt: string; lastUsedAt: string | null } | null }> {
+    return this.request(`/admin/web-keys/${userId}`);
+  }
+
+  adminGiveWebKey(userId: number): Promise<{ key: string; expiresAt: string; url: string }> {
+    return this.request('/admin/web-keys', { method: 'POST', body: JSON.stringify({ userId }) });
+  }
+
+  adminRevokeWebKey(userId: number): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/web-keys/${userId}`, { method: 'DELETE' });
+  }
+
+  adminAddCustomer(input: { telegramId: number; username: string | null; firstName: string }): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>('/admin/customers', { method: 'POST', body: JSON.stringify(input) });
+  }
+
   adminCreateOrder(input: {
     who: string;
     items: Array<{ productId: string; variantId: string | null; quantity: number; unitPrice: number | null }>;
