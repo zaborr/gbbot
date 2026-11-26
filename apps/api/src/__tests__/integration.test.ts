@@ -5171,7 +5171,10 @@ describeDb('API integration', () => {
       body: JSON.stringify({ telegramId: 555010001, username: 'web_only', firstName: 'Wendy' }),
     });
     expect(added.status).toBe(201);
-    // Found again by their @username, any case, with or without the @.
+    // The @username typed by hand is not kept; the bot fills it in when they open it.
+    expect((await db.query.users.findFirst({ where: eq(users.telegramId, 555010001) }))?.username).toBeNull();
+    await db.update(users).set({ username: 'web_only' }).where(eq(users.telegramId, 555010001));
+    // Found by their @username, any case, with or without the @.
     const lookup = await request('/api/admin/customers/lookup?username=%40Web_Only', { headers: admin });
     expect(((await lookup.json()) as { telegramId: number }[]).map((u) => u.telegramId)).toEqual([555010001]);
     const nobody = await request('/api/admin/customers/lookup?username=nobody_here', { headers: admin });
