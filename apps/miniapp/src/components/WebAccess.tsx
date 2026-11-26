@@ -141,22 +141,20 @@ export function NewCustomerSection(): React.JSX.Element {
   const valid = /^\d{3,15}$/.test(id.trim());
   return (
     <Section header={t('custKey.newCustomer')} footer={note ?? t('custKey.newCustomerFooter')}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '16px 16px 0' }}>
-        <Input
-          header={t('custKey.telegramId')}
-          inputMode="numeric"
-          value={id}
-          onChange={(e) => setId(e.target.value.replace(/\D/g, ''))}
-        />
-        <Input
-          header={t('custKey.username')}
-          placeholder="@usuario"
-          autoCapitalize="none"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-        <Input header={t('custKey.name')} value={name} onChange={(e) => setName(e.target.value)} />
-      </div>
+      <Input
+        header={t('custKey.telegramId')}
+        inputMode="numeric"
+        value={id}
+        onChange={(e) => setId(e.target.value.replace(/\D/g, ''))}
+      />
+      <Input
+        header={t('custKey.username')}
+        placeholder="@usuario"
+        autoCapitalize="none"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+      />
+      <Input header={t('custKey.name')} value={name} onChange={(e) => setName(e.target.value)} />
       <div style={{ display: 'flex', gap: 8, padding: 16 }}>
         <Button stretched mode="bezeled" onClick={() => setOpen(false)}>
           {t('common.cancel')}
