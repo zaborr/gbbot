@@ -74,6 +74,9 @@ import type {
 } from '@tma-shop/shared';
 import { lang } from '../i18n/index.js';
 
+/** Proof of a finished "Log in with Telegram" (the server keeps who it was). */
+export type TelegramAuth = string;
+
 export interface ShopsResponse {
   shops: ShopSummary[];
   isSuperAdmin: boolean;
@@ -797,6 +800,97 @@ export class ApiClient {
 
   adminAddCustomer(input: { telegramId: number; username: string | null; firstName: string }): Promise<{ ok: boolean }> {
     return this.request<{ ok: boolean }>('/admin/customers', { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  // --- Customers' web accounts ---------------------------------------------------
+
+  webConfig(): Promise<{ telegramLogin: boolean }> {
+    return this.request('/web/config');
+  }
+
+  telegramLoginStart(): Promise<{ url: string; state: string }> {
+    return this.request('/auth/telegram/start', { method: 'POST' });
+  }
+
+  telegramLoginResult(state: string): Promise<{ status: 'waiting' | 'ready' | 'failed' }> {
+    return this.request('/web/telegram/result', { method: 'POST', body: JSON.stringify({ state }) });
+  }
+
+  inviteInfo(code: string): Promise<{ kind: 'group' | 'personal'; name: string | null }> {
+    return this.request('/auth/invite', { method: 'POST', body: JSON.stringify({ code }) });
+  }
+
+  signUp(input: { code: string; username: string; password: string; telegram?: TelegramAuth }): Promise<AuthResponse> {
+    return this.request<AuthResponse>('/auth/signup', { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  accountLogin(username: string, password: string): Promise<AuthResponse> {
+    return this.request<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+  }
+
+  telegramLogin(telegram: TelegramAuth): Promise<AuthResponse> {
+    return this.request<AuthResponse>('/auth/telegram', { method: 'POST', body: JSON.stringify({ telegram }) });
+  }
+
+  myAccount(): Promise<{ account: { username: string; linkState: 'confirmed' | 'staff' } | null }> {
+    return this.request('/me/account');
+  }
+
+  createMyAccount(input: { username: string; password: string; telegram?: TelegramAuth }): Promise<{
+    username: string;
+    linkState: 'confirmed' | 'staff';
+    token: string;
+    expiresAt: string;
+  }> {
+    return this.request('/me/account', { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  changeMyPassword(input: { password: string; current?: string; telegram?: TelegramAuth }): Promise<{ token: string; expiresAt: string }> {
+    return this.request('/me/account/password', { method: 'PUT', body: JSON.stringify(input) });
+  }
+
+  confirmMyAccount(telegram: TelegramAuth): Promise<{ linkState: 'confirmed' }> {
+    return this.request('/me/account/confirm', { method: 'POST', body: JSON.stringify({ telegram }) });
+  }
+
+  adminCreateInvite(input: {
+    kind: 'group' | 'personal';
+    days?: number;
+    userId?: number;
+    vip?: 'none' | 'shop' | 'platform';
+  }): Promise<{ id: string; code: string; expiresAt: string; url: string; more: string[] }> {
+    return this.request('/admin/invites', { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  adminInvites(): Promise<
+    Array<{
+      id: string;
+      kind: 'group' | 'personal';
+      forWhom: string | null;
+      vip: string;
+      createdBy: string;
+      createdAt: string;
+      expiresAt: string;
+      revoked: boolean;
+      uses: number;
+    }>
+  > {
+    return this.request('/admin/invites');
+  }
+
+  adminRevokeInvite(id: string): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/admin/invites/${id}`, { method: 'DELETE' });
+  }
+
+  adminAccount(userId: number): Promise<{
+    account: { username: string; linkState: 'confirmed' | 'staff'; linkedBy: string | null; manages: boolean } | null;
+    canReset: boolean;
+  }> {
+    return this.request(`/admin/accounts/${userId}`);
+  }
+
+  adminResetAccount(userId: number): Promise<{ username: string; password: string }> {
+    return this.request(`/admin/accounts/${userId}/reset`, { method: 'POST' });
   }
 
   adminCreateOrder(input: {

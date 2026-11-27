@@ -1,4 +1,6 @@
-import { createHash, createHmac, generateKeyPairSync } from 'node:crypto';
+import { createHmac, generateKeyPairSync } from 'node:crypto';
+import { generateKeyPair as generateJoseKeys, SignJWT } from 'jose';
+import { setTelegramLoginTransport } from '../services/telegramLogin.js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import type { Pool } from 'pg';
@@ -5313,8 +5315,7 @@ describeDb('API integration', () => {
   });
 
   it('opens customer web accounts with invitations, and signs them in', async () => {
-    const LOGIN_TOKEN = '777000:login-bot-token';
-    const acc = createApp({ env: { ...testEnv, LOGIN_BOT_TOKEN: LOGIN_TOKEN, LOGIN_BOT_USERNAME: 'gb_login_bot' }, db });
+    const acc = createApp({ env: { ...testEnv, LOGIN_BOT_CLIENT_ID: 777000, LOGIN_BOT_CLIENT_SECRET: 'login-secret' }, db });
     const call = (path: string, init: RequestInit & { json?: unknown } = {}): Promise<Response> => {
       const headers = new Headers(init.headers);
       if (!headers.has('X-Shop')) headers.set('X-Shop', shopId);
@@ -5323,12 +5324,36 @@ describeDb('API integration', () => {
         acc.request(path, { ...init, headers, ...(init.json !== undefined ? { body: JSON.stringify(init.json) } : {}) }),
       );
     };
-    // What Telegram's login button hands the page, signed like Telegram signs it.
-    const telegramOf = (id: number, username: string): Record<string, string | number> => {
-      const data: Record<string, string | number> = { id, first_name: `Name${id}`, username, auth_date: Math.floor(Date.now() / 1000) };
-      const check = Object.keys(data).sort().map((k) => `${k}=${data[k]}`).join('\n');
-      const hash = createHmac('sha256', createHash('sha256').update(LOGIN_TOKEN).digest()).update(check).digest('hex');
-      return { ...data, hash };
+    // Telegram's OpenID Connect, faked: its token endpoint signs an ID token for whoever "pressed".
+    const { privateKey, publicKey } = await generateJoseKeys('RS256');
+    let pressing = { id: 0, username: '' };
+    let tokenRequest = '';
+    setTelegramLoginTransport({
+      keys: async () => publicKey,
+      fetch: (async (_url: unknown, init?: RequestInit) => {
+        tokenRequest = String(init?.body ?? '');
+        const idToken = await new SignJWT({ id: pressing.id, name: `Name${pressing.id}`, preferred_username: pressing.username })
+          .setProtectedHeader({ alg: 'RS256' })
+          .setIssuer('https://oauth.telegram.org')
+          .setAudience('777000')
+          .setSubject(String(pressing.id))
+          .setIssuedAt()
+          .setExpirationTime('5m')
+          .sign(privateKey);
+        return new Response(JSON.stringify({ id_token: idToken }), { status: 200 });
+      }) as typeof fetch,
+    });
+    /** "Log in with Telegram" as the page does it: start, Telegram comes back, ready → the proof. */
+    const telegramOf = async (id: number, username: string): Promise<string> => {
+      const started = (await (await call('/api/auth/telegram/start', { method: 'POST' })).json()) as { url: string; state: string };
+      expect(started.url).toContain('https://oauth.telegram.org/auth?');
+      expect(started.url).toContain('code_challenge_method=S256');
+      pressing = { id, username };
+      const back = await call(`/api/auth/telegram/callback?state=${started.state}&code=abc`);
+      expect(back.status).toBe(200);
+      expect(tokenRequest).toContain('code_verifier=');
+      expect(await (await call('/api/web/telegram/result', { method: 'POST', json: { state: started.state } })).json()).toEqual({ status: 'ready' });
+      return started.state;
     };
     const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}` };
     const stamp = Date.now() % 100000;
@@ -5343,10 +5368,9 @@ describeDb('API integration', () => {
     const signUp = (json: unknown): Promise<Response> => call('/api/auth/signup', { method: 'POST', json });
     const password = 'long enough pass';
     expect((await signUp({ code: group.code, username: `ana${stamp}`, password })).status).toBe(400);
-    // A forged Telegram: refused.
-    const forged = { ...telegramOf(555030001, 'ana_t'), id: 555030009 };
-    expect((await signUp({ code: group.code, username: `ana${stamp}`, password, telegram: forged })).status).toBe(401);
-    const opened = await signUp({ code: group.code, username: `ana${stamp}`, password, telegram: telegramOf(555030001, 'ana_t') });
+    // A proof nobody finished: refused.
+    expect((await signUp({ code: group.code, username: `ana${stamp}`, password, telegram: 'x'.repeat(32) })).status).toBe(401);
+    const opened = await signUp({ code: group.code, username: `ana${stamp}`, password, telegram: await telegramOf(555030001, 'ana_t') });
     expect(opened.status).toBe(201);
     const ana = (await opened.json()) as { token: string; user: { telegramId: number }; account: { linkState: string } };
     expect(ana.user.telegramId).toBe(555030001);
@@ -5360,13 +5384,13 @@ describeDb('API integration', () => {
     expect([403, 404]).toContain((await call('/api/admin/orders', { headers: asAna })).status);
     expect((await call('/api/me/web-access', { headers: asAna })).status).toBe(403);
     // The same Telegram twice: no.
-    expect((await signUp({ code: group.code, username: `ana2${stamp}`, password, telegram: telegramOf(555030001, 'ana_t') })).status).toBe(409);
+    expect((await signUp({ code: group.code, username: `ana2${stamp}`, password, telegram: await telegramOf(555030001, 'ana_t') })).status).toBe(409);
 
     // Signing in: username and password, or Telegram.
     expect((await call('/api/auth/login', { method: 'POST', json: { username: `ANA${stamp}`, password } })).status).toBe(200);
     expect((await call('/api/auth/login', { method: 'POST', json: { username: `ana${stamp}`, password: 'wrong one!!' } })).status).toBe(401);
-    expect((await call('/api/auth/telegram', { method: 'POST', json: { telegram: telegramOf(555030001, 'ana_t') } })).status).toBe(200);
-    expect((await call('/api/auth/telegram', { method: 'POST', json: { telegram: telegramOf(555030099, 'nobody') } })).status).toBe(404);
+    expect((await call('/api/auth/telegram', { method: 'POST', json: { telegram: await telegramOf(555030001, 'ana_t') } })).status).toBe(200);
+    expect((await call('/api/auth/telegram', { method: 'POST', json: { telegram: await telegramOf(555030099, 'nobody') } })).status).toBe(404);
 
     // A new password with the current one: other sessions end.
     const changed = await call('/api/me/account/password', { method: 'PUT', headers: asAna, json: { password: 'another long one', current: password } });
@@ -5380,7 +5404,7 @@ describeDb('API integration', () => {
       await call('/api/admin/invites', { method: 'POST', headers: admin, json: { kind: 'personal', userId: 555030002, vip: 'shop' } })
     ).json()) as { code: string };
     expect(((await (await call('/api/auth/invite', { method: 'POST', json: { code: personal.code } })).json()) as { kind: string }).kind).toBe('personal');
-    expect((await signUp({ code: personal.code, username: `bo${stamp}`, password, telegram: telegramOf(555030003, 'other') })).status).toBe(409);
+    expect((await signUp({ code: personal.code, username: `bo${stamp}`, password, telegram: await telegramOf(555030003, 'other') })).status).toBe(409);
     const bo = (await (await signUp({ code: personal.code, username: `bo${stamp}`, password })).json()) as {
       token: string;
       account: { linkState: string };
@@ -5391,8 +5415,8 @@ describeDb('API integration', () => {
     expect(shopRow.vipClub.userIds).toContain(555030002);
     // Confirming it: another Telegram, no; theirs, yes.
     const asBo = { Authorization: `Bearer ${bo.token}` };
-    expect((await call('/api/me/account/confirm', { method: 'POST', headers: asBo, json: { telegram: telegramOf(555030003, 'other') } })).status).toBe(409);
-    expect((await call('/api/me/account/confirm', { method: 'POST', headers: asBo, json: { telegram: telegramOf(555030002, 'bo_t') } })).status).toBe(200);
+    expect((await call('/api/me/account/confirm', { method: 'POST', headers: asBo, json: { telegram: await telegramOf(555030003, 'other') } })).status).toBe(409);
+    expect((await call('/api/me/account/confirm', { method: 'POST', headers: asBo, json: { telegram: await telegramOf(555030002, 'bo_t') } })).status).toBe(200);
     // Already has an account: no more invitations for them.
     expect((await call('/api/admin/invites', { method: 'POST', headers: admin, json: { kind: 'personal', userId: 555030002 } })).status).toBe(409);
 

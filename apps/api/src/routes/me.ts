@@ -4,7 +4,7 @@ import {
   changePasswordRequest,
   createAccountRequest,
   createWebAccessRequest,
-  telegramLoginData,
+  telegramProof,
   securityPhraseRequest,
   updateLanguageRequest,
   type WebAccessStatus,
@@ -56,7 +56,7 @@ export function meRoutes(): Hono<AppBindings> {
     const claims = c.get('claims');
     if (claims.cs) throw ApiError.conflict('has_account', 'You already have a web account: sign in');
     const key = claims.ck ? await db.query.webKeys.findFirst({ where: eq(webKeys.id, claims.ck) }) : undefined;
-    const row = await createOwnAccount(db, env, {
+    const row = await createOwnAccount(db, {
       telegramId: claims.sub,
       fromTelegram: claims.ck === undefined,
       keyGivenBy: key?.createdBy ?? null,
@@ -72,7 +72,7 @@ export function meRoutes(): Hono<AppBindings> {
     const db = c.get('db');
     const env = c.get('env');
     const claims = c.get('claims');
-    const row = await setPassword(db, env, {
+    const row = await setPassword(db, {
       telegramId: claims.sub,
       ...c.req.valid('json'),
       telegramSession: claims.wid === undefined && claims.ck === undefined,
@@ -82,11 +82,11 @@ export function meRoutes(): Hono<AppBindings> {
   });
 
   // The staff tied it to an ID: their Telegram (the login bot) confirms it.
-  app.post('/account/confirm', zValidator('json', z.object({ telegram: telegramLoginData })), async (c) => {
+  app.post('/account/confirm', zValidator('json', z.object({ telegram: telegramProof })), async (c) => {
     const claims = c.get('claims');
     const row = await accountOf(c.get('db'), claims.sub);
     if (!row) throw ApiError.notFound('You have no web account');
-    await confirmLink(c.get('db'), c.get('env'), row.id, c.req.valid('json').telegram);
+    await confirmLink(c.get('db'), row.id, c.req.valid('json').telegram);
     return c.json({ linkState: 'confirmed' });
   });
 

@@ -5,13 +5,14 @@ import {
   authRequest,
   inviteCode,
   signupRequest,
-  telegramLoginData,
+  telegramProof,
   webAuthRequest,
   type AuthResponse,
 } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import type { Env } from '../config/env.js';
 import { accountByTelegram, accountSession, inviteInfo, signUp, type AccountRow } from '../services/accounts.js';
+import { finishTelegramLogin, startTelegramLogin } from '../services/telegramLogin.js';
 import type { AppBindings } from '../context.js';
 import { validateInitData } from '../auth/init-data.js';
 import { signSession } from '../auth/jwt.js';
@@ -197,7 +198,7 @@ export function authRoutes(): Hono<AppBindings> {
   app.post('/signup', zValidator('json', signupRequest), async (c) => {
     const db = c.get('db');
     const env = c.get('env');
-    const row = await signUp(db, env, c.req.valid('json'));
+    const row = await signUp(db, c.req.valid('json'));
     const userRow = await getUser(db, row.telegramId);
     await claimWhatIsTheirs(db, env, row.telegramId, userRow?.username ?? null);
     return c.json(await accountResponse(db, env, row), 201);
@@ -215,10 +216,34 @@ export function authRoutes(): Hono<AppBindings> {
   });
 
   // "Log in with Telegram" (the login bot): no password needed, and the link is confirmed.
-  app.post('/telegram', zValidator('json', z.object({ telegram: telegramLoginData })), async (c) => {
+  // "Log in with Telegram": start (the page opens Telegram's window with this
+  // address), and the way back from Telegram (it closes by itself).
+  app.post('/telegram/start', (c) => {
+    // The page's own address (behind Caddy the API sees plain http).
+    const url = new URL(c.req.url);
+    const proto = c.req.header('X-Forwarded-Proto') ?? url.protocol.replace(':', '');
+    return c.json(startTelegramLogin(c.get('env'), `${proto}://${url.host}`));
+  });
+  app.get('/telegram/callback', async (c) => {
+    const state = c.req.query('state') ?? '';
+    const ok = await finishTelegramLogin(c.get('env'), {
+      state,
+      code: c.req.query('code'),
+      error: c.req.query('error'),
+    });
+    c.header('Cache-Control', 'no-store');
+    return c.html(
+      `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Telegram</title>` +
+        `<body style="font:16px system-ui;text-align:center;padding:48px 16px">` +
+        (ok ? '✅<p>Telegram OK.</p>' : '⚠️<p>Telegram ✗</p>') +
+        `<p>← ${ok ? 'Vuelve a la página anterior · Go back to the previous page' : 'Inténtalo de nuevo · Try again'}</p></body>`,
+    );
+  });
+
+  app.post('/telegram', zValidator('json', z.object({ telegram: telegramProof })), async (c) => {
     const db = c.get('db');
     const env = c.get('env');
-    const row = await accountByTelegram(db, env, c.req.valid('json').telegram);
+    const row = await accountByTelegram(db, c.req.valid('json').telegram);
     const userRow = await getUser(db, row.telegramId);
     await claimWhatIsTheirs(db, env, row.telegramId, userRow?.username ?? null);
     return c.json(await accountResponse(db, env, row));

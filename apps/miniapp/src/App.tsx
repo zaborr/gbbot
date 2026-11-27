@@ -73,7 +73,9 @@ import {
 import { lang, onLangChange, t } from './i18n/index.js';
 import { isCustomerWeb, isWebMode } from './lib/web.js';
 import { WebNoticesPage } from './pages/WebNoticesPage.js';
-import { WebBanner, WebKeySignIn, WebMainButton, WebSignIn, WebTopBar } from './components/WebChrome.js';
+import { WebBanner, WebMainButton, WebSignIn, WebTopBar } from './components/WebChrome.js';
+import { WebCustomerSignIn } from './components/WebAccount.js';
+import { AccountPage } from './pages/AccountPage.js';
 
 /** Web mode has no customer screens (no cart, no orders): a GB opens on its admin. */
 function WebToAdmin(): React.JSX.Element {
@@ -99,7 +101,7 @@ function Shell(): React.JSX.Element {
   const { status, error } = useSession();
 
   if (status === 'loading') return <Loader />;
-  if (status === 'signin') return isCustomerWeb() ? <WebKeySignIn /> : <WebSignIn />;
+  if (status === 'signin') return isCustomerWeb() ? <WebCustomerSignIn /> : <WebSignIn />;
   if (status === 'error') {
     return (
       <Placeholder header={t('app.signInFailed')} description={error ?? t('app.reopen')}>
@@ -112,6 +114,9 @@ function Shell(): React.JSX.Element {
     <Routes>
       <Route path="/" element={<ShopsPage />} />
       <Route path="/notices" element={<WebNoticesPage />} />
+      <Route path="/cuenta" element={<AccountPage />} />
+      {/* An invitation opened while already signed in: nothing to do there. */}
+      <Route path="/alta" element={<Navigate to="/" replace />} />
       <Route path="/platform" element={<PlatformPage />} />
       <Route path="/platform/shops/:id" element={<PlatformShopPage />} />
       <Route path="/platform/retention" element={<PlatformRetentionPage />} />

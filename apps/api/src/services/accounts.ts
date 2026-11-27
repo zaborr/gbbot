@@ -1,6 +1,5 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { and, desc, eq, sql } from 'drizzle-orm';
-import type { TelegramLoginData } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { invites, shops, users, webAdmins } from '../db/schema.js';
@@ -9,51 +8,7 @@ import { signSession } from '../auth/jwt.js';
 import { assertUsernameFree, forgetSessions, hashPassword, verifyPassword, accountOf } from './webAdmins.js';
 import { keyHash, markKeyed } from './webKeys.js';
 import { addVipBy } from './vip.js';
-
-// --- Telegram's "Log in with Telegram" (the login bot) -------------------------
-
-/** How old the button's answer may be: it is pressed as the last step. */
-const LOGIN_MAX_AGE_S = 3600;
-
-export interface TelegramIdentity {
-  id: number;
-  firstName: string;
-  username: string | null;
-}
-
-/**
- * Checks what the login button handed the page, as Telegram documents it: an
- * HMAC-SHA-256 of the sorted "key=value" lines, keyed with SHA-256 of the login
- * bot's token. Proves which Telegram account pressed it.
- */
-export function verifyTelegramLogin(
-  env: Env,
-  data: TelegramLoginData,
-  now = Date.now(),
-): TelegramIdentity {
-  const bad = ApiError.unauthorized('Telegram could not confirm who you are. Try again.');
-  if (!env.LOGIN_BOT_TOKEN) throw new ApiError(503, 'no_login_bot', 'Logging in with Telegram is not set up');
-  const { hash, ...rest } = data;
-  if (typeof hash !== 'string' || !/^[0-9a-f]{64}$/.test(hash)) throw bad;
-  const check = Object.keys(rest)
-    .sort()
-    .map((k) => `${k}=${rest[k]}`)
-    .join('\n');
-  const secret = createHash('sha256').update(env.LOGIN_BOT_TOKEN).digest();
-  const expected = createHmac('sha256', secret).update(check).digest();
-  if (!timingSafeEqual(expected, Buffer.from(hash, 'hex'))) throw bad;
-  const authDate = Number(rest.auth_date);
-  const id = Number(rest.id);
-  if (!Number.isFinite(authDate) || now / 1000 - authDate > LOGIN_MAX_AGE_S || !Number.isSafeInteger(id) || id <= 0) {
-    throw bad;
-  }
-  const name = [rest.first_name, rest.last_name].filter((p) => typeof p === 'string' && p !== '').join(' ');
-  return {
-    id,
-    firstName: name || String(id),
-    username: typeof rest.username === 'string' && rest.username !== '' ? rest.username : null,
-  };
-}
+import { takeTelegramIdentity, type TelegramIdentity } from './telegramLogin.js';
 
 /** The person's Telegram names, as Telegram gave them (kept up to date, like the bot does). */
 async function rememberTelegramUser(db: Database, who: TelegramIdentity): Promise<void> {
@@ -177,10 +132,9 @@ export type AccountRow = typeof webAdmins.$inferSelect & { telegramId: number };
  */
 export async function signUp(
   db: Database,
-  env: Env,
-  input: { code: string; username: string; password: string; telegram?: TelegramLoginData | undefined },
+  input: { code: string; username: string; password: string; telegram?: string | undefined },
 ): Promise<AccountRow> {
-  const who = input.telegram ? verifyTelegramLogin(env, input.telegram) : undefined;
+  const who = input.telegram ? takeTelegramIdentity(input.telegram) : undefined;
   const username = input.username.trim().toLowerCase();
   const passwordHash = await hashPassword(input.password);
   const account = await db.transaction(async (tx) => {
@@ -241,17 +195,16 @@ export async function signUp(
  */
 export async function createOwnAccount(
   db: Database,
-  env: Env,
   input: {
     telegramId: number;
     fromTelegram: boolean;
     keyGivenBy: number | null;
     username: string;
     password: string;
-    telegram?: TelegramLoginData | undefined;
+    telegram?: string | undefined;
   },
 ): Promise<AccountRow> {
-  const who = input.telegram ? verifyTelegramLogin(env, input.telegram) : undefined;
+  const who = input.telegram ? takeTelegramIdentity(input.telegram) : undefined;
   if (who && who.id !== input.telegramId) {
     throw ApiError.conflict('telegram_mismatch', 'That Telegram account is not the one you are signed in with');
   }
@@ -279,8 +232,8 @@ export async function createOwnAccount(
 }
 
 /** The login bot proved their Telegram: the account tied to it, now confirmed. */
-export async function accountByTelegram(db: Database, env: Env, telegram: TelegramLoginData): Promise<AccountRow> {
-  const who = verifyTelegramLogin(env, telegram);
+export async function accountByTelegram(db: Database, telegram: string): Promise<AccountRow> {
+  const who = takeTelegramIdentity(telegram);
   const row = await accountOf(db, who.id);
   if (!row) throw ApiError.notFound('There is no web account for this Telegram yet: you need an invitation');
   await rememberTelegramUser(db, who);
@@ -294,8 +247,8 @@ export async function accountByTelegram(db: Database, env: Env, telegram: Telegr
  * Confirms the Telegram an account was tied to by the staff. Another Telegram
  * pressing it: refused (the staff gave a wrong ID; whoever tied it can see it).
  */
-export async function confirmLink(db: Database, env: Env, accountId: number, telegram: TelegramLoginData): Promise<void> {
-  const who = verifyTelegramLogin(env, telegram);
+export async function confirmLink(db: Database, accountId: number, telegram: string): Promise<void> {
+  const who = takeTelegramIdentity(telegram);
   const row = await db.query.webAdmins.findFirst({ where: eq(webAdmins.id, accountId) });
   if (!row || row.telegramId === null) throw ApiError.notFound('Account not found');
   if (row.telegramId !== who.id) {
@@ -311,19 +264,18 @@ export async function confirmLink(db: Database, env: Env, accountId: number, tel
  */
 export async function setPassword(
   db: Database,
-  env: Env,
   input: {
     telegramId: number;
     password: string;
     current?: string | undefined;
-    telegram?: TelegramLoginData | undefined;
+    telegram?: string | undefined;
     telegramSession: boolean;
   },
 ): Promise<AccountRow> {
   const row = await accountOf(db, input.telegramId);
   if (!row) throw ApiError.notFound('You have no web account');
   let proved = input.telegramSession;
-  if (!proved && input.telegram) proved = verifyTelegramLogin(env, input.telegram).id === input.telegramId;
+  if (!proved && input.telegram) proved = takeTelegramIdentity(input.telegram).id === input.telegramId;
   if (!proved && input.current !== undefined) proved = await verifyPassword(input.current, row.passwordHash);
   if (!proved) throw ApiError.forbidden('Wrong current password');
   const [updated] = await db
