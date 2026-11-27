@@ -17,7 +17,16 @@ export interface SessionClaims {
   ck?: string;
   /** That key's GB: the session only reaches it. */
   ws?: string;
+  /**
+   * Signed in with a customer's web account (username and password, or the
+   * login bot): the customer side only, whatever the person manages.
+   */
+  cs?: boolean;
 }
+
+/** Sessions that only buy: a web key, or a customer's web account. */
+export const customerOnly = (claims: SessionClaims | undefined): boolean =>
+  claims !== undefined && (claims.ck !== undefined || claims.cs === true);
 
 const ALG = 'HS256';
 
@@ -39,6 +48,7 @@ export async function signSession(
     ...(claims.wid === undefined ? {} : { wid: claims.wid }),
     ...(claims.ck === undefined ? {} : { ck: claims.ck }),
     ...(claims.ws === undefined ? {} : { ws: claims.ws }),
+    ...(claims.cs === true ? { cs: true } : {}),
   })
     .setProtectedHeader({ alg: ALG })
     .setSubject(String(claims.sub))
@@ -67,5 +77,6 @@ function claimsFromPayload(payload: JWTPayload): SessionClaims {
     ...(typeof payload.wid === 'number' ? { wid: payload.wid } : {}),
     ...(typeof payload.ck === 'string' ? { ck: payload.ck } : {}),
     ...(typeof payload.ws === 'string' ? { ws: payload.ws } : {}),
+    ...(payload.cs === true ? { cs: true } : {}),
   };
 }

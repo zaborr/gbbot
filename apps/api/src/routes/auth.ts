@@ -1,6 +1,17 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { authRequest, webAuthRequest, type AuthResponse } from '@tma-shop/shared';
+import {
+  accountLoginRequest,
+  authRequest,
+  inviteCode,
+  signupRequest,
+  telegramLoginData,
+  webAuthRequest,
+  type AuthResponse,
+} from '@tma-shop/shared';
+import type { Database } from '../db/client.js';
+import type { Env } from '../config/env.js';
+import { accountByTelegram, accountSession, inviteInfo, signUp, type AccountRow } from '../services/accounts.js';
 import type { AppBindings } from '../context.js';
 import { validateInitData } from '../auth/init-data.js';
 import { signSession } from '../auth/jwt.js';
@@ -16,8 +27,39 @@ import { claimBlacklisted } from '../services/blacklist.js';
 import { toSessionUserDTO } from '../db/mappers.js';
 import { clientIp } from '../middleware/rateLimit.js';
 import { ApiError } from '../lib/errors.js';
-import { signInWebAdmin, webSessionId } from '../services/webAdmins.js';
+import { signInWebAdmin, signInWithPassword, webSessionId } from '../services/webAdmins.js';
 import { botToken } from '../services/activeBot.js';
+
+/**
+ * What was waiting for them by @username, now that Telegram says who they are
+ * (the Mini App, or the login bot on the web).
+ */
+async function claimWhatIsTheirs(db: Database, env: Env, telegramId: number, username: string | null): Promise<void> {
+  // Added by @username to a GB's admins or to the organisers: the role is theirs now.
+  await claimPendingRoles(db, telegramId, username);
+  await claimBlacklisted(db, telegramId, username);
+  // Orders made for them before they had opened the bot: made now.
+  await claimPendingOrders(db, env, telegramId, username).catch((error) =>
+    console.error('Could not claim pending orders:', error),
+  );
+  // Put in a testing by hand before they had opened the bot: in now.
+  await claimInvites(db, env, telegramId, username).catch((error) =>
+    console.error('Could not claim testing invites:', error),
+  );
+}
+
+/** The answer to a customer's web account sign-in (any way in). */
+async function accountResponse(db: Database, env: Env, row: AccountRow): Promise<AuthResponse> {
+  const userRow = await getUser(db, row.telegramId);
+  if (!userRow) throw ApiError.unauthorized('Wrong username or password');
+  const { token, expiresAt } = await accountSession(env, row);
+  return {
+    token,
+    expiresAt: expiresAt.toISOString(),
+    user: toSessionUserDTO(userRow, 'customer'),
+    account: { username: row.username, linkState: row.linkState },
+  };
+}
 
 export function authRoutes(): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
@@ -38,17 +80,7 @@ export function authRoutes(): Hono<AppBindings> {
     }
 
     const userRow = await upsertUser(db, result.data.user);
-    // Added by @username to a GB's admins or to the organisers: the role is theirs now.
-    await claimPendingRoles(db, userRow.telegramId, userRow.username);
-    await claimBlacklisted(db, userRow.telegramId, userRow.username);
-    // Orders made for them before they had opened the bot: made now.
-    await claimPendingOrders(db, env, userRow.telegramId, userRow.username).catch((error) =>
-      console.error('Could not claim pending orders:', error),
-    );
-    // Put in a testing by hand before they had opened the bot: in now.
-    await claimInvites(db, env, userRow.telegramId, userRow.username).catch((error) =>
-      console.error('Could not claim testing invites:', error),
-    );
+    await claimWhatIsTheirs(db, env, userRow.telegramId, userRow.username);
     // Platform super-admin status always follows the current ADMIN_TELEGRAM_IDS.
     const role = env.ADMIN_TELEGRAM_IDS.includes(userRow.telegramId) ? 'admin' : 'customer';
     const { token, expiresAt } = await signSession(
@@ -152,6 +184,44 @@ export function authRoutes(): Hono<AppBindings> {
       webRole: account.role,
     };
     return c.json(response);
+  });
+
+  // --- Customers' web accounts --------------------------------------------------
+
+  // The sign-up page, with a code: a group's invitation, or whose personal one.
+  app.post('/invite', zValidator('json', z.object({ code: inviteCode })), async (c) =>
+    c.json(await inviteInfo(c.get('db'), c.req.valid('json').code)),
+  );
+
+  // Opening a web account with an invitation (group: Telegram by the login bot).
+  app.post('/signup', zValidator('json', signupRequest), async (c) => {
+    const db = c.get('db');
+    const env = c.get('env');
+    const row = await signUp(db, env, c.req.valid('json'));
+    const userRow = await getUser(db, row.telegramId);
+    await claimWhatIsTheirs(db, env, row.telegramId, userRow?.username ?? null);
+    return c.json(await accountResponse(db, env, row), 201);
+  });
+
+  // Username and password: the customer side only.
+  app.post('/login', zValidator('json', accountLoginRequest), async (c) => {
+    const db = c.get('db');
+    const { username, password } = c.req.valid('json');
+    const host = new URL(c.req.url).hostname;
+    const row = await signInWithPassword(db, username, password, {
+      from: host.endsWith('.onion') ? 'onion' : clientIp(c),
+    });
+    return c.json(await accountResponse(db, c.get('env'), row));
+  });
+
+  // "Log in with Telegram" (the login bot): no password needed, and the link is confirmed.
+  app.post('/telegram', zValidator('json', z.object({ telegram: telegramLoginData })), async (c) => {
+    const db = c.get('db');
+    const env = c.get('env');
+    const row = await accountByTelegram(db, env, c.req.valid('json').telegram);
+    const userRow = await getUser(db, row.telegramId);
+    await claimWhatIsTheirs(db, env, row.telegramId, userRow?.username ?? null);
+    return c.json(await accountResponse(db, env, row));
   });
 
   return app;

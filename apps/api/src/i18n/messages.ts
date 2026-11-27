@@ -318,6 +318,10 @@ const en = {
   'order.createdForYouPaid': '🛒 {shop}: the organisers made an order for you (#{ref}), already paid.',
   'order.viewButton': '🛒 View order',
   'web.keyGiven': '🔑 {who} gave web access (a key) to {whom} in {shop}.',
+  'web.groupInviteMade': '🎟️ {who} made a group invitation to open web accounts in {shop} ({days} days).',
+  'web.personalInviteMade': '🎟️ {who} invited {whom} to open a web account in {shop}.',
+  'web.passwordReset': '🔑 {who} gave your web account a new password. If you did not ask for it, tell the staff.',
+  'web.passwordResetBy': '🔑 {who} gave the web account "{whom}" a new password.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -628,6 +632,10 @@ const es: Record<BotMessageKey, string> = {
   'order.createdForYouPaid': '🛒 {shop}: los organizadores te han creado un pedido (#{ref}), ya pagado.',
   'order.viewButton': '🛒 Ver pedido',
   'web.keyGiven': '🔑 {who} ha dado acceso web (clave) a {whom} en {shop}.',
+  'web.groupInviteMade': '🎟️ {who} ha creado una invitación de grupo para abrir cuentas web en {shop} ({days} días).',
+  'web.personalInviteMade': '🎟️ {who} ha invitado a {whom} a abrir una cuenta web en {shop}.',
+  'web.passwordReset': '🔑 {who} ha puesto una contraseña nueva a tu cuenta web. Si no lo pediste, avisa al staff.',
+  'web.passwordResetBy': '🔑 {who} ha puesto una contraseña nueva a la cuenta web «{whom}».',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -936,6 +944,10 @@ const it: Record<BotMessageKey, string> = {
   'order.createdForYouPaid': '🛒 {shop}: gli organizzatori ti hanno creato un ordine (#{ref}), già pagato.',
   'order.viewButton': '🛒 Vedi ordine',
   'web.keyGiven': '🔑 {who} ha dato l\'accesso web (chiave) a {whom} in {shop}.',
+  'web.groupInviteMade': '🎟️ {who} ha creato un invito di gruppo per aprire account web in {shop} ({days} giorni).',
+  'web.personalInviteMade': '🎟️ {who} ha invitato {whom} ad aprire un account web in {shop}.',
+  'web.passwordReset': '🔑 {who} ha dato una nuova password al tuo account web. Se non l\'hai chiesto, avvisa lo staff.',
+  'web.passwordResetBy': '🔑 {who} ha dato una nuova password all\'account web «{whom}».',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -1244,6 +1256,10 @@ const pt: Record<BotMessageKey, string> = {
   'order.createdForYouPaid': '🛒 {shop}: os organizadores criaram-lhe um pedido (#{ref}), já pago.',
   'order.viewButton': '🛒 Ver pedido',
   'web.keyGiven': '🔑 {who} deu acesso web (chave) a {whom} em {shop}.',
+  'web.groupInviteMade': '🎟️ {who} criou um convite de grupo para abrir contas web em {shop} ({days} dias).',
+  'web.personalInviteMade': '🎟️ {who} convidou {whom} a abrir uma conta web em {shop}.',
+  'web.passwordReset': '🔑 {who} deu uma nova palavra-passe à tua conta web. Se não pediste, avisa a equipa.',
+  'web.passwordResetBy': '🔑 {who} deu uma nova palavra-passe à conta web «{whom}».',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

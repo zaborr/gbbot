@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
-import { asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { users, webAdmins } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
@@ -129,15 +129,12 @@ export async function createWebAdmin(
   rawUsername: string,
   { role = 'platform', telegramId = null }: { role?: WebRole; telegramId?: number | null } = {},
 ): Promise<NewCredentials> {
+  // Someone who already has a customer's account (username and password): the
+  // same account now manages too (new password and authenticator; its username stays).
+  const own = role === 'linked' && telegramId !== null ? await accountOf(db, telegramId) : undefined;
+  if (own && own.totpSecret === null) return resetWebAdmin(db, own.username);
   const username = rawUsername.trim().toLowerCase();
-  if (!USERNAME_RE.test(username)) {
-    throw ApiError.badRequest(
-      'bad_username',
-      'Use 3–32 characters: letters, numbers, ".", "_" or "-"',
-    );
-  }
-  const taken = await db.query.webAdmins.findFirst({ where: eq(webAdmins.username, username) });
-  if (taken) throw ApiError.conflict('username_taken', 'That username is taken');
+  await assertUsernameFree(db, username);
   const { password, totpSecret } = newCredentials();
   await db.insert(webAdmins).values({
     username,
@@ -169,6 +166,15 @@ export async function createLinkedWebAdmin(
   return createWebAdmin(db, rawUsername, { role: 'linked', telegramId });
 }
 
+/** A valid username nobody has (admins and customers share them). */
+export async function assertUsernameFree(db: Database, username: string): Promise<void> {
+  if (!USERNAME_RE.test(username)) {
+    throw ApiError.badRequest('bad_username', 'Use 3–32 characters: letters, numbers, ".", "_" or "-"');
+  }
+  const taken = await db.query.webAdmins.findFirst({ where: eq(webAdmins.username, username) });
+  if (taken) throw ApiError.conflict('username_taken', 'That username is taken');
+}
+
 /** New password and authenticator secret; every open session is closed. */
 export async function resetWebAdmin(db: Database, rawUsername: string): Promise<NewCredentials> {
   const username = rawUsername.trim().toLowerCase();
@@ -197,8 +203,15 @@ export async function removeWebAdmin(db: Database, rawUsername: string): Promise
   forgetSessions();
 }
 
-/** The web account linked to a Telegram user, if they activated one. */
+/** The web account linked to a Telegram user that can manage (with an authenticator), if any. */
 export async function webAccountOf(db: Database, telegramId: number): Promise<WebAdminRow | undefined> {
+  return db.query.webAdmins.findFirst({
+    where: and(eq(webAdmins.telegramId, telegramId), isNotNull(webAdmins.totpSecret)),
+  });
+}
+
+/** Any web account of a Telegram user: one that manages, or a customer's (username and password). */
+export async function accountOf(db: Database, telegramId: number): Promise<WebAdminRow | undefined> {
   return db.query.webAdmins.findFirst({ where: eq(webAdmins.telegramId, telegramId) });
 }
 
@@ -253,7 +266,8 @@ export async function changeWebPassword(
 }
 
 export async function listWebAdmins(db: Database): Promise<WebAdminRow[]> {
-  return db.select().from(webAdmins).orderBy(asc(webAdmins.username));
+  // Accounts that manage; customers' accounts (no authenticator) are not listed here.
+  return db.select().from(webAdmins).where(isNotNull(webAdmins.totpSecret)).orderBy(asc(webAdmins.username));
 }
 
 // --- Signing in ----------------------------------------------------------------
@@ -301,7 +315,8 @@ export async function signInWebAdmin(
     throw new ApiError(429, 'account_locked', 'Too many wrong attempts. Try again in 15 minutes.');
   }
   const passwordOk = await verifyPassword(password, row.passwordHash);
-  const step = passwordOk ? matchTotp(row.totpSecret, code.trim(), now.getTime()) : null;
+  // A customer's account has no authenticator: never an admin sign-in.
+  const step = passwordOk && row.totpSecret ? matchTotp(row.totpSecret, code.trim(), now.getTime()) : null;
   if (!passwordOk || step === null || step <= row.totpLastStep) {
     const count = (seen && seen.lockedUntil === 0 ? seen.count : 0) + 1;
     failures.set(key, count >= MAX_FAILURES ? { count: 0, lockedUntil: now.getTime() + LOCK_MS } : { count, lockedUntil: 0 });
@@ -317,6 +332,40 @@ export async function signInWebAdmin(
     .where(eq(webAdmins.id, row.id))
     .returning();
   return updated ?? row;
+}
+
+/**
+ * A customer's web sign-in: username and password, no code. Any account tied to
+ * a Telegram user (one that manages too, but then it only buys); never a
+ * platform account. Same lock per account and place, same single answer.
+ */
+export async function signInWithPassword(
+  db: Database,
+  rawUsername: string,
+  password: string,
+  { from = 'local' }: { from?: string } = {},
+  now = new Date(),
+): Promise<WebAdminRow & { telegramId: number }> {
+  const wrong = ApiError.unauthorized('Wrong username or password');
+  const username = rawUsername.trim().toLowerCase();
+  const row = await db.query.webAdmins.findFirst({ where: eq(webAdmins.username, username) });
+  if (!row || row.telegramId === null) {
+    await hashPassword(password);
+    throw wrong;
+  }
+  const key = `${row.id}|${from}`;
+  const seen = failures.get(key);
+  if (seen && seen.lockedUntil > now.getTime()) {
+    throw new ApiError(429, 'account_locked', 'Too many wrong attempts. Try again in 15 minutes.');
+  }
+  if (!(await verifyPassword(password, row.passwordHash))) {
+    const count = (seen && seen.lockedUntil === 0 ? seen.count : 0) + 1;
+    failures.set(key, count >= MAX_FAILURES ? { count: 0, lockedUntil: now.getTime() + LOCK_MS } : { count, lockedUntil: 0 });
+    throw wrong;
+  }
+  failures.delete(key);
+  await db.update(webAdmins).set({ lastLoginAt: now }).where(eq(webAdmins.id, row.id));
+  return { ...row, telegramId: row.telegramId };
 }
 
 // --- Sessions ------------------------------------------------------------------
@@ -349,7 +398,7 @@ export async function describeWebAdmin(db: Database, sub: number): Promise<strin
 }
 
 const sessionCache = new Map<number, { version: number | null; until: number }>();
-const forgetSessions = (): void => sessionCache.clear();
+export const forgetSessions = (): void => sessionCache.clear();
 
 /**
  * Whether a web session is still good: the account exists and was not reset

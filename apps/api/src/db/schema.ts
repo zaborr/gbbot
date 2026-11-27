@@ -13,6 +13,7 @@ import {
   timestamp,
   unique,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import type {
@@ -764,8 +765,11 @@ export const webAdmins = pgTable('web_admins', {
     .references(() => users.telegramId, { onDelete: 'cascade' }),
   /** scrypt: "salt:hash", both base64. */
   passwordHash: text('password_hash').notNull(),
-  /** Base32 secret of the authenticator app (TOTP). */
-  totpSecret: text('totp_secret').notNull(),
+  /**
+   * Base32 secret of the authenticator app (TOTP). None: a customer's account
+   * (username and password), which only buys.
+   */
+  totpSecret: text('totp_secret'),
   /** Last 30-second step whose code was used: a code works only once. */
   totpLastStep: bigint('totp_last_step', { mode: 'number' }).notNull().default(0),
   /** Goes up on a reset, so sessions opened before stop working. */
@@ -775,6 +779,15 @@ export const webAdmins = pgTable('web_admins', {
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   /** Last notice of the inbox this admin has seen. */
   noticesSeenId: integer('notices_seen_id').notNull().default(0),
+  /**
+   * How the Telegram account was tied: `confirmed` (Telegram proved it: the
+   * Mini App or the login bot) or `staff` (an ID a staff member gave, with no
+   * proof yet; `linkedBy` says who).
+   */
+  linkState: text('link_state').$type<'confirmed' | 'staff'>().notNull().default('confirmed'),
+  linkedBy: bigint('linked_by', { mode: 'number' }),
+  /** The invitation the account was opened with. */
+  inviteId: uuid('invite_id').references((): AnyPgColumn => invites.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -997,4 +1010,31 @@ export const groupMembers = pgTable(
     checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.chatId, table.userId] })],
+);
+
+/**
+ * Invitations to open a web account. `group`: one code for many people, until
+ * it expires (who they are comes from Telegram, through the login bot).
+ * `personal`: for one Telegram ID a staff member gave, used once.
+ * Only the code's hash is kept.
+ */
+export const invites = pgTable(
+  'invites',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    hash: text('hash').notNull().unique(),
+    kind: text('kind').$type<'group' | 'personal'>().notNull(),
+    telegramId: bigint('telegram_id', { mode: 'number' }),
+    /** The GB it was made from (where its VIP applies). */
+    shopId: uuid('shop_id').references(() => shops.id, { onDelete: 'set null' }),
+    /** Personal only: VIP in that GB or in every GB. */
+    vip: text('vip').$type<'none' | 'shop' | 'platform'>().notNull().default('none'),
+    createdBy: bigint('created_by', { mode: 'number' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    uses: integer('uses').notNull().default(0),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  },
+  (table) => [index('invites_shop_idx').on(table.shopId)],
 );

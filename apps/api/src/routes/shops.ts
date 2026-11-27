@@ -7,6 +7,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { isSuperAdmin, listShops } from '../services/shop.js';
 import { isWebSession } from '../services/webAdmins.js';
 import { isOrganizer, managesSomething } from '../services/team.js';
+import { customerOnly } from '../auth/jwt.js';
 
 /** `GET /api/shops`: the start screen — visible shops plus hidden ones the user manages. */
 export function shopsRoutes(): Hono<AppBindings> {
@@ -21,10 +22,10 @@ export function shopsRoutes(): Hono<AppBindings> {
     // A customer's web key: only its GB, and nothing to manage.
     const all = await listShops(db, env, sub);
     const shops = claims.ws !== undefined ? all.filter((s) => s.id === claims.ws) : all;
-    const manages = claims.ck === undefined && (await managesSomething(db, env, sub));
+    const manages = !customerOnly(claims) && (await managesSomething(db, env, sub));
     return c.json({
       shops,
-      isSuperAdmin: claims.ck === undefined && isSuperAdmin(env, sub),
+      isSuperAdmin: !customerOnly(claims) && isSuperAdmin(env, sub),
       isOrganizer: await isOrganizer(db, sub),
       // Managers may activate web access (Telegram sessions only).
       canUseWeb: !isWebSession(c.get('claims')) && manages,

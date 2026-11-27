@@ -2,7 +2,7 @@ import { createMiddleware } from 'hono/factory';
 import type { AppBindings } from '../context.js';
 import { ApiError } from '../lib/errors.js';
 import { webKeyValid } from '../services/webKeys.js';
-import { verifySession, type SessionClaims } from './jwt.js';
+import { customerOnly, verifySession, type SessionClaims } from './jwt.js';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import {
@@ -62,7 +62,7 @@ export const requireAdmin = createMiddleware<AppBindings>(async (c, next) => {
 /** Requires a platform super-admin (ADMIN_TELEGRAM_IDS). Run after `requireAuth`. */
 export const requireSuperAdmin = createMiddleware<AppBindings>(async (c, next) => {
   // A customer's web key never reaches the platform, whoever it belongs to.
-  if (c.get('claims').ck !== undefined || !isSuperAdmin(c.get('env'), c.get('claims').sub)) {
+  if (customerOnly(c.get('claims')) || !isSuperAdmin(c.get('env'), c.get('claims').sub)) {
     throw ApiError.forbidden('Platform admin role required');
   }
   await next();
@@ -89,7 +89,8 @@ export const requireOwner = createMiddleware<AppBindings>(async (c, next) => {
  * administrators only manage. Run after `requireAuth`.
  */
 export const requireTelegramUser = createMiddleware<AppBindings>(async (c, next) => {
-  if (isWebSession(c.get('claims'))) {
+  // A customer's web account acts as its Telegram user (on the customer side).
+  if (isWebSession(c.get('claims')) && c.get('claims').cs !== true) {
     throw ApiError.forbidden('Only available in Telegram');
   }
   await next();
