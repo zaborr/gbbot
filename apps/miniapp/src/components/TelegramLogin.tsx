@@ -29,16 +29,19 @@ export function TelegramLoginButton({
   const start = async (): Promise<void> => {
     setNote(null);
     setLink(null);
+    // Opened in the same tap (phones block windows opened later), then sent to Telegram.
+    const popup = window.open('about:blank', 'gb-telegram-login', 'width=520,height=640');
     let started: { url: string; state: string };
     try {
       started = await api.telegramLoginStart();
     } catch (err) {
+      popup?.close();
       setNote(err instanceof ApiClientError ? err.message : t('error.title'));
       return;
     }
-    const popup = window.open(started.url, 'gb-telegram-login', 'width=520,height=640');
-    // Blocked (some phones): a link to open it by hand.
-    if (!popup) setLink(started.url);
+    if (popup) popup.location.href = started.url;
+    // Blocked anyway: a link to open it by hand.
+    else setLink(started.url);
     setWaiting(true);
     const until = Date.now() + WAIT_MS;
     let timer = 0;

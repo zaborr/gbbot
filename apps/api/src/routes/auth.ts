@@ -5,13 +5,14 @@ import {
   authRequest,
   inviteCode,
   signupRequest,
+  accountPassword,
   telegramProof,
   webAuthRequest,
   type AuthResponse,
 } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import type { Env } from '../config/env.js';
-import { accountByTelegram, accountSession, inviteInfo, signUp, type AccountRow } from '../services/accounts.js';
+import { accountByTelegram, accountSession, claimAccount, inviteInfo, signUp, type AccountRow } from '../services/accounts.js';
 import { finishTelegramLogin, startTelegramLogin } from '../services/telegramLogin.js';
 import type { AppBindings } from '../context.js';
 import { validateInitData } from '../auth/init-data.js';
@@ -61,6 +62,34 @@ async function accountResponse(db: Database, env: Env, row: AccountRow): Promise
     account: { username: row.username, linkState: row.linkState },
   };
 }
+
+/** The page Telegram sends people back to, in their browser's language. */
+const CALLBACK_TEXT: Record<string, { ok: string; failed: string; back: string; again: string }> = {
+  es: {
+    ok: 'Telegram confirmado',
+    failed: 'Telegram no lo ha confirmado',
+    back: 'Cierra esta pestaña y vuelve a la página anterior: ya está.',
+    again: 'Cierra esta pestaña y vuelve a intentarlo.',
+  },
+  en: {
+    ok: 'Telegram confirmed',
+    failed: 'Telegram did not confirm it',
+    back: 'Close this tab and go back to the previous page: it is done.',
+    again: 'Close this tab and try again.',
+  },
+  it: {
+    ok: 'Telegram confermato',
+    failed: 'Telegram non l’ha confermato',
+    back: 'Chiudi questa scheda e torna alla pagina precedente: è fatto.',
+    again: 'Chiudi questa scheda e riprova.',
+  },
+  pt: {
+    ok: 'Telegram confirmado',
+    failed: 'O Telegram não o confirmou',
+    back: 'Fecha este separador e volta à página anterior: está feito.',
+    again: 'Fecha este separador e tenta de novo.',
+  },
+};
 
 export function authRoutes(): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
@@ -232,18 +261,35 @@ export function authRoutes(): Hono<AppBindings> {
       error: c.req.query('error'),
     });
     c.header('Cache-Control', 'no-store');
+    const lang = (c.req.header('Accept-Language') ?? '').slice(0, 2).toLowerCase();
+    const text = (CALLBACK_TEXT[lang] ?? CALLBACK_TEXT.en)!;
     return c.html(
-      `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Telegram</title>` +
-        `<body style="font:16px system-ui;text-align:center;padding:48px 16px">` +
-        (ok ? '✅<p>Telegram OK.</p>' : '⚠️<p>Telegram ✗</p>') +
-        `<p>← ${ok ? 'Vuelve a la página anterior · Go back to the previous page' : 'Inténtalo de nuevo · Try again'}</p></body>`,
+      `<!doctype html><html lang="${CALLBACK_TEXT[lang] ? lang : 'en'}"><meta charset="utf-8">` +
+        `<meta name="viewport" content="width=device-width"><title>Telegram</title>` +
+        `<body style="font:17px system-ui;text-align:center;padding:48px 20px;max-width:420px;margin:auto">` +
+        `<div style="font-size:48px">${ok ? '✅' : '⚠️'}</div><p><b>${ok ? text.ok : text.failed}</b></p>` +
+        `<p>${ok ? text.back : text.again}</p></body></html>`,
     );
   });
+
+  // Someone who was already a customer, just proved by Telegram: their account now, no invitation.
+  app.post(
+    '/telegram/claim',
+    zValidator('json', z.object({ telegram: telegramProof, username: z.string().trim().min(3).max(32), password: accountPassword })),
+    async (c) => {
+      const db = c.get('db');
+      const env = c.get('env');
+      const row = await claimAccount(db, env, c.req.valid('json'));
+      const userRow = await getUser(db, row.telegramId);
+      await claimWhatIsTheirs(db, env, row.telegramId, userRow?.username ?? null);
+      return c.json(await accountResponse(db, env, row), 201);
+    },
+  );
 
   app.post('/telegram', zValidator('json', z.object({ telegram: telegramProof })), async (c) => {
     const db = c.get('db');
     const env = c.get('env');
-    const row = await accountByTelegram(db, c.req.valid('json').telegram);
+    const row = await accountByTelegram(db, env, c.req.valid('json').telegram);
     const userRow = await getUser(db, row.telegramId);
     await claimWhatIsTheirs(db, env, row.telegramId, userRow?.username ?? null);
     return c.json(await accountResponse(db, env, row));

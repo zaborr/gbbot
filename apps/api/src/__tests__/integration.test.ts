@@ -2,7 +2,7 @@ import { createHmac, generateKeyPairSync } from 'node:crypto';
 import { generateKeyPair as generateJoseKeys, SignJWT } from 'jose';
 import { setTelegramLoginTransport } from '../services/telegramLogin.js';
 import { forgetMembership } from '../services/members.js';
-import { removeFromPlatformBlacklist } from '../services/blacklist.js';
+import { addToPlatformBlacklist, removeFromPlatformBlacklist } from '../services/blacklist.js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import type { Pool } from 'pg';
@@ -5406,6 +5406,28 @@ describeDb('API integration', () => {
     expect((await call('/api/auth/login', { method: 'POST', json: { username: `ana${stamp}`, password: 'wrong one!!' } })).status).toBe(401);
     expect((await call('/api/auth/telegram', { method: 'POST', json: { telegram: await telegramOf(555030001, 'ana_t') } })).status).toBe(200);
     expect((await call('/api/auth/telegram', { method: 'POST', json: { telegram: await telegramOf(555030099, 'nobody') } })).status).toBe(404);
+    // Someone who was already a customer (here: on the member list), no account
+    // yet: Telegram proves it, they choose username and password, no invitation.
+    const beforeMembers = (await db.query.platformSettings.findFirst())?.memberClub ?? { groups: [], userIds: [], usernames: [] };
+    await db.insert(platformSettings).values({ id: 1 }).onConflictDoNothing();
+    await db.update(platformSettings).set({ memberClub: { ...beforeMembers, userIds: [...beforeMembers.userIds, 555030050] } }).where(eq(platformSettings.id, 1));
+    forgetMembership();
+    const proof = await telegramOf(555030050, 'old_customer');
+    const asked = await call('/api/auth/telegram', { method: 'POST', json: { telegram: proof } });
+    expect(asked.status).toBe(409);
+    expect(((await asked.json()) as { error: { code: string } }).error.code).toBe('make_account');
+    const claimed = await call('/api/auth/telegram/claim', { method: 'POST', json: { telegram: proof, username: `old${stamp}`, password } });
+    expect(claimed.status).toBe(201);
+    expect(((await claimed.json()) as { account: { linkState: string } }).account.linkState).toBe('confirmed');
+    // Not a customer: still needs an invitation.
+    expect((await call('/api/auth/telegram/claim', { method: 'POST', json: { telegram: await telegramOf(555030051, 'new_one'), username: `new${stamp}`, password } })).status).toBe(404);
+    await db.update(platformSettings).set({ memberClub: beforeMembers }).where(eq(platformSettings.id, 1));
+    forgetMembership();
+    // On the platform blacklist: no web account.
+    await addToPlatformBlacklist(db, testEnv, ADMIN_ID, '555030052', false, 'test');
+    const blocked = await signUp({ code: group.code, username: `bl${stamp}`, password, telegram: await telegramOf(555030052, 'blocked') });
+    expect(blocked.status).toBe(403);
+    await removeFromPlatformBlacklist(db, '555030052');
 
     // A new password with the current one: other sessions end.
     const changed = await call('/api/me/account/password', { method: 'PUT', headers: asAna, json: { password: 'another long one', current: password } });
@@ -5456,7 +5478,7 @@ describeDb('API integration', () => {
     const list = (await (await call('/api/admin/invites', { headers: admin })).json()) as { id: string; uses: number; revoked: boolean }[];
     expect(list.find((i) => i.id === group.id)).toMatchObject({ uses: 1, revoked: true });
 
-    await db.delete(webAdmins).where(inArray(webAdmins.telegramId, [555030001, 555030002, ADMIN_ID]));
+    await db.delete(webAdmins).where(inArray(webAdmins.telegramId, [555030001, 555030002, 555030050, ADMIN_ID]));
   });
 
   it('keeps the GBs for members in private mode, with an invitation at the entrance', async () => {

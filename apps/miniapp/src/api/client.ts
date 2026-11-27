@@ -862,6 +862,11 @@ export class ApiClient {
     return this.request<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });
   }
 
+  /** Someone who was already a customer, proved by Telegram: their account, no invitation. */
+  telegramClaim(input: { telegram: TelegramAuth; username: string; password: string }): Promise<AuthResponse> {
+    return this.request<AuthResponse>('/auth/telegram/claim', { method: 'POST', body: JSON.stringify(input) });
+  }
+
   telegramLogin(telegram: TelegramAuth): Promise<AuthResponse> {
     return this.request<AuthResponse>('/auth/telegram', { method: 'POST', body: JSON.stringify({ telegram }) });
   }

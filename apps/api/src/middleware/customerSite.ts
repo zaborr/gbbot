@@ -38,6 +38,7 @@ const CUSTOMER_SIGN_IN = new Set([
   '/api/auth/telegram',
   '/api/auth/telegram/start',
   '/api/auth/telegram/callback',
+  '/api/auth/telegram/claim',
 ]);
 
 export function keySessionMay(method: string, path: string): boolean {

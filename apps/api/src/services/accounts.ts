@@ -18,8 +18,9 @@ import {
 import { managesSomething } from './team.js';
 import { keyHash, markKeyed } from './webKeys.js';
 import { addVipBy } from './vip.js';
-import { takeTelegramIdentity, type TelegramIdentity } from './telegramLogin.js';
-import { forgetMembership } from './members.js';
+import { peekTelegramIdentity, takeTelegramIdentity, type TelegramIdentity } from './telegramLogin.js';
+import { forgetMembership, isMember } from './members.js';
+import { getPlatformBlacklist } from './blacklist.js';
 
 /** The person's Telegram names, as Telegram gave them (kept up to date, like the bot does). */
 async function rememberTelegramUser(db: Database, who: TelegramIdentity): Promise<void> {
@@ -168,6 +169,8 @@ export async function signUp(
       }
       linkState = who ? 'confirmed' : 'staff';
     }
+    const known = await tx.query.users.findFirst({ where: eq(users.telegramId, telegramId), columns: { username: true } });
+    await assertNotBlacklisted(tx as unknown as Database, telegramId, who?.username ?? known?.username ?? null);
     if (who) await rememberTelegramUser(tx as unknown as Database, who);
     if (await accountOf(tx as unknown as Database, telegramId)) {
       throw ApiError.conflict('has_account', 'You already have a web account: sign in');
@@ -224,6 +227,8 @@ export async function createOwnAccount(
   if (await accountOf(db, input.telegramId)) {
     throw ApiError.conflict('has_account', 'You already have a web account: sign in');
   }
+  const known = await db.query.users.findFirst({ where: eq(users.telegramId, input.telegramId), columns: { username: true } });
+  await assertNotBlacklisted(db, input.telegramId, who?.username ?? known?.username ?? null);
   const username = input.username.trim().toLowerCase();
   await assertUsernameFree(db, username);
   if (who) await rememberTelegramUser(db, who);
@@ -246,10 +251,20 @@ export async function createOwnAccount(
 }
 
 /** The login bot proved their Telegram: the account tied to it, now confirmed. */
-export async function accountByTelegram(db: Database, telegram: string): Promise<AccountRow> {
+export async function accountByTelegram(db: Database, env: Env, telegram: string): Promise<AccountRow> {
+  const peeked = peekTelegramIdentity(telegram);
+  const row = await accountOf(db, peeked.id);
+  if (!row) {
+    // Someone who was already a customer (orders, lists, a key…): Telegram has
+    // just proved it is them, so they make their account now, with no
+    // invitation. The proof stays for that next step.
+    if (await isMember(db, env, peeked.id)) {
+      throw ApiError.conflict('make_account', 'Choose your username and password to finish');
+    }
+    takeTelegramIdentity(telegram);
+    throw ApiError.notFound('There is no web account for this Telegram yet: you need an invitation');
+  }
   const who = takeTelegramIdentity(telegram);
-  const row = await accountOf(db, who.id);
-  if (!row) throw ApiError.notFound('There is no web account for this Telegram yet: you need an invitation');
   await rememberTelegramUser(db, who);
   if (row.linkState !== 'confirmed') {
     await db.update(webAdmins).set({ linkState: 'confirmed', linkedBy: null }).where(eq(webAdmins.id, row.id));
@@ -370,4 +385,47 @@ export async function confirmManaging(db: Database, telegramId: number, code: st
   if (step === null) throw ApiError.badRequest('bad_code', 'Wrong code: check the time on your phone and try again');
   enrolling.delete(row.id);
   await db.update(webAdmins).set({ totpSecret: pendingSecret.secret, totpLastStep: step }).where(eq(webAdmins.id, row.id));
+}
+
+/** Nobody on the platform blacklist opens a web account. */
+async function assertNotBlacklisted(db: Database, telegramId: number, username: string | null): Promise<void> {
+  const list = await getPlatformBlacklist(db);
+  if (list.userIds.includes(telegramId) || (username !== null && list.usernames.includes(username.toLowerCase()))) {
+    throw ApiError.forbidden('You cannot open a web account');
+  }
+}
+
+/**
+ * Someone who was already a customer, proved by Telegram (the login bot):
+ * their web account at once, with no invitation (confirmed).
+ */
+export async function claimAccount(
+  db: Database,
+  env: Env,
+  input: { telegram: string; username: string; password: string },
+): Promise<AccountRow> {
+  const who = peekTelegramIdentity(input.telegram);
+  if (!(await isMember(db, env, who.id))) {
+    throw ApiError.notFound('There is no web account for this Telegram yet: you need an invitation');
+  }
+  takeTelegramIdentity(input.telegram);
+  await assertNotBlacklisted(db, who.id, who.username);
+  if (await accountOf(db, who.id)) throw ApiError.conflict('has_account', 'You already have a web account: sign in');
+  const username = input.username.trim().toLowerCase();
+  await assertUsernameFree(db, username);
+  await rememberTelegramUser(db, who);
+  const [row] = await db
+    .insert(webAdmins)
+    .values({
+      username,
+      role: 'linked',
+      telegramId: who.id,
+      passwordHash: await hashPassword(input.password),
+      totpSecret: null,
+      linkState: 'confirmed',
+    })
+    .returning();
+  markKeyed(who.id);
+  forgetMembership(who.id);
+  return row as AccountRow;
 }
