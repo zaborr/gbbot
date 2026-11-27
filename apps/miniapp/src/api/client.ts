@@ -858,8 +858,19 @@ export class ApiClient {
     return this.request<AuthResponse>('/auth/telegram', { method: 'POST', body: JSON.stringify({ telegram }) });
   }
 
-  myAccount(): Promise<{ account: { username: string; linkState: 'confirmed' | 'staff' } | null }> {
+  myAccount(): Promise<{
+    account: { username: string; linkState: 'confirmed' | 'staff'; manages: boolean } | null;
+    managesSomething: boolean;
+  }> {
     return this.request('/me/account');
+  }
+
+  startManaging(telegram: TelegramAuth): Promise<{ secret: string; otpauth: string }> {
+    return this.request('/me/account/manage/start', { method: 'POST', body: JSON.stringify({ telegram }) });
+  }
+
+  confirmManaging(code: string): Promise<{ manages: boolean }> {
+    return this.request('/me/account/manage/confirm', { method: 'POST', body: JSON.stringify({ code }) });
   }
 
   createMyAccount(input: { username: string; password: string; telegram?: TelegramAuth }): Promise<{

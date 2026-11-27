@@ -5,7 +5,17 @@ import type { Database } from '../db/client.js';
 import { invites, shops, users, webAdmins } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 import { signSession } from '../auth/jwt.js';
-import { assertUsernameFree, forgetSessions, hashPassword, verifyPassword, accountOf } from './webAdmins.js';
+import {
+  accountOf,
+  assertUsernameFree,
+  base32Encode,
+  forgetSessions,
+  hashPassword,
+  matchTotp,
+  otpauthUri,
+  verifyPassword,
+} from './webAdmins.js';
+import { managesSomething } from './team.js';
 import { keyHash, markKeyed } from './webKeys.js';
 import { addVipBy } from './vip.js';
 import { takeTelegramIdentity, type TelegramIdentity } from './telegramLogin.js';
@@ -320,4 +330,44 @@ export async function accountSession(
     env.JWT_SECRET,
     (env.WEB_ACCOUNT_SESSION_DAYS ?? 30) * 24 * 3600,
   );
+}
+
+// --- Managing on the web from one's own account -----------------------------------
+
+const enrolling = new Map<number, { secret: string; until: number }>();
+
+/**
+ * Someone who manages and has a customer's account adds the authenticator to
+ * it (then signs in as staff with username, password and code). Telegram must
+ * prove it is them first: a password alone must never turn into management.
+ */
+export async function startManaging(
+  db: Database,
+  env: Env,
+  telegramId: number,
+  telegram: string,
+): Promise<{ secret: string; otpauth: string }> {
+  if (takeTelegramIdentity(telegram).id !== telegramId) {
+    throw ApiError.conflict('telegram_mismatch', 'That Telegram account is not the one you are signed in with');
+  }
+  if (!(await managesSomething(db, env, telegramId))) throw ApiError.forbidden('You do not manage any GB');
+  const row = await accountOf(db, telegramId);
+  if (!row) throw ApiError.notFound('You have no web account');
+  if (row.totpSecret !== null) throw ApiError.conflict('already_manages', 'Your account already manages');
+  const secret = base32Encode(randomBytes(20));
+  enrolling.set(row.id, { secret, until: Date.now() + 10 * 60_000 });
+  return { secret, otpauth: otpauthUri(row.username, secret) };
+}
+
+/** The first code from the app proves it was saved: the authenticator is on. */
+export async function confirmManaging(db: Database, telegramId: number, code: string): Promise<void> {
+  const row = await accountOf(db, telegramId);
+  const pendingSecret = row ? enrolling.get(row.id) : undefined;
+  if (!row || !pendingSecret || pendingSecret.until <= Date.now()) {
+    throw ApiError.badRequest('start_again', 'Start again: confirm with Telegram first');
+  }
+  const step = matchTotp(pendingSecret.secret, code.trim());
+  if (step === null) throw ApiError.badRequest('bad_code', 'Wrong code: check the time on your phone and try again');
+  enrolling.delete(row.id);
+  await db.update(webAdmins).set({ totpSecret: pendingSecret.secret, totpLastStep: step }).where(eq(webAdmins.id, row.id));
 }

@@ -132,7 +132,7 @@ export async function createWebAdmin(
   // Someone who already has a customer's account (username and password): the
   // same account now manages too (new password and authenticator; its username stays).
   const own = role === 'linked' && telegramId !== null ? await accountOf(db, telegramId) : undefined;
-  if (own && own.totpSecret === null) return resetWebAdmin(db, own.username);
+  if (own && own.totpSecret === null) return addAuthenticator(db, own);
   const username = rawUsername.trim().toLowerCase();
   await assertUsernameFree(db, username);
   const { password, totpSecret } = newCredentials();
@@ -164,6 +164,16 @@ export async function createLinkedWebAdmin(
     .values({ telegramId, firstName: String(telegramId), username: null })
     .onConflictDoNothing();
   return createWebAdmin(db, rawUsername, { role: 'linked', telegramId });
+}
+
+/**
+ * A customer's account that now manages too: an authenticator is added; the
+ * username and password stay (an empty password in the answer says so).
+ */
+async function addAuthenticator(db: Database, row: WebAdminRow): Promise<NewCredentials> {
+  const totpSecret = base32Encode(randomBytes(20));
+  await db.update(webAdmins).set({ totpSecret, totpLastStep: 0 }).where(eq(webAdmins.id, row.id));
+  return { username: row.username, password: '', totpSecret, otpauth: otpauthUri(row.username, totpSecret) };
 }
 
 /** A valid username nobody has (admins and customers share them). */

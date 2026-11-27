@@ -33,7 +33,15 @@ import {
   webAccountOf,
 } from '../services/webAdmins.js';
 import { customerOnly } from '../auth/jwt.js';
-import { accountSession, confirmLink, createOwnAccount, setPassword, signUp } from '../services/accounts.js';
+import {
+  accountSession,
+  confirmLink,
+  confirmManaging,
+  createOwnAccount,
+  setPassword,
+  signUp,
+  startManaging,
+} from '../services/accounts.js';
 import { accountOf } from '../services/webAdmins.js';
 import { webKeys } from '../db/schema.js';
 import { z } from 'zod';
@@ -46,8 +54,24 @@ export function meRoutes(): Hono<AppBindings> {
   // --- Their customer web account (username and password) ---------------------
 
   app.get('/account', async (c) => {
-    const row = await accountOf(c.get('db'), c.get('claims').sub);
-    return c.json({ account: row ? { username: row.username, linkState: row.linkState } : null });
+    const db = c.get('db');
+    const sub = c.get('claims').sub;
+    const row = await accountOf(db, sub);
+    return c.json({
+      account: row ? { username: row.username, linkState: row.linkState, manages: row.totpSecret !== null } : null,
+      // Manages GBs: their account may add the authenticator to manage on the web too.
+      managesSomething: await managesSomething(db, c.get('env'), sub),
+    });
+  });
+
+  // Managing on the web with this same account: Telegram proves it is them,
+  // then the first code from the authenticator app turns it on.
+  app.post('/account/manage/start', zValidator('json', z.object({ telegram: telegramProof })), async (c) =>
+    c.json(await startManaging(c.get('db'), c.get('env'), c.get('claims').sub, c.req.valid('json').telegram)),
+  );
+  app.post('/account/manage/confirm', zValidator('json', z.object({ code: z.string().trim().min(6).max(8) })), async (c) => {
+    await confirmManaging(c.get('db'), c.get('claims').sub, c.req.valid('json').code);
+    return c.json({ manages: true });
   });
 
   // From the Mini App (Telegram says who they are) or a web key (the ID the

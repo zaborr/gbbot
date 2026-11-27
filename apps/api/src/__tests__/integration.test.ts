@@ -5382,7 +5382,10 @@ describeDb('API integration', () => {
     expect((await call('/api/shops', { headers: asAna })).status).toBe(200);
     expect((await call('/api/orders', { headers: asAna })).status).toBe(200);
     expect((await call('/api/me/notices', { headers: asAna })).status).toBe(200);
-    expect(await (await call('/api/me/account', { headers: asAna })).json()).toEqual({ account: { username: `ana${stamp}`, linkState: 'confirmed' } });
+    expect(await (await call('/api/me/account', { headers: asAna })).json()).toEqual({
+      account: { username: `ana${stamp}`, linkState: 'confirmed', manages: false },
+      managesSomething: false,
+    });
     expect([403, 404]).toContain((await call('/api/admin/orders', { headers: asAna })).status);
     expect((await call('/api/me/web-access', { headers: asAna })).status).toBe(403);
     // The same Telegram twice: no.
@@ -5497,5 +5500,74 @@ describeDb('API integration', () => {
     await db.update(platformSettings).set({ guestList: before }).where(eq(platformSettings.id, 1));
     await db.delete(webAdmins).where(inArray(webAdmins.telegramId, [555040001, 555040002]));
     forgetMembership();
+  });
+
+  it('lets someone who manages add the authenticator to their own account', async () => {
+    const acc = createApp({ env: { ...testEnv, LOGIN_BOT_CLIENT_ID: 777000, LOGIN_BOT_CLIENT_SECRET: 'login-secret' }, db });
+    const call = (path: string, init: RequestInit & { json?: unknown } = {}): Promise<Response> => {
+      const headers = new Headers(init.headers);
+      if (init.json !== undefined) headers.set('content-type', 'application/json');
+      return Promise.resolve(acc.request(path, { ...init, headers, ...(init.json !== undefined ? { body: JSON.stringify(init.json) } : {}) }));
+    };
+    const { privateKey, publicKey } = await generateJoseKeys('RS256');
+    let pressing = 0;
+    setTelegramLoginTransport({
+      keys: async () => publicKey,
+      fetch: (async () => {
+        const idToken = await new SignJWT({ id: pressing, name: 'N' })
+          .setProtectedHeader({ alg: 'RS256' })
+          .setIssuer('https://oauth.telegram.org')
+          .setAudience('777000')
+          .setIssuedAt()
+          .setExpirationTime('5m')
+          .sign(privateKey);
+        return new Response(JSON.stringify({ id_token: idToken }), { status: 200 });
+      }) as typeof fetch,
+    });
+    const proofOf = async (id: number): Promise<string> => {
+      const started = (await (await call('/api/auth/telegram/start', { method: 'POST' })).json()) as { state: string };
+      pressing = id;
+      await call(`/api/auth/telegram/callback?state=${started.state}&code=abc`);
+      return started.state;
+    };
+    const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}` };
+    const username = `owner${Date.now() % 100000}`;
+    const password = 'long enough pass';
+    const made = await call('/api/me/account', { method: 'POST', headers: admin, json: { username, password } });
+    expect(made.status).toBe(201);
+    const asAccount = { Authorization: `Bearer ${((await made.json()) as { token: string }).token}` };
+    expect(await (await call('/api/me/account', { headers: asAccount })).json()).toMatchObject({
+      account: { manages: false },
+      managesSomething: true,
+    });
+    // Not without Telegram proving it is them.
+    expect((await call('/api/me/account/manage/start', { method: 'POST', headers: asAccount, json: { telegram: await proofOf(555050009) } })).status).toBe(409);
+    const enrol = (await (
+      await call('/api/me/account/manage/start', { method: 'POST', headers: asAccount, json: { telegram: await proofOf(ADMIN_ID) } })
+    ).json()) as { secret: string };
+    expect((await call('/api/me/account/manage/confirm', { method: 'POST', headers: asAccount, json: { code: '000000' } })).status).toBe(400);
+    const code = totpCode(base32Decode(enrol.secret), Math.floor(Date.now() / 30_000));
+    expect((await call('/api/me/account/manage/confirm', { method: 'POST', headers: asAccount, json: { code } })).status).toBe(200);
+    // Now: staff sign-in with the same username and password, plus the code (a later one).
+    const later = totpCode(base32Decode(enrol.secret), Math.floor(Date.now() / 30_000) + 1);
+    const staff = await acc.request('http://gb.example.com/api/auth/web', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username, password, code: later }),
+    });
+    expect(staff.status).toBe(200);
+    await db.delete(webAdmins).where(eq(webAdmins.telegramId, ADMIN_ID));
+
+    // A customer's account that is given web management keeps its password.
+    const plain = await call('/api/me/account', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${await authToken(555050001, 'Org')}` },
+      json: { username: `org${Date.now() % 100000}`, password },
+    });
+    expect(plain.status).toBe(201);
+    const upgraded = await createWebAdmin(db, 'ignored', { role: 'linked', telegramId: 555050001 });
+    expect(upgraded.password).toBe('');
+    expect(upgraded.totpSecret).not.toBe('');
+    await db.delete(webAdmins).where(eq(webAdmins.telegramId, 555050001));
   });
 });
