@@ -57,9 +57,16 @@ export function Credentials({
     <>
       <Section header={t('webAccess.onceTitle')} footer={t('webAccess.onceFooter')}>
         <Cell subtitle={t('web.username')}>{creds.username}</Cell>
-        <Cell subtitle={t('web.password')} after={copyButton('password', creds.password)}>
-          <code style={{ wordBreak: 'break-all' }}>{creds.password}</code>
-        </Cell>
+        {creds.password === '' ? (
+          // Their customer's account now manages too: same password as always.
+          <Cell multiline subtitle={t('web.password')}>
+            {t('acct.samePassword')}
+          </Cell>
+        ) : (
+          <Cell subtitle={t('web.password')} after={copyButton('password', creds.password)}>
+            <code style={{ wordBreak: 'break-all' }}>{creds.password}</code>
+          </Cell>
+        )}
         <Address onionUrl={creds.onionUrl} />
       </Section>
 

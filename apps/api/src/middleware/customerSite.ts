@@ -24,7 +24,7 @@ const KEY_SESSION_PATHS: Array<[methods: string[] | '*', path: RegExp]> = [
   // Their own web account (made, password, Telegram confirmed).
   [['GET', 'POST'], /^\/api\/me\/account$/],
   [['PUT'], /^\/api\/me\/account\/password$/],
-  [['POST'], /^\/api\/me\/account\/confirm$/],
+  [['POST'], /^\/api\/me\/account\/(confirm|manage\/start|manage\/confirm)$/],
   // "Log in with Telegram" (to confirm their Telegram or prove it for a new password).
   [['POST'], /^\/api\/(auth\/telegram\/start|web\/telegram\/result)$/],
 ];

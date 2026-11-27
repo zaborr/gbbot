@@ -218,6 +218,11 @@ export function WebSignIn(): React.JSX.Element {
           </Cell>
         </Section>
       )}
+      <Section>
+        <Cell onClick={() => (window.location.href = '/')} subtitle={t('acct.toShopHint')}>
+          {t('acct.toShop')}
+        </Cell>
+      </Section>
     </List>
   );
 }

@@ -8,6 +8,7 @@ import { PageTitle } from './PageTitle.js';
 import { TelegramLoginButton } from './TelegramLogin.js';
 import { WebBanner, WebKeySignIn } from './WebChrome.js';
 import { SnakeGame } from './SnakeGame.js';
+import { QrCode } from './QrCode.js';
 import { t } from '../i18n/index.js';
 
 const errorText = (err: unknown): string => (err instanceof ApiClientError ? err.message : t('error.title'));
@@ -111,6 +112,9 @@ function WebAccountSignIn({ onInvite, onKey }: { onInvite: (code: string) => voi
       </Section>
       <Section>
         <Cell onClick={onKey}>{t('acct.haveKey')}</Cell>
+        <Cell onClick={() => (window.location.href = '/admin')} subtitle={t('acct.toStaffHint')}>
+          {t('acct.toStaff')}
+        </Cell>
       </Section>
       {privateMode && (
         <Section header={t('gate.meanwhile')}>
@@ -314,6 +318,7 @@ export function AccountSections({
 
   return (
     <>
+      {!inTelegram && !account.manages && current.data?.managesSomething && <ManageOnWeb />}
       <Section header={t('acct.yourAccount')} footer={note ?? undefined}>
         <Cell subtitle={account.linkState === 'confirmed' ? t('acct.linkConfirmed') : t('acct.linkByStaff')}>{account.username}</Cell>
         {account.linkState === 'staff' && bot && (
@@ -377,5 +382,80 @@ export function AccountSections({
         )}
       </Section>
     </>
+  );
+}
+
+/**
+ * Someone who manages GBs, signed in with their account: add the authenticator
+ * to manage on the web too (Telegram proves it is them first).
+ */
+function ManageOnWeb(): React.JSX.Element {
+  const [enrol, setEnrol] = useState<{ secret: string; otpauth: string } | null>(null);
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  if (done) {
+    return (
+      <Section header={t('acct.manageTitle')}>
+        <Cell multiline>{t('acct.manageDone')}</Cell>
+        <div style={{ padding: 16 }}>
+          <Button stretched onClick={() => (window.location.href = '/admin')}>
+            {t('acct.toStaff')}
+          </Button>
+        </div>
+      </Section>
+    );
+  }
+  if (!enrol) {
+    return (
+      <Section header={t('acct.manageTitle')} footer={note ?? t('acct.manageFooter')}>
+        <TelegramLoginButton
+          label={t('acct.manageButton')}
+          onAuth={(proof) => {
+            setNote(null);
+            void api
+              .startManaging(proof)
+              .then(setEnrol)
+              .catch((err: unknown) => setNote(errorText(err)));
+          }}
+        />
+      </Section>
+    );
+  }
+  return (
+    <Section header={t('acct.manageTitle')} footer={note ?? t('acct.manageScan')}>
+      <div style={{ padding: 16 }}>
+        <QrCode text={enrol.otpauth} />
+      </div>
+      <Cell multiline subtitle={t('webAccess.secret')}>
+        <code style={{ wordBreak: 'break-all' }}>{enrol.secret}</code>
+      </Cell>
+      <Input
+        header={t('acct.manageCode')}
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        value={code}
+        onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+      />
+      <div style={{ padding: 16 }}>
+        <Button
+          stretched
+          loading={busy}
+          disabled={code.length < 6}
+          onClick={() => {
+            setBusy(true);
+            setNote(null);
+            void api
+              .confirmManaging(code)
+              .then(() => setDone(true))
+              .catch((err: unknown) => setNote(errorText(err)))
+              .finally(() => setBusy(false));
+          }}
+        >
+          {t('acct.manageConfirm')}
+        </Button>
+      </div>
+    </Section>
   );
 }
