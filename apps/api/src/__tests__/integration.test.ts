@@ -2,6 +2,7 @@ import { createHmac, generateKeyPairSync } from 'node:crypto';
 import { generateKeyPair as generateJoseKeys, SignJWT } from 'jose';
 import { setTelegramLoginTransport } from '../services/telegramLogin.js';
 import { forgetMembership } from '../services/members.js';
+import { removeFromPlatformBlacklist } from '../services/blacklist.js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import type { Pool } from 'pg';
