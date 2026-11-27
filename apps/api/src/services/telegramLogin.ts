@@ -133,6 +133,15 @@ export function telegramLoginStatus(state: string, now = Date.now()): 'waiting' 
   return entry.failed ? 'failed' : 'waiting';
 }
 
+/** The proved Telegram of a finished login, without using it up (to decide what comes next). */
+export function peekTelegramIdentity(state: string, now = Date.now()): TelegramIdentity {
+  const entry = pending.get(state);
+  if (!entry || entry.until <= now || !entry.identity) {
+    throw ApiError.unauthorized('Telegram could not confirm who you are. Try again.');
+  }
+  return entry.identity;
+}
+
 /** The proved Telegram of a finished login, used once. */
 export function takeTelegramIdentity(state: string, now = Date.now()): TelegramIdentity {
   const entry = pending.get(state);
