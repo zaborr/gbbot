@@ -25,10 +25,20 @@ const KEY_SESSION_PATHS: Array<[methods: string[] | '*', path: RegExp]> = [
   [['GET', 'POST'], /^\/api\/me\/account$/],
   [['PUT'], /^\/api\/me\/account\/password$/],
   [['POST'], /^\/api\/me\/account\/confirm$/],
+  // "Log in with Telegram" (to confirm their Telegram or prove it for a new password).
+  [['POST'], /^\/api\/(auth\/telegram\/start|web\/telegram\/result)$/],
 ];
 
 /** The ways in on a customer-only domain: a web key, or a customer's web account. */
-const CUSTOMER_SIGN_IN = new Set(['/api/auth/key', '/api/auth/invite', '/api/auth/signup', '/api/auth/login', '/api/auth/telegram']);
+const CUSTOMER_SIGN_IN = new Set([
+  '/api/auth/key',
+  '/api/auth/invite',
+  '/api/auth/signup',
+  '/api/auth/login',
+  '/api/auth/telegram',
+  '/api/auth/telegram/start',
+  '/api/auth/telegram/callback',
+]);
 
 export function keySessionMay(method: string, path: string): boolean {
   if (method === 'OPTIONS' || method === 'HEAD') return true;

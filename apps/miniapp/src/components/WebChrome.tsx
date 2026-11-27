@@ -56,6 +56,11 @@ export function WebTopBar(): React.JSX.Element {
           🔔
         </Button>
       )}
+      {isCustomerWeb() && (
+        <Button size="s" mode="plain" title={t('acct.myAccount')} onClick={() => navigate('/cuenta')}>
+          👤
+        </Button>
+      )}
       {platform && (
         <Button size="s" mode="plain" onClick={() => navigate('/platform/notices')}>
           🔔{unread > 0 ? ` ${unread}` : ''}
@@ -230,7 +235,7 @@ export function WebBanner(): React.JSX.Element | null {
 }
 
 /** A customer on the web: the key an organiser gave them, pasted. */
-export function WebKeySignIn(): React.JSX.Element {
+export function WebKeySignIn({ onBack }: { onBack?: () => void } = {}): React.JSX.Element {
   const { signInWithKey } = useSession();
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
@@ -273,6 +278,13 @@ export function WebKeySignIn(): React.JSX.Element {
               {t('webKey.submit')}
             </Button>
           </div>
+          {onBack && (
+            <div style={{ padding: '0 16px 16px' }}>
+              <Button stretched mode="bezeled" onClick={onBack}>
+                {t('web.back')}
+              </Button>
+            </div>
+          )}
         </Section>
       </form>
     </List>

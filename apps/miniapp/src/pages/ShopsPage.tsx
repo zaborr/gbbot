@@ -10,7 +10,7 @@ import { ErrorView } from '../components/ErrorView.js';
 import { SecurityPhraseBadge } from '../components/SecurityPhrase.js';
 import { t, tn } from '../i18n/index.js';
 import { LanguagePicker } from '../components/LanguagePicker.js';
-import { isWebMode } from '../lib/web.js';
+import { isCustomerWeb, isWebMode } from '../lib/web.js';
 import { shopName } from '../lib/localize.js';
 import { ShopCard } from '../components/ShopCard.js';
 import { HowItWorks } from '../components/HowItWorks.js';
@@ -90,6 +90,7 @@ export function ShopsPage(): React.JSX.Element {
             <span className="gb-hint">{t('shops.pickHint')}</span>
           </div>
           <SecurityPhraseBadge />
+          {!isWebMode() && <MakeAccountNudge />}
           {!isWebMode() && result.data?.showHowTo && <HowItWorks />}
           {/* Something to do first: orders still to pay. */}
           {shops
@@ -134,7 +135,16 @@ export function ShopsPage(): React.JSX.Element {
         </Section>
       )}
 
-      {isWebMode() && (
+      {/* Their web account: to get in by the web when the bot is down. */}
+      {(isCustomerWeb() || !isWebMode()) && (
+        <Section>
+          <Cell onClick={() => navigate('/cuenta')} subtitle={t('acct.menuHint')}>
+            {t('acct.myAccount')}
+          </Cell>
+        </Section>
+      )}
+
+      {isWebMode() && !isCustomerWeb() && (
         <Section header={t('webPassword.section')}>
           <Cell onClick={() => navigate('/web-password')}>{t('webPassword.title')}</Cell>
         </Section>
@@ -163,5 +173,20 @@ export function ShopsPage(): React.JSX.Element {
       )}
       <LanguagePicker />
     </List>
+  );
+}
+
+/** In Telegram, without a web account yet: a nudge to make one (the way in if the bot fails). */
+function MakeAccountNudge(): React.JSX.Element | null {
+  const navigate = useNavigate();
+  const mine = useAsync(() => api.myAccount(), []);
+  if (!mine.data || mine.data.account) return null;
+  return (
+    <div className="gb-banner gb-banner--info gb-phrase">
+      <span style={{ flex: 1 }}>{t('acct.nudge')}</span>
+      <Button size="s" onClick={() => navigate('/cuenta')}>
+        {t('acct.nudgeButton')}
+      </Button>
+    </div>
   );
 }

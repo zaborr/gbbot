@@ -19,14 +19,10 @@ export const webAuthRequest = z.object({
 export type WebAuthRequest = z.infer<typeof webAuthRequest>;
 
 /**
- * What Telegram's "Log in with Telegram" button hands the page (id, names,
- * username, photo, auth_date, hash); checked on the server against the login
- * bot's token. Kept as sent: every field is part of the signature.
+ * Proof that the login bot confirmed someone's Telegram: the state of a
+ * finished "Log in with Telegram" (used once, kept by the server).
  */
-export const telegramLoginData = z
-  .record(z.string().max(32), z.union([z.string().max(512), z.number()]))
-  .refine((d) => Object.keys(d).length <= 16, 'Too many fields');
-export type TelegramLoginData = z.infer<typeof telegramLoginData>;
+export const telegramProof = z.string().trim().min(16).max(100);
 
 /** A customer's web password. */
 export const accountPassword = z.string().min(10, 'At least 10 characters').max(128);
@@ -50,7 +46,7 @@ export const signupRequest = z.object({
   code: inviteCode,
   username: z.string().trim().min(3).max(32),
   password: accountPassword,
-  telegram: telegramLoginData.optional(),
+  telegram: telegramProof.optional(),
 });
 export type SignupRequest = z.infer<typeof signupRequest>;
 
@@ -64,14 +60,14 @@ export const accountLoginRequest = z.object({
 export const createAccountRequest = z.object({
   username: z.string().trim().min(3).max(32),
   password: accountPassword,
-  telegram: telegramLoginData.optional(),
+  telegram: telegramProof.optional(),
 });
 
 /** A new password: with the current one, or proving their Telegram. */
 export const changePasswordRequest = z.object({
   password: accountPassword,
   current: z.string().max(256).optional(),
-  telegram: telegramLoginData.optional(),
+  telegram: telegramProof.optional(),
 });
 
 /**

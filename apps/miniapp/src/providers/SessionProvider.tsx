@@ -26,6 +26,8 @@ interface SessionValue {
   signIn: (username: string, password: string, code: string) => Promise<void>;
   /** Web mode, customers: signs in with the key an organiser gave them; the GB it opens. */
   signInWithKey: (key: string) => Promise<string | null>;
+  /** Web mode, customers: a session from their web account (password, Telegram or sign-up). */
+  signInWithSession: (session: AuthResponse) => void;
   /** Web mode: forgets the session in this tab. */
   signOut: () => void;
   /** Web mode: the account's role (null in Telegram). */
@@ -79,6 +81,7 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
     },
     [startWeb],
   );
+  const signInWithSession = useCallback((session: AuthResponse) => startWeb(session), [startWeb]);
   const signOut = useCallback(() => startWeb(null), [startWeb]);
   const replaceWebToken = useCallback((token: string, expiresAt: string) => {
     const session = webSession();
@@ -125,11 +128,12 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
       isSuperAdmin: user?.role === 'admin',
       signIn,
       signInWithKey,
+      signInWithSession,
       signOut,
       webRole,
       replaceWebToken,
     }),
-    [status, user, error, signIn, signInWithKey, signOut, webRole, replaceWebToken],
+    [status, user, error, signIn, signInWithKey, signInWithSession, signOut, webRole, replaceWebToken],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

@@ -9,17 +9,31 @@ import { t } from '../i18n/index.js';
 
 const errorText = (err: unknown): string => (err instanceof ApiClientError ? err.message : t('error.title'));
 
-/** A buyer's web access (for when the bot is down): give a key, copy it, take it back. */
+/** The message to send with an invitation: the link (with the code in it), and the others in case. */
+function inviteMessage(given: { url: string; more: string[] }, personal: boolean): string {
+  return (
+    t(personal ? 'invite.personalMessage' : 'invite.groupMessage', { url: given.url }) +
+    (given.more.length ? `\n${t('custKey.more', { urls: given.more.join('\n') })}` : '')
+  );
+}
+
+/**
+ * A buyer's web access: their account (or an invitation to open one), a new
+ * password when Telegram cannot prove who they are, and an old web key.
+ */
 export function WebAccessSection({ userId }: { userId: number }): React.JSX.Element {
   const [reloadKey, setReloadKey] = useState(0);
-  const current = useAsync(() => api.adminWebKey(userId), [userId, reloadKey]);
-  const [given, setGiven] = useState<{ key: string; url: string; more: string[] } | null>(null);
+  const status = useAsync(() => api.adminAccount(userId), [userId, reloadKey]);
+  const legacy = useAsync(() => api.adminWebKey(userId), [userId, reloadKey]);
+  const [given, setGiven] = useState<{ url: string; more: string[] } | null>(null);
+  const [fresh, setFresh] = useState<{ username: string; password: string } | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [sure, setSure] = useState(false);
+  const [sure, setSure] = useState<string | null>(null);
   const [vip, setVip] = useState<'none' | 'shop' | 'platform'>('none');
-  const key = current.data?.key ?? null;
-  const everywhere = current.data?.canVipEverywhere ?? false;
+  const account = status.data?.account ?? null;
+  const key = legacy.data?.key ?? null;
+  const everywhere = legacy.data?.canVipEverywhere ?? false;
 
   const run = (what: string, work: () => Promise<void>): void => {
     setBusy(what);
@@ -28,17 +42,152 @@ export function WebAccessSection({ userId }: { userId: number }): React.JSX.Elem
       .catch((err: unknown) => setNote(errorText(err)))
       .finally(() => setBusy(null));
   };
+  const copy = (text: string): void =>
+    void copyText(text).then((ok) => setNote(ok ? t('sheet.copied') : t('sheet.copyFailed')));
+  const confirmFirst = (what: string, work: () => void): void => {
+    if (sure !== what) {
+      setSure(what);
+      return;
+    }
+    setSure(null);
+    work();
+  };
 
   return (
-    <Section header={t('custKey.title')} footer={note ?? t('custKey.footer')}>
-      <Cell multiline>
-        {key
-          ? t('custKey.active', {
+    <Section header={t('custKey.title')} footer={note ?? t('invite.accessFooter')}>
+      <Cell
+        multiline
+        subtitle={
+          account
+            ? account.linkState === 'confirmed'
+              ? t('invite.linkConfirmed')
+              : t('invite.linkByStaff', { who: account.linkedBy ?? '—' })
+            : undefined
+        }
+      >
+        {account ? t('invite.hasAccount', { username: account.username }) : t('invite.noAccount')}
+      </Cell>
+
+      {!account && (
+        <>
+          {given && (
+            <Cell
+              multiline
+              subtitle={[given.url, ...given.more].join('\n')}
+              after={
+                <Button size="s" mode="bezeled" onClick={() => copy(inviteMessage(given, true))}>
+                  {t('custKey.copy')}
+                </Button>
+              }
+            >
+              {t('invite.made')}
+            </Cell>
+          )}
+          <div className="gb-tabs" role="radiogroup" style={{ padding: '8px 16px' }}>
+            {(['none', 'shop', ...(everywhere ? (['platform'] as const) : [])] as const).map((v) => (
+              <Button key={v} size="s" mode={vip === v ? 'filled' : 'bezeled'} onClick={() => setVip(v)}>
+                {t(v === 'none' ? 'custKey.vipNone' : v === 'shop' ? 'custKey.vipShop' : 'custKey.vipAll')}
+              </Button>
+            ))}
+          </div>
+          <div style={{ padding: 16 }}>
+            <Button
+              stretched
+              loading={busy === 'invite'}
+              onClick={() =>
+                run('invite', async () => {
+                  const r = await api.adminCreateInvite({ kind: 'personal', userId, vip });
+                  setGiven({ url: r.url, more: r.more });
+                })
+              }
+            >
+              {given ? t('invite.again') : t('invite.personal')}
+            </Button>
+          </div>
+        </>
+      )}
+
+      {account && status.data?.canReset && !account.manages && (
+        <>
+          {fresh && (
+            <Cell
+              multiline
+              after={
+                <Button size="s" mode="bezeled" onClick={() => copy(t('invite.resetMessage', fresh))}>
+                  {t('custKey.copy')}
+                </Button>
+              }
+            >
+              <code style={{ wordBreak: 'break-all' }}>
+                {fresh.username} · {fresh.password}
+              </code>
+            </Cell>
+          )}
+          <div style={{ padding: 16 }}>
+            <Button
+              stretched
+              mode="bezeled"
+              loading={busy === 'reset'}
+              onClick={() =>
+                confirmFirst('reset', () =>
+                  run('reset', async () => {
+                    setFresh(await api.adminResetAccount(userId));
+                    setReloadKey((k) => k + 1);
+                  }),
+                )
+              }
+            >
+              {sure === 'reset' ? t('invite.resetSure') : t('invite.reset')}
+            </Button>
+          </div>
+        </>
+      )}
+
+      {key && (
+        <>
+          <Cell multiline>
+            {t('custKey.active', {
               until: formatDateTime(key.expiresAt),
               used: key.lastUsedAt ? formatDateTime(key.lastUsedAt) : t('custKey.neverUsed'),
-            })
-          : t('custKey.none')}
-      </Cell>
+            })}
+          </Cell>
+          <div style={{ padding: 16 }}>
+            <Button
+              stretched
+              mode="bezeled"
+              loading={busy === 'revoke'}
+              onClick={() =>
+                confirmFirst('revoke', () =>
+                  run('revoke', async () => {
+                    await api.adminRevokeWebKey(userId);
+                    setReloadKey((k) => k + 1);
+                  }),
+                )
+              }
+            >
+              {sure === 'revoke' ? t('custKey.revokeSure') : t('custKey.revoke')}
+            </Button>
+          </div>
+        </>
+      )}
+    </Section>
+  );
+}
+
+/** Group invitations of this GB: one link for many people, until it expires. */
+export function GroupInviteSection(): React.JSX.Element {
+  const [reloadKey, setReloadKey] = useState(0);
+  const list = useAsync(() => api.adminInvites(), [reloadKey]);
+  const [days, setDays] = useState(3);
+  const [given, setGiven] = useState<{ url: string; more: string[] } | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [sure, setSure] = useState<string | null>(null);
+  const now = Date.now();
+  const active = (list.data ?? []).filter((i) => !i.revoked && new Date(i.expiresAt).getTime() > now && (i.kind === 'group' || i.uses === 0));
+
+  return (
+    <Section header={t('invite.groupTitle')} footer={note ?? t('invite.groupFooter')}>
       {given && (
         <Cell
           multiline
@@ -48,65 +197,75 @@ export function WebAccessSection({ userId }: { userId: number }): React.JSX.Elem
               size="s"
               mode="bezeled"
               onClick={() =>
-                void copyText(
-                  t('custKey.message', { url: given.url, key: given.key }) +
-                    (given.more.length ? `\n${t('custKey.more', { urls: given.more.join('\n') })}` : ''),
-                ).then((ok) =>
-                  setNote(ok ? t('sheet.copied') : t('sheet.copyFailed')),
-                )
+                void copyText(inviteMessage(given, false)).then((ok) => setNote(ok ? t('sheet.copied') : t('sheet.copyFailed')))
               }
             >
               {t('custKey.copy')}
             </Button>
           }
         >
-          <code style={{ fontSize: 16, wordBreak: 'break-all' }}>{given.key}</code>
+          {t('invite.made')}
         </Cell>
       )}
       <div className="gb-tabs" role="radiogroup" style={{ padding: '8px 16px' }}>
-        {(['none', 'shop', ...(everywhere ? (['platform'] as const) : [])] as const).map((v) => (
-          <Button key={v} size="s" mode={vip === v ? 'filled' : 'bezeled'} onClick={() => setVip(v)}>
-            {t(v === 'none' ? 'custKey.vipNone' : v === 'shop' ? 'custKey.vipShop' : 'custKey.vipAll')}
+        {[1, 3, 7, 14, 30].map((d) => (
+          <Button key={d} size="s" mode={days === d ? 'filled' : 'bezeled'} onClick={() => setDays(d)}>
+            {t('invite.days', { n: d })}
           </Button>
         ))}
       </div>
-      <div style={{ display: 'flex', gap: 8, padding: 16 }}>
+      <div style={{ padding: 16 }}>
         <Button
           stretched
-          mode={key ? 'bezeled' : 'filled'}
-          loading={busy === 'give'}
-          onClick={() =>
-            run('give', async () => {
-              const r = await api.adminGiveWebKey(userId, vip);
-              setGiven({ key: r.key, url: r.url, more: r.more ?? [] });
-              setReloadKey((k) => k + 1);
-            })
+          loading={busy}
+          onClick={() => {
+            setBusy(true);
+            setNote(null);
+            void api
+              .adminCreateInvite({ kind: 'group', days })
+              .then((r) => {
+                setGiven({ url: r.url, more: r.more });
+                setReloadKey((k) => k + 1);
+              })
+              .catch((err: unknown) => setNote(errorText(err)))
+              .finally(() => setBusy(false));
+          }}
+        >
+          {t('invite.group')}
+        </Button>
+      </div>
+      {active.map((i) => (
+        <Cell
+          key={i.id}
+          multiline
+          subtitle={t('invite.line', {
+            who: i.createdBy,
+            until: formatDateTime(i.expiresAt),
+            uses: i.uses,
+          })}
+          after={
+            <Button
+              size="s"
+              mode="bezeled"
+              onClick={() => {
+                if (sure !== i.id) {
+                  setSure(i.id);
+                  return;
+                }
+                setSure(null);
+                void api
+                  .adminRevokeInvite(i.id)
+                  .then(() => setReloadKey((k) => k + 1))
+                  .catch((err: unknown) => setNote(errorText(err)));
+              }}
+            >
+              {sure === i.id ? t('invite.revokeSure') : t('invite.revoke')}
+            </Button>
           }
         >
-          {key ? t('custKey.newKey') : t('custKey.give')}
-        </Button>
-        {key && (
-          <Button
-            stretched
-            mode="bezeled"
-            loading={busy === 'revoke'}
-            onClick={() => {
-              if (!sure) {
-                setSure(true);
-                return;
-              }
-              setSure(false);
-              run('revoke', async () => {
-                await api.adminRevokeWebKey(userId);
-                setGiven(null);
-                setReloadKey((k) => k + 1);
-              });
-            }}
-          >
-            {sure ? t('custKey.revokeSure') : t('custKey.revoke')}
-          </Button>
-        )}
-      </div>
+          {i.kind === 'group' ? t('invite.groupKind') : t('invite.personalKind', { who: i.forWhom ?? '' })}
+        </Cell>
+      ))}
     </Section>
   );
 }

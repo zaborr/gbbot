@@ -98,12 +98,13 @@ const envSchema = z.object({
   /**
    * The login bot: only for "Log in with Telegram" on the web (linking a web
    * account to its Telegram, signing in, a forgotten password). A bot of its
-   * own, apart from the shop's, so it survives if that one is blocked. Its
-   * domain is set in @BotFather (/setdomain). Empty = no Telegram button.
+   * own, apart from the shop's, so it survives if that one is blocked. In
+   * @BotFather → the bot → Login Widget: its Client ID and Client Secret, and
+   * as Allowed URLs every domain's https://<domain>/api/auth/telegram/callback.
+   * Empty = no Telegram button.
    */
-  LOGIN_BOT_TOKEN: z.string().optional(),
-  /** Its @username, without the @. */
-  LOGIN_BOT_USERNAME: z.string().optional(),
+  LOGIN_BOT_CLIENT_ID: z.coerce.number().int().positive().optional(),
+  LOGIN_BOT_CLIENT_SECRET: z.string().optional(),
   /** How long a customer's web account session lasts, in days. */
   WEB_ACCOUNT_SESSION_DAYS: z.coerce.number().int().min(1).max(90).default(30),
   /** How long a web session lasts. */

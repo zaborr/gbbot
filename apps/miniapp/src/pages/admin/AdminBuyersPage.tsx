@@ -14,7 +14,7 @@ import { ErrorView } from '../../components/ErrorView.js';
 import { PageTitle } from '../../components/PageTitle.js';
 import { useShopPath } from '../../providers/ShopProvider.js';
 import { AdminOnly } from './common.js';
-import { NewCustomerSection } from '../../components/WebAccess.js';
+import { GroupInviteSection, NewCustomerSection } from '../../components/WebAccess.js';
 import { t, tn, type MessageKey } from '../../i18n/index.js';
 
 type Filter = 'all' | 'unpaid' | 'toShip' | 'testing' | 'cart';
@@ -93,6 +93,7 @@ function AdminBuyers(): React.JSX.Element {
           </Button>
         ))}
       </div>
+      <GroupInviteSection />
       <NewCustomerSection />
       <Section>
         <Input
