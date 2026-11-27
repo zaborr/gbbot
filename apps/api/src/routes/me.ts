@@ -206,7 +206,7 @@ export function meRoutes(): Hono<AppBindings> {
       account: account
         ? { username: account.username, lastLoginAt: account.lastLoginAt?.toISOString() ?? null }
         : null,
-      onionUrl: env.WEB_ONION_URL ?? null,
+      onionUrl: webPanelUrl(env),
     };
     return c.json(status);
   });
@@ -224,7 +224,7 @@ export function meRoutes(): Hono<AppBindings> {
       telegramId: sub,
     });
     await tellPlatform(db, env, sub, 'web.activated', creds.username);
-    const result: WebCredentials = { ...creds, onionUrl: env.WEB_ONION_URL ?? null };
+    const result: WebCredentials = { ...creds, onionUrl: webPanelUrl(env) };
     return c.json(result, 201);
   });
 
@@ -238,7 +238,7 @@ export function meRoutes(): Hono<AppBindings> {
     if (!account) throw ApiError.notFound('You have no web access');
     const creds = await resetWebAdmin(db, account.username);
     await tellPlatform(db, env, sub, 'web.renewed', creds.username);
-    const result: WebCredentials = { ...creds, onionUrl: env.WEB_ONION_URL ?? null };
+    const result: WebCredentials = { ...creds, onionUrl: webPanelUrl(env) };
     return c.json(result);
   });
 
@@ -266,4 +266,13 @@ export function meRoutes(): Hono<AppBindings> {
   });
 
   return app;
+}
+
+/**
+ * Where the web panel opens: the main domain's /admin, or the .onion address
+ * when web sign-in is only allowed there (WEB_LOGIN_ONION_ONLY).
+ */
+function webPanelUrl(env: Env): string | null {
+  if (env.WEB_LOGIN_ONION_ONLY === true) return env.WEB_ONION_URL ?? null;
+  return env.PUBLIC_URL ? `${env.PUBLIC_URL.replace(/\/+$/, '')}/admin` : (env.WEB_ONION_URL ?? null);
 }
