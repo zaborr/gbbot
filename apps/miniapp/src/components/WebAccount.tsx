@@ -30,18 +30,19 @@ function useLoginBot(): boolean {
 
 /**
  * The customers' web entrance: their account (username and password, or
- * Telegram), an invitation to open one, or an old web key.
+ * Telegram) or an invitation to open one. A web key only from its own link
+ * (/s/<slug>); the staff go to /admin themselves.
  */
 export function WebCustomerSignIn(): React.JSX.Element {
   const [code] = useState(codeFromAddress);
   const [signup, setSignup] = useState<string | null>(code);
-  const [withKey, setWithKey] = useState(false);
+  const [withKey, setWithKey] = useState(() => /^#\/s\//.test(window.location.hash));
   if (signup !== null) return <WebSignUp initialCode={signup} onBack={() => setSignup(null)} />;
   if (withKey) return <WebKeySignIn onBack={() => setWithKey(false)} />;
-  return <WebAccountSignIn onInvite={(c) => setSignup(c)} onKey={() => setWithKey(true)} />;
+  return <WebAccountSignIn onInvite={(c) => setSignup(c)} />;
 }
 
-function WebAccountSignIn({ onInvite, onKey }: { onInvite: (code: string) => void; onKey: () => void }): React.JSX.Element {
+function WebAccountSignIn({ onInvite }: { onInvite: (code: string) => void }): React.JSX.Element {
   const { signInWithSession } = useSession();
   const config = useAsync(() => api.webConfig(), []).data;
   const [claimProof, setClaimProof] = useState<string | null>(null);
@@ -126,12 +127,6 @@ function WebAccountSignIn({ onInvite, onKey }: { onInvite: (code: string) => voi
             {t('acct.useInvite')}
           </Button>
         </div>
-      </Section>
-      <Section>
-        <Cell onClick={onKey}>{t('acct.haveKey')}</Cell>
-        <Cell onClick={() => (window.location.href = '/admin')} subtitle={t('acct.toStaffHint')}>
-          {t('acct.toStaff')}
-        </Cell>
       </Section>
       {privateMode && (
         <Section header={t('gate.meanwhile')}>
