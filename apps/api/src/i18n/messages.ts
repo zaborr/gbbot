@@ -324,6 +324,8 @@ const en = {
   'web.passwordResetBy': '🔑 {who} gave the web account "{whom}" a new password.',
   'start.private': '🔒 This is a private bot. If you have an invitation, open it and enter it.',
   'start.privateButton': 'Open',
+  'web.expelled': '⛔ {who} expelled {whom} from the platform: {reason}',
+  'web.inviteForYou': '🎟️ {who} made you an invitation to open your web account. If you did not ask for it, tell the staff.',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -640,6 +642,8 @@ const es: Record<BotMessageKey, string> = {
   'web.passwordResetBy': '🔑 {who} ha puesto una contraseña nueva a la cuenta web «{whom}».',
   'start.private': '🔒 Este bot es privado. Si tienes una invitación, ábrelo e introdúcela.',
   'start.privateButton': 'Abrir',
+  'web.expelled': '⛔ {who} ha expulsado a {whom} de la plataforma: {reason}',
+  'web.inviteForYou': '🎟️ {who} te ha creado una invitación para abrir tu cuenta web. Si no la pediste, avisa al staff.',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -954,6 +958,8 @@ const it: Record<BotMessageKey, string> = {
   'web.passwordResetBy': '🔑 {who} ha dato una nuova password all\'account web «{whom}».',
   'start.private': '🔒 Questo bot è privato. Se hai un invito, aprilo e inseriscilo.',
   'start.privateButton': 'Apri',
+  'web.expelled': '⛔ {who} ha espulso {whom} dalla piattaforma: {reason}',
+  'web.inviteForYou': '🎟️ {who} ti ha creato un invito per aprire il tuo account web. Se non l\'hai chiesto, avvisa lo staff.',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -1268,6 +1274,8 @@ const pt: Record<BotMessageKey, string> = {
   'web.passwordResetBy': '🔑 {who} deu uma nova palavra-passe à conta web «{whom}».',
   'start.private': '🔒 Este bot é privado. Se tens um convite, abre-o e introduz o convite.',
   'start.privateButton': 'Abrir',
+  'web.expelled': '⛔ {who} expulsou {whom} da plataforma: {reason}',
+  'web.inviteForYou': '🎟️ {who} criou-te um convite para abrires a tua conta web. Se não pediste, avisa a equipa.',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

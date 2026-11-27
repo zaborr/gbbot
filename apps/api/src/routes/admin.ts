@@ -53,6 +53,7 @@ import { labelFile, requestLabel, requestLabels, sendLabelTo } from '../services
 import { createOrderFor, listPendingOrders, removePendingOrder } from '../services/adminOrders.js';
 import { addCustomer, giveKey, keyOf, revokeKeys } from '../services/webKeys.js';
 import { createInvite, listInvites, resetAccountPassword, revokeInvite } from '../services/accounts.js';
+import { expel } from '../services/expel.js';
 import { accountOf } from '../services/webAdmins.js';
 import { testingAdminRoutes } from './testing.js';
 import { announceTestingTiers, listTestings, markTestings, setTestingEnabled } from '../services/testing.js';
@@ -108,7 +109,7 @@ import {
   updatePaymentSetup,
 } from '../services/shop.js';
 import { ApiError } from '../lib/errors.js';
-import { orders, users } from '../db/schema.js';
+import { invites, orders, users } from '../db/schema.js';
 import type { Database } from '../db/client.js';
 import { startPaymentCheck } from '../services/paymentCheck.js';
 import { buildReport } from '../export/report.js';
@@ -801,6 +802,10 @@ export function adminRoutes(): Hono<AppBindings> {
       describeUser(db, sub),
       input.userId === undefined ? Promise.resolve(null) : describeUser(db, input.userId),
     ]);
+    // A personal invitation: the person is told (if they did not ask for it, they know).
+    if (input.userId !== undefined) {
+      await notifyUsers(db, botToken(env), [input.userId], (lang) => tr(lang, 'web.inviteForYou', { who }));
+    }
     await notifyPlatform(
       db,
       env,
@@ -846,6 +851,9 @@ export function adminRoutes(): Hono<AppBindings> {
     const db = c.get('db');
     const sub = c.get('claims').sub;
     const row = await accountOf(db, c.req.valid('param').userId);
+    // The invitation they came in with: who made it, which kind, when.
+    const invite = row?.inviteId ? await db.query.invites.findFirst({ where: eq(invites.id, row.inviteId) }) : undefined;
+    const platformStaff = isSuperAdmin(c.get('env'), sub) || isSupervisor(sub);
     return c.json({
       account: row
         ? {
@@ -853,11 +861,35 @@ export function adminRoutes(): Hono<AppBindings> {
             linkState: row.linkState,
             linkedBy: row.linkedBy === null ? null : await describeUser(db, row.linkedBy),
             manages: row.totpSecret !== null,
+            createdAt: row.createdAt.toISOString(),
+            invitedBy: invite ? { who: await describeUser(db, invite.createdBy), kind: invite.kind } : null,
           }
         : null,
-      canReset: isSuperAdmin(c.get('env'), sub) || isSupervisor(sub),
+      canReset: platformStaff,
+      canExpel: platformStaff,
     });
   });
+
+  // Out of the platform (platform admins and supervisors): blacklist, keys,
+  // web account and the invitations they made.
+  app.post(
+    '/accounts/:userId/expel',
+    zValidator('param', z.object({ userId: z.coerce.number().int() })),
+    zValidator('json', z.object({ reason: z.string().trim().min(1).max(200) })),
+    async (c) => {
+      const db = c.get('db');
+      const env = c.get('env');
+      const sub = c.get('claims').sub;
+      if (!isSuperAdmin(env, sub) && !isSupervisor(sub)) {
+        throw ApiError.forbidden('Only platform admins and supervisors can expel');
+      }
+      const userId = c.req.valid('param').userId;
+      const done = await expel(db, env, sub, userId, c.req.valid('json').reason);
+      const [who, whom] = await Promise.all([describeUser(db, sub), describeUser(db, userId)]);
+      await notifyPlatform(db, env, (lang) => tr(lang, 'web.expelled', { who, whom, reason: c.req.valid('json').reason }), c.get('shopId'));
+      return c.json(done);
+    },
+  );
 
   // A forgotten password when Telegram cannot prove who they are: a new one,
   // shown once; their other sessions end and they are told.

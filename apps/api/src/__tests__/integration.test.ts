@@ -2,6 +2,7 @@ import { createHmac, generateKeyPairSync } from 'node:crypto';
 import { generateKeyPair as generateJoseKeys, SignJWT } from 'jose';
 import { setTelegramLoginTransport } from '../services/telegramLogin.js';
 import { forgetMembership } from '../services/members.js';
+import { removeFromPlatformBlacklist } from '../services/blacklist.js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import type { Pool } from 'pg';
@@ -5610,5 +5611,31 @@ describeDb('API integration', () => {
     await request('/api/platform/members', { method: 'PUT', headers: admin, body: JSON.stringify({ groups: [], userIds: [], usernames: [] }) });
     await request('/api/platform/private', { method: 'PUT', headers: admin, body: JSON.stringify({ privateMode: false }) });
     forgetMembership();
+  });
+
+  it('expels someone everywhere at once, and shows how they came in', async () => {
+    const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`, 'content-type': 'application/json' };
+    const invite = (await (
+      await request('/api/admin/invites', { method: 'POST', headers: admin, body: JSON.stringify({ kind: 'group', days: 1 }) })
+    ).json()) as { code: string };
+    const them = { Authorization: `Bearer ${await authToken(555070001, 'Gone')}`, 'content-type': 'application/json' };
+    expect(
+      (await request('/api/me/join', { method: 'POST', headers: them, body: JSON.stringify({ code: invite.code, username: `gone${Date.now() % 100000}`, password: 'long enough pass' }) })).status,
+    ).toBe(201);
+    const status = (await (await request('/api/admin/accounts/555070001', { headers: admin })).json()) as {
+      account: { invitedBy: { kind: string } };
+      canExpel: boolean;
+    };
+    expect(status.account.invitedBy.kind).toBe('group');
+    expect(status.canExpel).toBe(true);
+    // Staff cannot be expelled this way.
+    expect((await request(`/api/admin/accounts/${ADMIN_ID}/expel`, { method: 'POST', headers: admin, body: JSON.stringify({ reason: 'x' }) })).status).toBe(400);
+    const out = await request('/api/admin/accounts/555070001/expel', { method: 'POST', headers: admin, body: JSON.stringify({ reason: 'test' }) });
+    expect(out.status).toBe(200);
+    expect(((await out.json()) as { account: boolean }).account).toBe(true);
+    expect(await db.query.webAdmins.findFirst({ where: eq(webAdmins.telegramId, 555070001) })).toBeUndefined();
+    // For them no GB exists any more.
+    expect((await request('/api/products', { headers: them })).status).toBe(404);
+    await removeFromPlatformBlacklist(db, '555070001');
   });
 });
