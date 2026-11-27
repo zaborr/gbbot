@@ -20,6 +20,14 @@ export interface TelegramUpdate {
     data?: string;
     message?: { message_id: number; chat: { id: number; type: string } };
   };
+  /**
+   * Someone joined or left a group where the bot is an administrator (only
+   * sent when asked for, in allowed_updates).
+   */
+  chat_member?: {
+    chat: { id: number; type: string };
+    new_chat_member: { status: string; is_member?: boolean; user: { id: number } };
+  };
   /** The bot was added to, or removed from, a chat. */
   my_chat_member?: {
     chat: { id: number; type: string; title?: string; username?: string };

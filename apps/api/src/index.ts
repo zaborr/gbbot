@@ -1,5 +1,7 @@
 import { loadSupervisors } from './services/team.js';
 import { loadKeyed, mirrorToWeb } from './services/webKeys.js';
+import { setGroupChecker } from './services/vip.js';
+import { TelegramApi } from './telegram/api.js';
 import { serve } from '@hono/node-server';
 import { loadEnv } from './config/env.js';
 import { createDb, createPool } from './db/client.js';
@@ -34,6 +36,8 @@ await loadActiveBot(db, env).catch((error: unknown) => {
 void configureBot(env);
 // Customers with a web key: what the bot tells them is kept for the web too.
 mirrorToWeb(db);
+// The checking bot, if any: asks the groups when the shop's bot cannot.
+setGroupChecker(env.CHECK_BOT_TOKEN ? new TelegramApi(env.CHECK_BOT_TOKEN) : null);
 await loadKeyed(db).catch((error: unknown) => console.error('Could not load the web keys:', error));
 // Who supervises every GB (kept in memory for the permission checks).
 await loadSupervisors(db).catch((error: unknown) => {

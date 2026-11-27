@@ -45,7 +45,7 @@ import { goalTotals } from '../services/goal.js';
 import { cancelDrawsOnReopen, finishDraw, launchDraw } from '../services/testingDraw.js';
 import { botToken, loadActiveBot, useBot } from '../services/activeBot.js';
 import { switchBot } from '../services/botSwitch.js';
-import { isGroupMember, resetVipCache } from '../services/vip.js';
+import { isGroupMember, resetVipCache, setGroupChecker } from '../services/vip.js';
 import { closeDonationWindows, openDonationWindows } from '../services/testingDonations.js';
 import { advanceExtras } from '../services/testingExtra.js';
 import {
@@ -62,7 +62,7 @@ import { resetWatch, watchBot, watchStatus } from '../services/botWatch.js';
 import { announceSwitch } from '../services/botNotices.js';
 import { open as openSecret, seal, secretKey } from '../lib/secretBox.js';
 import { sendPaymentReminders } from '../services/reminders.js';
-import { resetMiniAppUrlCache } from '../services/bot.js';
+import { handleBotMessage, resetMiniAppUrlCache } from '../services/bot.js';
 import { closeDueShops } from '../services/closing.js';
 import { deleteExpiredMessages } from '../services/expiringMessages.js';
 import { TelegramApi, TelegramError } from '../telegram/api.js';
@@ -5569,5 +5569,46 @@ describeDb('API integration', () => {
     expect(upgraded.password).toBe('');
     expect(upgraded.totpSecret).not.toBe('');
     await db.delete(webAdmins).where(eq(webAdmins.telegramId, 555050001));
+  });
+
+  it('remembers group joins and leaves, asks the checking bot, and lets member lists in', async () => {
+    resetVipCache();
+    const down = {
+      getChatMember: async () => {
+        throw new Error('down');
+      },
+    } as unknown as TelegramApi;
+    // Joined (Telegram told the bot): a member even with the bot down.
+    await handleBotMessage(testEnv, { update_id: 1, chat_member: { chat: { id: -2001, type: 'supergroup' }, new_chat_member: { status: 'member', user: { id: 555060001 } } } }, down, db);
+    resetVipCache();
+    expect(await isGroupMember(down, -2001, 555060001, Date.now(), db)).toBe(true);
+    // Left: not any more.
+    await handleBotMessage(testEnv, { update_id: 2, chat_member: { chat: { id: -2001, type: 'supergroup' }, new_chat_member: { status: 'left', user: { id: 555060001 } } } }, down, db);
+    resetVipCache();
+    expect(await isGroupMember(down, -2001, 555060001, Date.now(), db)).toBe(false);
+    // The checking bot answers when the shop's bot cannot.
+    setGroupChecker({ getChatMember: async () => ({ status: 'member' }) });
+    resetVipCache();
+    expect(await isGroupMember(down, -2002, 555060002, Date.now(), db)).toBe(true);
+    setGroupChecker(null);
+    await db.delete(groupMembers).where(inArray(groupMembers.chatId, [-2001, -2002]));
+    resetVipCache();
+
+    // Private mode: someone on the member list is in, with no invitation.
+    const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`, 'content-type': 'application/json' };
+    await request('/api/platform/private', { method: 'PUT', headers: admin, body: JSON.stringify({ privateMode: true }) });
+    const listed = { Authorization: `Bearer ${await authToken(555060003, 'Listed')}` };
+    const gateOf = async (): Promise<string> => ((await (await request('/api/shops', { headers: listed })).json()) as { gate: string }).gate;
+    expect(await gateOf()).toBe('invite');
+    const saved = await request('/api/platform/members', {
+      method: 'PUT',
+      headers: admin,
+      body: JSON.stringify({ groups: [], userIds: [555060003], usernames: [] }),
+    });
+    expect(saved.status).toBe(200);
+    expect(await gateOf()).toBe('none');
+    await request('/api/platform/members', { method: 'PUT', headers: admin, body: JSON.stringify({ groups: [], userIds: [], usernames: [] }) });
+    await request('/api/platform/private', { method: 'PUT', headers: admin, body: JSON.stringify({ privateMode: false }) });
+    forgetMembership();
   });
 });

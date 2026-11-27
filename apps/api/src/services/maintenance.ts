@@ -1,7 +1,6 @@
 import type { Env } from '../config/env.js';
 import { deleteExpiredUploads } from './uploads.js';
 import { deleteUnusedImages } from './images.js';
-import { forgetOldMembers } from './vip.js';
 import { closeStaleBroadcasts } from './broadcast.js';
 import { deleteExpiredMessages } from './expiringMessages.js';
 import type { Database } from '../db/client.js';
@@ -54,11 +53,6 @@ export async function runMaintenance(db: Database, env: Env): Promise<void> {
     if (dropped > 0) console.log(`Deleted ${dropped} expired file(s) sent to the bot.`);
   } catch (error) {
     console.error('Cleaning files sent to the bot failed:', error);
-  }
-  try {
-    await forgetOldMembers(db);
-  } catch (error) {
-    console.error('Forgetting old group members failed:', error);
   }
   try {
     const dropped = await deleteUnusedImages(db);
