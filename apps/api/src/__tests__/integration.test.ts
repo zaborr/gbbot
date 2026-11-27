@@ -5382,7 +5382,10 @@ describeDb('API integration', () => {
     expect((await call('/api/shops', { headers: asAna })).status).toBe(200);
     expect((await call('/api/orders', { headers: asAna })).status).toBe(200);
     expect((await call('/api/me/notices', { headers: asAna })).status).toBe(200);
-    expect(await (await call('/api/me/account', { headers: asAna })).json()).toEqual({ account: { username: `ana${stamp}`, linkState: 'confirmed' } });
+    expect(await (await call('/api/me/account', { headers: asAna })).json()).toEqual({
+      account: { username: `ana${stamp}`, linkState: 'confirmed', manages: false },
+      managesSomething: false,
+    });
     expect([403, 404]).toContain((await call('/api/admin/orders', { headers: asAna })).status);
     expect((await call('/api/me/web-access', { headers: asAna })).status).toBe(403);
     // The same Telegram twice: no.
