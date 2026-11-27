@@ -178,7 +178,7 @@ export type AccountRow = typeof webAdmins.$inferSelect & { telegramId: number };
 export async function signUp(
   db: Database,
   env: Env,
-  input: { code: string; username: string; password: string; telegram?: TelegramLoginData },
+  input: { code: string; username: string; password: string; telegram?: TelegramLoginData | undefined },
 ): Promise<AccountRow> {
   const who = input.telegram ? verifyTelegramLogin(env, input.telegram) : undefined;
   const username = input.username.trim().toLowerCase();
@@ -248,7 +248,7 @@ export async function createOwnAccount(
     keyGivenBy: number | null;
     username: string;
     password: string;
-    telegram?: TelegramLoginData;
+    telegram?: TelegramLoginData | undefined;
   },
 ): Promise<AccountRow> {
   const who = input.telegram ? verifyTelegramLogin(env, input.telegram) : undefined;
@@ -312,7 +312,13 @@ export async function confirmLink(db: Database, env: Env, accountId: number, tel
 export async function setPassword(
   db: Database,
   env: Env,
-  input: { telegramId: number; password: string; current?: string; telegram?: TelegramLoginData; telegramSession: boolean },
+  input: {
+    telegramId: number;
+    password: string;
+    current?: string | undefined;
+    telegram?: TelegramLoginData | undefined;
+    telegramSession: boolean;
+  },
 ): Promise<AccountRow> {
   const row = await accountOf(db, input.telegramId);
   if (!row) throw ApiError.notFound('You have no web account');
