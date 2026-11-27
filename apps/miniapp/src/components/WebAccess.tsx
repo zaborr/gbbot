@@ -67,6 +67,13 @@ export function WebAccessSection({ userId }: { userId: number }): React.JSX.Elem
       >
         {account ? t('invite.hasAccount', { username: account.username }) : t('invite.noAccount')}
       </Cell>
+      {account && (
+        <Cell multiline subtitle={formatDateTime(account.createdAt)}>
+          {account.invitedBy
+            ? t(account.invitedBy.kind === 'group' ? 'invite.cameGroup' : 'invite.camePersonal', { who: account.invitedBy.who })
+            : t('invite.cameOwn')}
+        </Cell>
+      )}
 
       {!account && (
         <>
@@ -166,6 +173,52 @@ export function WebAccessSection({ userId }: { userId: number }): React.JSX.Elem
               }
             >
               {sure === 'revoke' ? t('custKey.revokeSure') : t('custKey.revoke')}
+            </Button>
+          </div>
+        </>
+      )}
+    </Section>
+  );
+}
+
+/** Out of the platform (platform admins and supervisors): blacklist, keys, web account, their invitations. */
+export function ExpelSection({ userId }: { userId: number }): React.JSX.Element | null {
+  const status = useAsync(() => api.adminAccount(userId), [userId]);
+  const [reason, setReason] = useState('');
+  const [sure, setSure] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  if (!status.data?.canExpel) return null;
+  return (
+    <Section header={t('expel.title')} footer={note ?? t('expel.footer')}>
+      {done ? (
+        <Cell multiline>{t('expel.done')}</Cell>
+      ) : (
+        <>
+          <Input header={t('expel.reason')} value={reason} onChange={(e) => setReason(e.target.value)} />
+          <div style={{ padding: 16 }}>
+            <Button
+              stretched
+              mode={sure ? 'filled' : 'bezeled'}
+              loading={busy}
+              disabled={reason.trim() === ''}
+              onClick={() => {
+                if (!sure) {
+                  setSure(true);
+                  return;
+                }
+                setSure(false);
+                setBusy(true);
+                setNote(null);
+                void api
+                  .adminExpel(userId, reason.trim())
+                  .then(() => setDone(true))
+                  .catch((err: unknown) => setNote(errorText(err)))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              {sure ? t('expel.sure') : t('expel.button')}
             </Button>
           </div>
         </>

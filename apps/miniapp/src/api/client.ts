@@ -928,10 +928,22 @@ export class ApiClient {
   }
 
   adminAccount(userId: number): Promise<{
-    account: { username: string; linkState: 'confirmed' | 'staff'; linkedBy: string | null; manages: boolean } | null;
+    account: {
+      username: string;
+      linkState: 'confirmed' | 'staff';
+      linkedBy: string | null;
+      manages: boolean;
+      createdAt: string;
+      invitedBy: { who: string; kind: 'group' | 'personal' } | null;
+    } | null;
     canReset: boolean;
+    canExpel: boolean;
   }> {
     return this.request(`/admin/accounts/${userId}`);
+  }
+
+  adminExpel(userId: number, reason: string): Promise<{ keys: number; account: boolean; invites: number }> {
+    return this.request(`/admin/accounts/${userId}/expel`, { method: 'POST', body: JSON.stringify({ reason }) });
   }
 
   adminResetAccount(userId: number): Promise<{ username: string; password: string }> {
