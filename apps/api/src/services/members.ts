@@ -59,16 +59,21 @@ export async function memberReason(
   if (await db.query.orders.findFirst({ where: eq(orders.userId, userId), columns: { id: true } })) return 'orders';
   const user = await db.query.users.findFirst({ where: eq(users.telegramId, userId), columns: { username: true } });
   const id = JSON.stringify([userId]);
-  const name = JSON.stringify([user?.username?.toLowerCase() ?? '\u0000']);
-  const inList = sql`(
+  const handle = user?.username?.toLowerCase();
+  const name = handle ? JSON.stringify([handle]) : null;
+  const inList = name
+    ? sql`(
     ${shops.vipClub} -> 'userIds' @> ${id}::jsonb or ${shops.guestList} -> 'userIds' @> ${id}::jsonb or
     ${shops.vipClub} -> 'usernames' @> ${name}::jsonb or ${shops.guestList} -> 'usernames' @> ${name}::jsonb
-  )`;
+  )`
+    : sql`(${shops.vipClub} -> 'userIds' @> ${id}::jsonb or ${shops.guestList} -> 'userIds' @> ${id}::jsonb)`;
   if (await db.query.shops.findFirst({ where: inList, columns: { id: true } })) return 'list';
-  const platformList = sql`(
+  const platformList = name
+    ? sql`(
     ${platformSettings.vipClub} -> 'userIds' @> ${id}::jsonb or ${platformSettings.guestList} -> 'userIds' @> ${id}::jsonb or
     ${platformSettings.vipClub} -> 'usernames' @> ${name}::jsonb or ${platformSettings.guestList} -> 'usernames' @> ${name}::jsonb
-  )`;
+  )`
+    : sql`(${platformSettings.vipClub} -> 'userIds' @> ${id}::jsonb or ${platformSettings.guestList} -> 'userIds' @> ${id}::jsonb)`;
   if (await db.query.platformSettings.findFirst({ where: platformList, columns: { id: true } })) return 'list';
   return null;
 }
