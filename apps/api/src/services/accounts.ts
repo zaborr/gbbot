@@ -9,6 +9,7 @@ import { assertUsernameFree, forgetSessions, hashPassword, verifyPassword, accou
 import { keyHash, markKeyed } from './webKeys.js';
 import { addVipBy } from './vip.js';
 import { takeTelegramIdentity, type TelegramIdentity } from './telegramLogin.js';
+import { forgetMembership } from './members.js';
 
 /** The person's Telegram names, as Telegram gave them (kept up to date, like the bot does). */
 async function rememberTelegramUser(db: Database, who: TelegramIdentity): Promise<void> {
@@ -132,9 +133,10 @@ export type AccountRow = typeof webAdmins.$inferSelect & { telegramId: number };
  */
 export async function signUp(
   db: Database,
-  input: { code: string; username: string; password: string; telegram?: string | undefined },
+  input: { code: string; username: string; password: string; telegram?: string | undefined; trusted?: TelegramIdentity },
 ): Promise<AccountRow> {
-  const who = input.telegram ? takeTelegramIdentity(input.telegram) : undefined;
+  // Telegram's proof: the login bot, or a Telegram session (the Mini App) the caller trusts.
+  const who = input.trusted ?? (input.telegram ? takeTelegramIdentity(input.telegram) : undefined);
   const username = input.username.trim().toLowerCase();
   const passwordHash = await hashPassword(input.password);
   const account = await db.transaction(async (tx) => {
@@ -186,6 +188,7 @@ export async function signUp(
     if (shop) await addVipBy(db, shop, account.row.telegramId!, account.invite.vip);
   }
   markKeyed(account.row.telegramId!);
+  forgetMembership(account.row.telegramId!);
   return account.row as AccountRow;
 }
 
@@ -228,6 +231,7 @@ export async function createOwnAccount(
     })
     .returning();
   markKeyed(input.telegramId);
+  forgetMembership(input.telegramId);
   return row as AccountRow;
 }
 

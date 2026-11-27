@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
+  accountPassword,
   changePasswordRequest,
+  inviteCode,
   createAccountRequest,
   createWebAccessRequest,
   telegramProof,
@@ -31,7 +33,7 @@ import {
   webAccountOf,
 } from '../services/webAdmins.js';
 import { customerOnly } from '../auth/jwt.js';
-import { accountSession, confirmLink, createOwnAccount, setPassword } from '../services/accounts.js';
+import { accountSession, confirmLink, createOwnAccount, setPassword, signUp } from '../services/accounts.js';
 import { accountOf } from '../services/webAdmins.js';
 import { webKeys } from '../db/schema.js';
 import { z } from 'zod';
@@ -65,6 +67,26 @@ export function meRoutes(): Hono<AppBindings> {
     const { token, expiresAt } = await accountSession(env, row);
     return c.json({ username: row.username, linkState: row.linkState, token, expiresAt: expiresAt.toISOString() }, 201);
   });
+
+  // In Telegram, at the entrance (private mode): an invitation, and their web
+  // account at once (Telegram already says who they are: confirmed).
+  app.post(
+    '/join',
+    zValidator('json', z.object({ code: inviteCode, username: z.string().trim().min(3).max(32), password: accountPassword })),
+    async (c) => {
+      const db = c.get('db');
+      const claims = c.get('claims');
+      if (claims.wid !== undefined || claims.ck !== undefined) {
+        throw ApiError.forbidden('Only available in Telegram');
+      }
+      const me = await db.query.users.findFirst({ where: eq(users.telegramId, claims.sub) });
+      const row = await signUp(db, {
+        ...c.req.valid('json'),
+        trusted: { id: claims.sub, firstName: me?.firstName ?? String(claims.sub), username: me?.username ?? null },
+      });
+      return c.json({ username: row.username, linkState: row.linkState }, 201);
+    },
+  );
 
   // A new password: with the current one, or proving their Telegram. Other
   // sessions end; a web account session gets a fresh token.

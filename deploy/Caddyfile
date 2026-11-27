@@ -10,6 +10,7 @@
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Robots-Tag "noindex, nofollow"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
 		# Only Telegram (and the site itself) may show it inside another page: no fake page
 		# can wrap the web to catch keys or passwords.
@@ -45,6 +46,7 @@
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Robots-Tag "noindex, nofollow"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
 		Content-Security-Policy "frame-ancestors 'self'; script-src 'self'; object-src 'none'; base-uri 'self'"
 		-Server

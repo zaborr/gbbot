@@ -322,6 +322,8 @@ const en = {
   'web.personalInviteMade': '🎟️ {who} invited {whom} to open a web account in {shop}.',
   'web.passwordReset': '🔑 {who} gave your web account a new password. If you did not ask for it, tell the staff.',
   'web.passwordResetBy': '🔑 {who} gave the web account "{whom}" a new password.',
+  'start.private': '🔒 This is a private bot. If you have an invitation, open it and enter it.',
+  'start.privateButton': 'Open',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -636,6 +638,8 @@ const es: Record<BotMessageKey, string> = {
   'web.personalInviteMade': '🎟️ {who} ha invitado a {whom} a abrir una cuenta web en {shop}.',
   'web.passwordReset': '🔑 {who} ha puesto una contraseña nueva a tu cuenta web. Si no lo pediste, avisa al staff.',
   'web.passwordResetBy': '🔑 {who} ha puesto una contraseña nueva a la cuenta web «{whom}».',
+  'start.private': '🔒 Este bot es privado. Si tienes una invitación, ábrelo e introdúcela.',
+  'start.privateButton': 'Abrir',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -948,6 +952,8 @@ const it: Record<BotMessageKey, string> = {
   'web.personalInviteMade': '🎟️ {who} ha invitato {whom} ad aprire un account web in {shop}.',
   'web.passwordReset': '🔑 {who} ha dato una nuova password al tuo account web. Se non l\'hai chiesto, avvisa lo staff.',
   'web.passwordResetBy': '🔑 {who} ha dato una nuova password all\'account web «{whom}».',
+  'start.private': '🔒 Questo bot è privato. Se hai un invito, aprilo e inseriscilo.',
+  'start.privateButton': 'Apri',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -1260,6 +1266,8 @@ const pt: Record<BotMessageKey, string> = {
   'web.personalInviteMade': '🎟️ {who} convidou {whom} a abrir uma conta web em {shop}.',
   'web.passwordReset': '🔑 {who} deu uma nova palavra-passe à tua conta web. Se não pediste, avisa a equipa.',
   'web.passwordResetBy': '🔑 {who} deu uma nova palavra-passe à conta web «{whom}».',
+  'start.private': '🔒 Este bot é privado. Se tens um convite, abre-o e introduz o convite.',
+  'start.privateButton': 'Abrir',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

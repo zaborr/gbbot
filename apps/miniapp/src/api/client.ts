@@ -84,6 +84,8 @@ export interface ShopsResponse {
   isOrganizer: boolean;
   /** Manages something, so may activate web access. */
   canUseWeb?: boolean;
+  /** Private mode: the entrance (an invitation) or making their web account first. */
+  gate?: 'none' | 'invite' | 'account';
   /** Show "how it works" (first visit only). */
   showHowTo?: boolean;
 }
@@ -804,8 +806,32 @@ export class ApiClient {
 
   // --- Customers' web accounts ---------------------------------------------------
 
-  webConfig(): Promise<{ telegramLogin: boolean }> {
+  webConfig(): Promise<{ telegramLogin: boolean; privateMode: boolean }> {
     return this.request('/web/config');
+  }
+
+  /** In Telegram, at the entrance: an invitation and their web account at once. */
+  joinWithInvite(input: { code: string; username: string; password: string }): Promise<{ username: string }> {
+    return this.request('/me/join', { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  platformPrivate(): Promise<{ privateMode: boolean; accountDeadline: string | null }> {
+    return this.request('/platform/private');
+  }
+
+  platformSetPrivate(input: { privateMode?: boolean; accountDeadline?: string | null }): Promise<{
+    privateMode: boolean;
+    accountDeadline: string | null;
+  }> {
+    return this.request('/platform/private', { method: 'PUT', body: JSON.stringify(input) });
+  }
+
+  platformPrivatePreview(): Promise<{
+    total: number;
+    byReason: Record<string, number>;
+    onlyOrders: Array<{ telegramId: number; name: string }>;
+  }> {
+    return this.request('/platform/private/preview');
   }
 
   telegramLoginStart(): Promise<{ url: string; state: string }> {

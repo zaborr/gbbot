@@ -14,6 +14,7 @@ import { and, eq } from 'drizzle-orm';
 import { isClosedAt } from '@tma-shop/shared';
 import { orders } from '../db/schema.js';
 import { customerOnly, type SessionClaims } from '../auth/jwt.js';
+import { gateFor } from '../services/members.js';
 
 /** The caller's session when a valid token is present, else undefined. */
 async function peekClaims(header: string | undefined, env: Env, db: Database): Promise<SessionClaims | undefined> {
@@ -49,6 +50,12 @@ export const withShop = createMiddleware<AppBindings>(async (c, next) => {
   if (claims?.ws !== undefined && claims.ws !== shop.id) throw ApiError.notFound('Shop not found');
   const keyed = customerOnly(claims);
   const canManage = !keyed && canManageShop(env, shop, userId);
+  // Private mode: the GBs exist only for members (staff always are).
+  if (!canManage) {
+    const gate = await gateFor(c.get('db'), env, claims);
+    if (gate === 'invite') throw new ApiError(403, 'private', 'Private access: you need an invitation');
+    if (gate === 'account') throw new ApiError(403, 'need_account', 'Make your web account to continue');
+  }
   if (!shop.isVisible && !canManage) throw ApiError.notFound('Shop not found');
   // Blacklisted: for them the GB does not exist (same answer as a missing one).
   if (userId !== undefined && (await isBlocked(c.get('db'), env, shop, userId))) {

@@ -14,6 +14,7 @@ import { isCustomerWeb, isWebMode } from '../lib/web.js';
 import { shopName } from '../lib/localize.js';
 import { ShopCard } from '../components/ShopCard.js';
 import { HowItWorks } from '../components/HowItWorks.js';
+import { PrivateGate } from '../components/PrivateGate.js';
 
 let startParamUsed = false;
 
@@ -68,6 +69,8 @@ export function ShopsPage(): React.JSX.Element {
 
   if (result.loading) return <Loader />;
   if (result.error) return <ErrorView message={result.error} />;
+  // Private mode: the entrance (an invitation) or their web account first.
+  if (result.data?.gate === 'invite' || result.data?.gate === 'account') return <PrivateGate kind={result.data.gate} />;
   const shops = result.data?.shops ?? [];
   const isSuperAdmin = result.data?.isSuperAdmin ?? false;
   const isOrganizer = result.data?.isOrganizer ?? false;

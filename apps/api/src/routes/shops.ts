@@ -8,6 +8,7 @@ import { isSuperAdmin, listShops } from '../services/shop.js';
 import { isWebSession } from '../services/webAdmins.js';
 import { isOrganizer, managesSomething } from '../services/team.js';
 import { customerOnly } from '../auth/jwt.js';
+import { gateFor } from '../services/members.js';
 
 /** `GET /api/shops`: the start screen — visible shops plus hidden ones the user manages. */
 export function shopsRoutes(): Hono<AppBindings> {
@@ -23,8 +24,11 @@ export function shopsRoutes(): Hono<AppBindings> {
     const all = await listShops(db, env, sub);
     const shops = claims.ws !== undefined ? all.filter((s) => s.id === claims.ws) : all;
     const manages = !customerOnly(claims) && (await managesSomething(db, env, sub));
+    // Private mode: the entrance (an invitation) or their web account first.
+    const gate = manages ? 'none' : await gateFor(db, env, claims);
     return c.json({
-      shops,
+      shops: gate === 'none' ? shops : [],
+      gate,
       isSuperAdmin: !customerOnly(claims) && isSuperAdmin(env, sub),
       isOrganizer: await isOrganizer(db, sub),
       // Managers may activate web access (Telegram sessions only).

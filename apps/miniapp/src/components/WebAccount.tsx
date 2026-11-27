@@ -7,6 +7,7 @@ import { Input } from './Field.js';
 import { PageTitle } from './PageTitle.js';
 import { TelegramLoginButton } from './TelegramLogin.js';
 import { WebBanner, WebKeySignIn } from './WebChrome.js';
+import { SnakeGame } from './SnakeGame.js';
 import { t } from '../i18n/index.js';
 
 const errorText = (err: unknown): string => (err instanceof ApiClientError ? err.message : t('error.title'));
@@ -41,7 +42,9 @@ export function WebCustomerSignIn(): React.JSX.Element {
 
 function WebAccountSignIn({ onInvite, onKey }: { onInvite: (code: string) => void; onKey: () => void }): React.JSX.Element {
   const { signInWithSession } = useSession();
-  const bot = useLoginBot();
+  const config = useAsync(() => api.webConfig(), []).data;
+  const bot = config?.telegramLogin ?? false;
+  const privateMode = config?.privateMode ?? false;
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [invite, setInvite] = useState('');
@@ -109,6 +112,11 @@ function WebAccountSignIn({ onInvite, onKey }: { onInvite: (code: string) => voi
       <Section>
         <Cell onClick={onKey}>{t('acct.haveKey')}</Cell>
       </Section>
+      {privateMode && (
+        <Section header={t('gate.meanwhile')}>
+          <SnakeGame />
+        </Section>
+      )}
     </List>
   );
 }
@@ -229,7 +237,13 @@ function WebSignUp({ initialCode, onBack }: { initialCode: string; onBack: () =>
  * Their web account, from inside: make one (Mini App, or a web key), confirm
  * the Telegram the staff tied it to, change the password.
  */
-export function AccountSections({ inTelegram }: { inTelegram: boolean }): React.JSX.Element {
+export function AccountSections({
+  inTelegram,
+  onCreated,
+}: {
+  inTelegram: boolean;
+  onCreated?: () => void;
+}): React.JSX.Element {
   const { replaceWebToken } = useSession();
   const bot = useLoginBot();
   const [reload, setReload] = useState(0);
@@ -286,6 +300,7 @@ export function AccountSections({ inTelegram }: { inTelegram: boolean }): React.
                 const made = await api.createMyAccount({ username: username.trim(), password });
                 // On the web: from now on, this session is the account's (every GB).
                 if (!inTelegram) replaceWebToken(made.token, made.expiresAt);
+                onCreated?.();
                 return inTelegram ? t('acct.createdTelegram') : t('acct.created');
               })
             }
