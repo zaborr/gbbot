@@ -26,10 +26,19 @@ export async function saveImage(
   userId: number,
   mime: string,
   data: Buffer,
+  /** Space for one GB's images (unused ones go every day). */
+  quotaBytes = 100 * 1024 * 1024,
 ): Promise<string> {
   if (!TYPES.includes(mime)) throw ApiError.badRequest('bad_image', 'Send a JPEG, PNG or WebP image');
   if (data.length === 0 || data.length > MAX_IMAGE_BYTES) {
     throw ApiError.badRequest('image_too_big', 'The image is too big');
+  }
+  const [used] = await db
+    .select({ bytes: sql<number>`coalesce(sum(${images.size}), 0)::bigint` })
+    .from(images)
+    .where(eq(images.shopId, shopId));
+  if (Number(used?.bytes ?? 0) + data.length > quotaBytes) {
+    throw new ApiError(413, 'image_quota', 'This GB has no image space left: remove pictures it no longer uses');
   }
   const [row] = await db
     .insert(images)

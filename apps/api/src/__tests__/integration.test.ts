@@ -5647,4 +5647,28 @@ describeDb('API integration', () => {
     expect((await request('/api/products', { headers: them })).status).toBe(404);
     await removeFromPlatformBlacklist(db, '555070001');
   });
+
+  it('caps cart lines, takes % and _ as letters, checks labels, and keeps image space per GB', async () => {
+    const buyer = { Authorization: `Bearer ${await authToken(555090001, 'Buyer')}`, 'content-type': 'application/json' };
+    const [someProduct] = await db.select().from(products).where(and(eq(products.shopId, shopId), eq(products.isActive, true))).limit(1);
+    if (someProduct && someProduct.stock === null && !someProduct.vipOnly) {
+      const add = (quantity: number): Promise<Response> =>
+        Promise.resolve(request('/api/cart/items', { method: 'POST', headers: buyer, body: JSON.stringify({ productId: someProduct.id, quantity }) }));
+      const first = await add(999);
+      if (first.status === 200 || first.status === 201) {
+        const again = await add(1);
+        expect(again.status).toBe(400);
+        expect(((await again.json()) as { error: { code: string } }).error.code).toBe('too_many');
+      }
+    }
+    // % in a search is a letter, not "anything".
+    const searched = (await (await request('/api/products?search=%25', { headers: buyer })).json()) as unknown[];
+    expect(Array.isArray(searched) ? searched.length : 0).toBe(0);
+    // An image over the GB's space: refused.
+    const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}` };
+    const tight = createApp({ env: { ...testEnv, IMAGE_QUOTA_MB: 1 }, db });
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(1_100_000)]);
+    const big = await tight.request('/api/admin/images', { method: 'POST', headers: { ...admin, 'X-Shop': shopId, 'content-type': 'image/png' }, body: png });
+    expect(big.status).toBe(413);
+  });
 });

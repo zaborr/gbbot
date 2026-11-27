@@ -170,6 +170,9 @@ export async function getCart(
   };
 }
 
+/** Most units of one product (or variant) in a cart line. */
+const MAX_LINE_QUANTITY = 999;
+
 export async function addItem(
   db: Database,
   shopId: string,
@@ -192,6 +195,10 @@ export async function addItem(
     ),
   });
   const newQty = (existing?.quantity ?? 0) + quantity;
+  // The same cap as one addition: no line grows past it by adding again and again.
+  if (newQty > MAX_LINE_QUANTITY) {
+    throw ApiError.badRequest('too_many', `At most ${MAX_LINE_QUANTITY} of one product`);
+  }
   assertStock(product, variant, newQty);
 
   // One order is paid with one token, so a cart cannot mix currencies.

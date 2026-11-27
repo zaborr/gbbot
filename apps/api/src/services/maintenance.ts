@@ -1,3 +1,4 @@
+import { loadKeyed } from './webKeys.js';
 import type { Env } from '../config/env.js';
 import { deleteExpiredUploads } from './uploads.js';
 import { deleteUnusedImages } from './images.js';
@@ -42,6 +43,12 @@ export async function runMaintenance(db: Database, env: Env): Promise<void> {
     if (deleted > 0) console.log(`Deleted ${deleted} expired bot message(s).`);
   } catch (error) {
     console.error('Deleting expired bot messages failed:', error);
+  }
+  try {
+    // Expired web keys: their holders' bot messages stop being kept for the web.
+    await loadKeyed(db);
+  } catch (error) {
+    console.error('Reloading web keys failed:', error);
   }
   try {
     await closeStaleBroadcasts(db);

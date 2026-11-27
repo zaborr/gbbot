@@ -23,7 +23,8 @@ const envSchema = z.object({
   BOTS_KEY: optional(z.string().min(16)),
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
   JWT_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
-  INITDATA_MAX_AGE_SECONDS: z.coerce.number().int().positive().default(86_400),
+  /** How old Telegram's launch data may be when opening a session (6 h). */
+  INITDATA_MAX_AGE_SECONDS: z.coerce.number().int().positive().default(21_600),
   /** Platform super-admins: create shops, hide them and assign their admins. */
   ADMIN_TELEGRAM_IDS: z
     .string()
@@ -111,6 +112,8 @@ const envSchema = z.object({
    * bot cannot. Empty = only the shop's bot asks.
    */
   CHECK_BOT_TOKEN: z.string().optional(),
+  /** Space for each GB's uploaded images, in MB. */
+  IMAGE_QUOTA_MB: z.coerce.number().int().min(1).max(10_000).default(100),
   /** How long a customer's web account session lasts, in days. */
   WEB_ACCOUNT_SESSION_DAYS: z.coerce.number().int().min(1).max(90).default(30),
   /** How long a web session lasts. */

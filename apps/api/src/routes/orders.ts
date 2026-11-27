@@ -124,9 +124,15 @@ export function orderRoutes(): Hono<AppBindings> {
   app.post('/:id/label', zValidator('param', idParam), async (c) => {
     const { sub } = c.get('claims');
     const mime = (c.req.header('content-type') ?? '').split(';')[0]!.trim().toLowerCase();
-    const fileName = decodeURIComponent(c.req.header('x-file-name') ?? '');
+    // A badly encoded name: the default one instead of an error.
+    let fileName = '';
+    try {
+      fileName = decodeURIComponent(c.req.header('x-file-name') ?? '');
+    } catch {
+      fileName = '';
+    }
     const data = Buffer.from(await c.req.arrayBuffer());
-    await saveLabel(c.get('db'), c.get('env'), c.req.valid('param').id, sub, { mime, fileName, data });
+    await saveLabel(c.get('db'), c.get('env'), c.req.valid('param').id, sub, { mime, fileName, data }, c.get('shopId'));
     return c.json({ ok: true });
   });
 

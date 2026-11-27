@@ -156,7 +156,8 @@ export function readProductsCsv(
     .slice(1)
     .map((cells, i): Row => ({
       line: i + 2,
-      get: (column) => (cells[index.get(column) ?? -1] ?? '').trim(),
+      // The ' put before what a spreadsheet would run as a formula goes away.
+      get: (column) => (cells[index.get(column) ?? -1] ?? '').trim().replace(/^'(?=[=+\-@])/, ''),
       has: (column) => index.has(column),
     }))
     .filter((row) => PRODUCT_CSV_COLUMNS.some((c) => row.get(c) !== ''));
@@ -410,7 +411,12 @@ export function writeProductsCsv(
   const yesNo = (value: boolean): string =>
     value ? (lang === 'en' ? 'yes' : lang === 'pt' ? 'sim' : 'si') : 'no';
   const categoryTitle = new Map(categories.map((c) => [c.id, c.title]));
-  const quote = (text: string): string =>
+  // A cell that a spreadsheet would run as a formula starts with ' (taken off on import).
+  const quote = (raw: string): string => {
+    const text = /^[=+\-@\t\r]/.test(raw) && !/^-?\d+([.,]\d+)?$/.test(raw) ? `'${raw}` : raw;
+    return quoteCell(text);
+  };
+  const quoteCell = (text: string): string =>
     text.includes(delimiter) || /["\r\n]/.test(text) || /^\s|\s$/.test(text)
       ? `"${text.replace(/"/g, '""')}"`
       : text;

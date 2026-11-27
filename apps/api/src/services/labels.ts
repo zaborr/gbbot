@@ -115,14 +115,35 @@ export async function requestLabels(
 }
 
 /** The label arrives (from the app or a reply to the bot): kept, and sent to the GB's team. */
+/** The file's first bytes match the type it was sent as. */
+function looksLike(mime: string, data: Buffer): boolean {
+  const starts = (bytes: number[], at = 0): boolean => bytes.every((b, i) => data[at + i] === b);
+  switch (mime) {
+    case 'application/pdf':
+      return starts([0x25, 0x50, 0x44, 0x46, 0x2d]);
+    case 'image/jpeg':
+      return starts([0xff, 0xd8, 0xff]);
+    case 'image/png':
+      return starts([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    case 'image/webp':
+      return starts([0x52, 0x49, 0x46, 0x46]) && starts([0x57, 0x45, 0x42, 0x50], 8);
+    default:
+      return false;
+  }
+}
+
 export async function saveLabel(
   db: Database,
   env: Env,
   orderId: string,
   userId: number,
   file: { mime: string; fileName: string; data: Buffer },
+  /** From a GB's page: only that GB's orders (a web key opens one GB only). */
+  shopId?: string,
 ): Promise<void> {
-  const order = await db.query.orders.findFirst({ where: and(eq(orders.id, orderId), eq(orders.userId, userId)) });
+  const order = await db.query.orders.findFirst({
+    where: and(eq(orders.id, orderId), eq(orders.userId, userId), shopId ? eq(orders.shopId, shopId) : undefined),
+  });
   if (!order) throw ApiError.notFound('Order not found');
   if (!order.label) throw ApiError.conflict('label_not_asked', 'No shipping label was asked for this order');
   const mime = file.mime.toLowerCase();
@@ -130,6 +151,8 @@ export async function saveLabel(
   if (file.data.length === 0 || file.data.length > MAX_LABEL_BYTES) {
     throw ApiError.badRequest('label_too_big', 'The file is too big (10 MB at most)');
   }
+  // What it says it is must be what it is (the first bytes of a PDF, JPEG, PNG or WebP).
+  if (!looksLike(mime, file.data)) throw ApiError.badRequest('bad_label', 'Send a PDF or an image');
   const fileName = file.fileName.trim().slice(0, 120) || `label-${ref(order.id)}.${mime === 'application/pdf' ? 'pdf' : 'jpg'}`;
   await db
     .insert(orderLabels)
