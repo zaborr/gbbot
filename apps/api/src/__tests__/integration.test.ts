@@ -11,7 +11,7 @@ import { base32Decode, createWebAdmin, removeWebAdmin, resetSignInFailures, rese
 import { addWebNotice } from '../services/webNotices.js';
 import type { Env } from '../config/env.js';
 import { createDb, createPool, type Database } from '../db/client.js';
-import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import {
   cartItems,
   carts,
@@ -3213,8 +3213,13 @@ describeDb('API integration', () => {
         .set({ vipClub: { groups: [{ chatId: -1001234567, title: 'VIP' }], userIds: [], usernames: [] } })
         .where(eq(shops.id, shopId));
       await db.insert(botSwitches).values({ toBotId: 1, reason: 'closed' });
+      // Someone with a web account: told on the web too.
+      await db.insert(users).values({ telegramId: 555080001, firstName: 'Web' }).onConflictDoNothing();
+      await db.insert(webAdmins).values({ username: 'webholder', role: 'linked', telegramId: 555080001, passwordHash: 'x', totpSecret: null });
 
       const notices = await announceSwitch(db, testEnv, 'gb_new_bot', 'closed', fake);
+      const inbox = await db.select().from(customerNotices).where(eq(customerNotices.userId, 555080001));
+      expect(inbox.some((n) => n.text.includes('@gb_new_bot'))).toBe(true);
       expect(notices).toEqual({
         admins: { sent: 1, failed: 0 },
         channel: { ok: true, botAdmin: true },
@@ -3230,8 +3235,12 @@ describeDb('API integration', () => {
       expect(settings?.groupStatus['-1001234567']).toMatchObject({ ok: false, error: 'CHAT_NOT_JOINED' });
       const [entry] = await db.select().from(botSwitches);
       expect(entry?.notices).toEqual(notices);
+      // The platform is told which groups still need the bot added by hand.
+      const told = await db.select().from(webNotices).orderBy(desc(webNotices.id)).limit(5);
+      expect(told.some((n) => JSON.stringify(n).includes('@gb_new_bot') && JSON.stringify(n).includes('VIP'))).toBe(true);
     } finally {
       await db.update(shops).set({ vipClub: shopBefore!.vipClub }).where(eq(shops.id, shopId));
+      await db.delete(webAdmins).where(eq(webAdmins.telegramId, 555080001));
       await db.delete(botSwitches);
       await db.delete(creatorAccounts);
       await db.delete(botSettings);
