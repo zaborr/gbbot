@@ -362,6 +362,6 @@ export async function accountSession(
   return signSession(
     { sub: row.telegramId, role: 'customer', wid: row.id, ver: row.sessionVersion, cs: true },
     env.JWT_SECRET,
-    env.WEB_ACCOUNT_SESSION_DAYS * 24 * 3600,
+    (env.WEB_ACCOUNT_SESSION_DAYS ?? 30) * 24 * 3600,
   );
 }
