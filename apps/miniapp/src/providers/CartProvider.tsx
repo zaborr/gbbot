@@ -10,7 +10,7 @@ import {
 import type { Cart } from '@tma-shop/shared';
 import { api } from '../api/client.js';
 import { useSession } from './SessionProvider.js';
-import { isWebMode } from '../lib/web.js';
+import { isCustomerWeb, isWebMode } from '../lib/web.js';
 
 interface CartValue {
   cart: Cart | null;
@@ -44,8 +44,8 @@ export function CartProvider({ children }: { children: ReactNode }): React.JSX.E
   }, []);
 
   useEffect(() => {
-    // Web administrators have no cart.
-    if (status === 'ready' && !isWebMode()) void refresh();
+    // Web administrators have no cart; customers on the web do.
+    if (status === 'ready' && (!isWebMode() || isCustomerWeb())) void refresh();
   }, [status, refresh]);
 
   const add = useCallback(async (productId: string, variantId: string | null, quantity: number) => {
