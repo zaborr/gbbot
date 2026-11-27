@@ -33,5 +33,8 @@ COPY --from=build /app/apps/api/drizzle ./apps/api/drizzle
 WORKDIR /app/apps/api
 EXPOSE 3000
 
-# Apply migrations, then start the server.
-CMD ["sh", "-c", "node dist/db/migrate.js && node dist/index.js"]
+# Runs as the unprivileged "node" user. It starts as root only to hand that user
+# the folder shared with the host for /update and /server (deploy/runtime), then
+# drops to it (setpriv, from util-linux). Then: migrations, and the server.
+# Without setpriv it stays as before (root) and says so in the log.
+CMD ["sh", "-c", "mkdir -p /run/gb-update && chown -R node:node /run/gb-update 2>/dev/null; if command -v setpriv >/dev/null; then exec setpriv --reuid=node --regid=node --init-groups sh -c 'node dist/db/migrate.js && exec node dist/index.js'; else echo 'setpriv missing: running as root' >&2; node dist/db/migrate.js && exec node dist/index.js; fi"]
