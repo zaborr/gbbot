@@ -54,6 +54,7 @@ import { createOrderFor, listPendingOrders, removePendingOrder } from '../servic
 import { addCustomer, giveKey, keyOf, revokeKeys } from '../services/webKeys.js';
 import { createInvite, listInvites, resetAccountPassword, revokeInvite } from '../services/accounts.js';
 import { expel } from '../services/expel.js';
+import { webLinks } from '../services/webLinks.js';
 import { accountOf } from '../services/webAdmins.js';
 import { testingAdminRoutes } from './testing.js';
 import { announceTestingTiers, listTestings, markTestings, setTestingEnabled } from '../services/testing.js';
@@ -792,12 +793,9 @@ export function adminRoutes(): Hono<AppBindings> {
       ...(input.userId === undefined ? {} : { telegramId: input.userId }),
       vip: input.vip,
     });
-    // Where they sign up: the main domain, or only the customer ones (WEB_KEY_MAIN_LINK=false).
+    // Where they sign up: every domain people may use (see webLinks).
     const base = (env.PUBLIC_URL ?? new URL(c.req.url).origin).replace(/\/+$/, '');
-    const links = [
-      ...(env.WEB_KEY_MAIN_LINK === false && (env.WEB_DOMAINS ?? []).length > 0 ? [] : [base]),
-      ...(env.WEB_DOMAINS ?? []).map((d) => `https://${d}`),
-    ].map((origin) => `${origin}/#/alta?c=${encodeURIComponent(made.code)}`);
+    const links = webLinks(env, base, `/#/alta?c=${encodeURIComponent(made.code)}`);
     const [who, whom] = await Promise.all([
       describeUser(db, sub),
       input.userId === undefined ? Promise.resolve(null) : describeUser(db, input.userId),
@@ -939,12 +937,8 @@ export function adminRoutes(): Hono<AppBindings> {
     await notifyPlatform(db, env, (lang) => tr(lang, 'web.keyGiven', { who, whom, shop: shop.name }), shop.id);
     const keyEnv = c.get('env');
     const base = (keyEnv.PUBLIC_URL ?? new URL(c.req.url).origin).replace(/\/+$/, '');
-    // The main domain, then the customer-only ones (in case the first does not
-    // open); WEB_KEY_MAIN_LINK=false leaves the main domain out of the message.
-    const links = [
-      ...(keyEnv.WEB_KEY_MAIN_LINK === false && (keyEnv.WEB_DOMAINS ?? []).length > 0 ? [] : [base]),
-      ...(keyEnv.WEB_DOMAINS ?? []).map((d) => `https://${d}`),
-    ].map((origin) => `${origin}/s/${shop.slug}`);
+    // The main domain, then the others in case the first does not open (see webLinks).
+    const links = webLinks(keyEnv, base, `/s/${shop.slug}`);
     return c.json({ ...given, url: links[0]!, more: links.slice(1) }, 201);
     },
   );
