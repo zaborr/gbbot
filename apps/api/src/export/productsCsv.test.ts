@@ -157,6 +157,15 @@ describe('writeProductsCsv', () => {
       expect(products[0]?.category).toBe('Clothes');
     }
   });
+
+  it('never writes a cell a spreadsheet would run as a formula, and reads it back as it was', () => {
+    const risky = product({ slug: 'risky', title: '=HYPERLINK("http://x","y")', price: 100 });
+    const csv = writeProductsCsv([risky], [], 'en');
+    expect(csv).toContain(`"'=HYPERLINK(""http://x"",""y"")"`);
+    const { products, errors } = readProductsCsv(csv, [], 'USDC');
+    expect(errors).toEqual([]);
+    expect(products[0]?.input.title).toBe('=HYPERLINK("http://x","y")');
+  });
 });
 
 describe('English versions in the CSV', () => {

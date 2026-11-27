@@ -40,7 +40,8 @@ export async function listProducts(
   }
   // Search in both languages.
   if (query.search) {
-    const pattern = `%${query.search}%`;
+    // Typed % and _ are letters, not wildcards.
+    const pattern = `%${query.search.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
     const match = or(ilike(products.title, pattern), ilike(products.titleEn, pattern));
     if (match) filters.push(match);
   }

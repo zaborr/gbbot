@@ -128,8 +128,24 @@ export async function addVipBy(db: Database, shop: ShopRow, userId: number, scop
     userIds: club.userIds.includes(userId) ? club.userIds : [...club.userIds, userId],
     notes: { ...(club.notes ?? {}), [String(userId)]: club.notes?.[String(userId)] ?? 'web' },
   });
-  if (scope === 'platform') await savePlatformClub(db, add(await getPlatformClub(db, 'vip')));
-  else await saveShopClub(db, shop.id, 'vip', add(ownClub(shop, 'vip')));
+  // Read and written under a lock: two at once never lose one of them.
+  await db.transaction(async (tx) => {
+    if (scope === 'platform') {
+      await tx.insert(platformSettings).values({ id: 1 }).onConflictDoNothing();
+      const [row] = await tx
+        .select({ club: platformSettings.vipClub })
+        .from(platformSettings)
+        .where(eq(platformSettings.id, 1))
+        .for('update');
+      await tx
+        .update(platformSettings)
+        .set({ vipClub: add(normalizeClub(row?.club ?? EMPTY_VIP_CLUB)), updatedAt: new Date() })
+        .where(eq(platformSettings.id, 1));
+    } else {
+      const [row] = await tx.select({ club: shops.vipClub }).from(shops).where(eq(shops.id, shop.id)).for('update');
+      if (row) await tx.update(shops).set({ vipClub: add(normalizeClub(row.club)) }).where(eq(shops.id, shop.id));
+    }
+  });
 }
 
 /** How someone appears in a club's hand-made list, if at all. */

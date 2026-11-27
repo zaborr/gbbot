@@ -233,7 +233,7 @@ export function adminRoutes(): Hono<AppBindings> {
   app.post('/images', async (c) => {
     const mime = (c.req.header('content-type') ?? '').split(';')[0]!.trim().toLowerCase();
     const data = Buffer.from(await c.req.arrayBuffer());
-    const id = await saveImage(c.get('db'), c.get('shopId'), c.get('claims').sub, mime, data);
+    const id = await saveImage(c.get('db'), c.get('shopId'), c.get('claims').sub, mime, data, (c.get('env').IMAGE_QUOTA_MB ?? 100) * 1024 * 1024);
     return c.json({ url: imageUrl(c.get('env'), new URL(c.req.url).origin, id) }, 201);
   });
 
