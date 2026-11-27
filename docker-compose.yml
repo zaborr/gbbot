@@ -90,8 +90,10 @@ services:
       - miniapp
     environment:
       DOMAIN: ${DOMAIN}
+      # Extra domains that serve everything, like DOMAIN (none: empty).
+      EXTRA_DOMAINS: ${EXTRA_DOMAINS:-}
       # Customer-only domains (none: a placeholder that serves nothing).
-      WEB_DOMAINS: ${WEB_DOMAINS:-http://customer.invalid}
+      WEB_DOMAINS: ${CUSTOMER_ONLY_DOMAINS:-${WEB_DOMAINS:-http://customer.invalid}}
     ports:
       - '80:80'
       - '443:443'

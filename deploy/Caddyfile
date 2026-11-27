@@ -1,6 +1,7 @@
-# The main domain: the Mini App, the bot's webhook, customers and admins on the web.
-# Caddy gets and renews the HTTPS certificates of every domain here.
-{$DOMAIN} {
+# The main domain (the Mini App, the bot's webhook) and the extra ones (EXTRA_DOMAINS):
+# customers and the staff's panel on the web. Caddy gets and renews the HTTPS
+# certificates of every domain here.
+{$DOMAIN} {$EXTRA_DOMAINS} {
 	encode gzip zstd
 	# Only the customer-only domains below may say so.
 	request_header -X-Gb-Site
@@ -35,7 +36,7 @@
 	}
 }
 
-# More domains, for customers only (WEB_DOMAINS in .env): the web for when the bot
+# More domains, for customers only (CUSTOMER_ONLY_DOMAINS in .env): the web for when the bot
 # is down, if the main domain is blocked. No web administration and no webhook; the
 # API also refuses any sign-in but a customer's key there (X-Gb-Site).
 {$WEB_DOMAINS:http://customer.invalid} {

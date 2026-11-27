@@ -66,9 +66,23 @@ const envSchema = z.object({
     .default('false')
     .transform((value) => value === 'true'),
   /**
-   * More domains for customers only (spaces or commas between them): the web
-   * fallback for when the bot is down, if the main domain is blocked. Admins
-   * cannot sign in there. Empty = none.
+   * More domains that serve everything, like the main one (customers, the
+   * staff's panel, "Log in with Telegram"), separated by spaces. Set as
+   * EXTRA_DOMAINS. The bot's webhook and Mini App stay on DOMAIN. Empty = none.
+   */
+  EXTRA_DOMAINS: z
+    .string()
+    .default('')
+    .transform((value) =>
+      value
+        .split(/[\s,]+/)
+        .map((d) => d.trim().replace(/^https?:\/\//, '').replace(/\/+$/, ''))
+        .filter((d) => d !== '' && !d.endsWith('.invalid')),
+    ),
+  /**
+   * More domains for customers only (spaces or commas between them): no staff
+   * panel there. Set as CUSTOMER_ONLY_DOMAINS (WEB_DOMAINS, the old name, works
+   * too). Empty = none.
    */
   WEB_DOMAINS: z
     .string()
@@ -136,7 +150,13 @@ export type Env = z.infer<typeof envSchema>;
  * Throws with a readable message if anything required is missing.
  */
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
-  const parsed = envSchema.safeParse(source);
+  // Clearer names in .env; the old ones still work.
+  const named = {
+    ...source,
+    WEB_DOMAINS: source.CUSTOMER_ONLY_DOMAINS ?? source.WEB_DOMAINS,
+    WEB_KEY_MAIN_LINK: source.LINKS_SHOW_MAIN_DOMAIN ?? source.WEB_KEY_MAIN_LINK,
+  };
+  const parsed = envSchema.safeParse(named);
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((issue) => `  - ${issue.path.join('.') || '(root)'}: ${issue.message}`)
