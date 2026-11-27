@@ -1,7 +1,10 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
+  changePasswordRequest,
+  createAccountRequest,
   createWebAccessRequest,
+  telegramLoginData,
   securityPhraseRequest,
   updateLanguageRequest,
   type WebAccessStatus,
@@ -27,11 +30,65 @@ import {
   resetWebAdmin,
   webAccountOf,
 } from '../services/webAdmins.js';
+import { customerOnly } from '../auth/jwt.js';
+import { accountSession, confirmLink, createOwnAccount, setPassword } from '../services/accounts.js';
+import { accountOf } from '../services/webAdmins.js';
+import { webKeys } from '../db/schema.js';
+import { z } from 'zod';
 
 /** The signed-in user's own settings. */
 export function meRoutes(): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
   app.use('*', requireAuth, requireTelegramUser);
+
+  // --- Their customer web account (username and password) ---------------------
+
+  app.get('/account', async (c) => {
+    const row = await accountOf(c.get('db'), c.get('claims').sub);
+    return c.json({ account: row ? { username: row.username, linkState: row.linkState } : null });
+  });
+
+  // From the Mini App (Telegram says who they are) or a web key (the ID the
+  // staff gave, unless the login bot confirms it).
+  app.post('/account', zValidator('json', createAccountRequest), async (c) => {
+    const db = c.get('db');
+    const env = c.get('env');
+    const claims = c.get('claims');
+    if (claims.cs) throw ApiError.conflict('has_account', 'You already have a web account: sign in');
+    const key = claims.ck ? await db.query.webKeys.findFirst({ where: eq(webKeys.id, claims.ck) }) : undefined;
+    const row = await createOwnAccount(db, env, {
+      telegramId: claims.sub,
+      fromTelegram: claims.ck === undefined,
+      keyGivenBy: key?.createdBy ?? null,
+      ...c.req.valid('json'),
+    });
+    const { token, expiresAt } = await accountSession(env, row);
+    return c.json({ username: row.username, linkState: row.linkState, token, expiresAt: expiresAt.toISOString() }, 201);
+  });
+
+  // A new password: with the current one, or proving their Telegram. Other
+  // sessions end; a web account session gets a fresh token.
+  app.put('/account/password', zValidator('json', changePasswordRequest), async (c) => {
+    const db = c.get('db');
+    const env = c.get('env');
+    const claims = c.get('claims');
+    const row = await setPassword(db, env, {
+      telegramId: claims.sub,
+      ...c.req.valid('json'),
+      telegramSession: claims.wid === undefined && claims.ck === undefined,
+    });
+    const { token, expiresAt } = await accountSession(env, row);
+    return c.json({ token, expiresAt: expiresAt.toISOString() });
+  });
+
+  // The staff tied it to an ID: their Telegram (the login bot) confirms it.
+  app.post('/account/confirm', zValidator('json', z.object({ telegram: telegramLoginData })), async (c) => {
+    const claims = c.get('claims');
+    const row = await accountOf(c.get('db'), claims.sub);
+    if (!row) throw ApiError.notFound('You have no web account');
+    await confirmLink(c.get('db'), c.get('env'), row.id, c.req.valid('json').telegram);
+    return c.json({ linkState: 'confirmed' });
+  });
 
   // Language chosen in the app (null = follow Telegram); also used by the bot.
   app.put('/language', zValidator('json', updateLanguageRequest), async (c) => {
@@ -153,11 +210,12 @@ export function meRoutes(): Hono<AppBindings> {
 
   // A customer on the web: what the bot told them (also while the bot is down).
   app.get('/notices', requireAuth, async (c) => {
-    const { sub, ck } = c.get('claims');
+    const claims = c.get('claims');
+    const { sub, ck } = claims;
     // Someone who manages GBs, signed in with a key (to buy): what the bot tells
     // them includes their GBs' business, which whoever gave the key must not read.
     // Their inbox is in their web account.
-    if (ck !== undefined && (await managesSomething(c.get('db'), c.get('env'), sub))) return c.json([]);
+    if (customerOnly(claims) && (await managesSomething(c.get('db'), c.get('env'), sub))) return c.json([]);
     return c.json(await noticesOf(c.get('db'), sub, ck));
   });
 

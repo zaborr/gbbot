@@ -13,7 +13,7 @@ import { shopsOpenToOutside } from '../services/testing.js';
 import { and, eq } from 'drizzle-orm';
 import { isClosedAt } from '@tma-shop/shared';
 import { orders } from '../db/schema.js';
-import type { SessionClaims } from '../auth/jwt.js';
+import { customerOnly, type SessionClaims } from '../auth/jwt.js';
 
 /** The caller's session when a valid token is present, else undefined. */
 async function peekClaims(header: string | undefined, env: Env, db: Database): Promise<SessionClaims | undefined> {
@@ -47,7 +47,7 @@ export const withShop = createMiddleware<AppBindings>(async (c, next) => {
   const userId = claims?.sub;
   // A customer's web key reaches only its GB, and never manages it.
   if (claims?.ws !== undefined && claims.ws !== shop.id) throw ApiError.notFound('Shop not found');
-  const keyed = claims?.ck !== undefined;
+  const keyed = customerOnly(claims);
   const canManage = !keyed && canManageShop(env, shop, userId);
   if (!shop.isVisible && !canManage) throw ApiError.notFound('Shop not found');
   // Blacklisted: for them the GB does not exist (same answer as a missing one).

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import {
   cloneProductsRequest,
+  createInviteRequest,
   MANUAL_METHOD_PREFIX,
   RATE_SCALE,
   updateGoalRequest,
@@ -51,6 +52,8 @@ import { imageUrl, saveImage } from '../services/images.js';
 import { labelFile, requestLabel, requestLabels, sendLabelTo } from '../services/labels.js';
 import { createOrderFor, listPendingOrders, removePendingOrder } from '../services/adminOrders.js';
 import { addCustomer, giveKey, keyOf, revokeKeys } from '../services/webKeys.js';
+import { createInvite, listInvites, resetAccountPassword, revokeInvite } from '../services/accounts.js';
+import { accountOf } from '../services/webAdmins.js';
 import { testingAdminRoutes } from './testing.js';
 import { announceTestingTiers, listTestings, markTestings, setTestingEnabled } from '../services/testing.js';
 import { unpaidExtras } from '../services/testingExtra.js';
@@ -768,6 +771,111 @@ export function adminRoutes(): Hono<AppBindings> {
   };
   // Web access for customers (when the bot is down): a key for someone, taking it back,
   // and adding someone new by their Telegram ID.
+  // --- Invitations to open a web account (any of the staff) --------------------
+
+  app.post('/invites', zValidator('json', createInviteRequest), async (c) => {
+    const db = c.get('db');
+    const env = c.get('env');
+    const shop = c.get('shop');
+    const sub = c.get('claims').sub;
+    const input = c.req.valid('json');
+    // VIP in every GB (the general club): platform admins and supervisors only.
+    if (input.vip === 'platform' && !isSuperAdmin(env, sub) && !isSupervisor(sub)) {
+      throw ApiError.forbidden('Only platform admins and supervisors can make someone VIP in every GB');
+    }
+    const made = await createInvite(db, {
+      kind: input.kind,
+      shopId: shop.id,
+      createdBy: sub,
+      days: input.days,
+      ...(input.userId === undefined ? {} : { telegramId: input.userId }),
+      vip: input.vip,
+    });
+    // Where they sign up: the main domain, or only the customer ones (WEB_KEY_MAIN_LINK=false).
+    const base = (env.PUBLIC_URL ?? new URL(c.req.url).origin).replace(/\/+$/, '');
+    const links = [
+      ...(env.WEB_KEY_MAIN_LINK === false && (env.WEB_DOMAINS ?? []).length > 0 ? [] : [base]),
+      ...(env.WEB_DOMAINS ?? []).map((d) => `https://${d}`),
+    ].map((origin) => `${origin}/#/alta?c=${encodeURIComponent(made.code)}`);
+    const [who, whom] = await Promise.all([
+      describeUser(db, sub),
+      input.userId === undefined ? Promise.resolve(null) : describeUser(db, input.userId),
+    ]);
+    await notifyPlatform(
+      db,
+      env,
+      (lang) =>
+        whom === null
+          ? tr(lang, 'web.groupInviteMade', { who, shop: shop.name, days: input.days })
+          : tr(lang, 'web.personalInviteMade', { who, whom, shop: shop.name }),
+      shop.id,
+    );
+    return c.json({ id: made.id, code: made.code, expiresAt: made.expiresAt.toISOString(), url: links[0]!, more: links.slice(1) }, 201);
+  });
+
+  app.get('/invites', async (c) => {
+    const db = c.get('db');
+    const rows = await listInvites(db, c.get('shopId'));
+    const names = new Map<number, string>();
+    for (const id of new Set(rows.flatMap((r) => [r.createdBy, ...(r.telegramId === null ? [] : [r.telegramId])]))) {
+      names.set(id, await describeUser(db, id));
+    }
+    return c.json(
+      rows.map((r) => ({
+        id: r.id,
+        kind: r.kind,
+        forWhom: r.telegramId === null ? null : names.get(r.telegramId) ?? String(r.telegramId),
+        vip: r.vip,
+        createdBy: names.get(r.createdBy) ?? String(r.createdBy),
+        createdAt: r.createdAt.toISOString(),
+        expiresAt: r.expiresAt.toISOString(),
+        revoked: r.revokedAt !== null,
+        uses: r.uses,
+      })),
+    );
+  });
+
+  app.delete('/invites/:id', zValidator('param', z.object({ id: z.uuid() })), async (c) => {
+    await revokeInvite(c.get('db'), c.get('shopId'), c.req.valid('param').id);
+    return c.json({ ok: true });
+  });
+
+  // Someone's web account: whether they have one, how their Telegram was tied,
+  // and whether the caller may give a new password (platform admins, supervisors).
+  app.get('/accounts/:userId', zValidator('param', z.object({ userId: z.coerce.number().int() })), async (c) => {
+    const db = c.get('db');
+    const sub = c.get('claims').sub;
+    const row = await accountOf(db, c.req.valid('param').userId);
+    return c.json({
+      account: row
+        ? {
+            username: row.username,
+            linkState: row.linkState,
+            linkedBy: row.linkedBy === null ? null : await describeUser(db, row.linkedBy),
+            manages: row.totpSecret !== null,
+          }
+        : null,
+      canReset: isSuperAdmin(c.get('env'), sub) || isSupervisor(sub),
+    });
+  });
+
+  // A forgotten password when Telegram cannot prove who they are: a new one,
+  // shown once; their other sessions end and they are told.
+  app.post('/accounts/:userId/reset', zValidator('param', z.object({ userId: z.coerce.number().int() })), async (c) => {
+    const db = c.get('db');
+    const env = c.get('env');
+    const sub = c.get('claims').sub;
+    if (!isSuperAdmin(env, sub) && !isSupervisor(sub)) {
+      throw ApiError.forbidden('Only platform admins and supervisors can give a new password');
+    }
+    const userId = c.req.valid('param').userId;
+    const fresh = await resetAccountPassword(db, userId);
+    const who = await describeUser(db, sub);
+    await notifyUsers(db, botToken(env), [userId], (lang) => tr(lang, 'web.passwordReset', { who }));
+    await notifyPlatform(db, env, (lang) => tr(lang, 'web.passwordResetBy', { who, whom: fresh.username }), c.get('shopId'));
+    return c.json(fresh);
+  });
+
   app.get('/web-keys/:userId', zValidator('param', z.object({ userId: z.coerce.number().int() })), async (c) => {
     const sub = c.get('claims').sub;
     return c.json({

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { and, desc, eq, gt, gte, isNull, lt } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, isNotNull, isNull, lt } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
-import { customerNotices, platformSettings, users, webKeys } from '../db/schema.js';
+import { customerNotices, platformSettings, users, webAdmins, webKeys } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 import { setTelegramMirror } from '../telegram/api.js';
 
@@ -39,8 +39,19 @@ export async function loadKeyed(db: Database): Promise<void> {
     .selectDistinct({ userId: webKeys.userId })
     .from(webKeys)
     .where(and(isNull(webKeys.revokedAt), gt(webKeys.expiresAt, new Date())));
+  // And everyone with a web account: their inbox on the web too.
+  const accounts = await db
+    .select({ userId: webAdmins.telegramId })
+    .from(webAdmins)
+    .where(isNotNull(webAdmins.telegramId));
   keyed.clear();
   for (const r of rows) keyed.add(r.userId);
+  for (const r of accounts) if (r.userId !== null) keyed.add(r.userId);
+}
+
+/** From now on, what the bot tells them is also kept for the web. */
+export function markKeyed(userId: number): void {
+  keyed.add(userId);
 }
 
 /** Every bot message to someone with a key also goes to their web inbox (best effort). */

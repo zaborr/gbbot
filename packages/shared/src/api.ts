@@ -19,6 +19,62 @@ export const webAuthRequest = z.object({
 export type WebAuthRequest = z.infer<typeof webAuthRequest>;
 
 /**
+ * What Telegram's "Log in with Telegram" button hands the page (id, names,
+ * username, photo, auth_date, hash); checked on the server against the login
+ * bot's token. Kept as sent: every field is part of the signature.
+ */
+export const telegramLoginData = z
+  .record(z.string().max(32), z.union([z.string().max(512), z.number()]))
+  .refine((d) => Object.keys(d).length <= 16, 'Too many fields');
+export type TelegramLoginData = z.infer<typeof telegramLoginData>;
+
+/** A customer's web password. */
+export const accountPassword = z.string().min(10, 'At least 10 characters').max(128);
+
+/** Staff: an invitation to open a web account (group: many people; personal: one Telegram ID). */
+export const createInviteRequest = z
+  .object({
+    kind: z.enum(['group', 'personal']),
+    days: z.number().int().min(1).max(60).default(7),
+    userId: z.number().int().positive().optional(),
+    vip: z.enum(['none', 'shop', 'platform']).default('none'),
+  })
+  .refine((r) => r.kind === 'group' || r.userId !== undefined, { message: 'A personal invitation needs a Telegram ID', path: ['userId'] })
+  .refine((r) => r.kind === 'personal' || r.vip === 'none', { message: 'Group invitations never give VIP', path: ['vip'] });
+export type CreateInviteRequest = z.infer<typeof createInviteRequest>;
+
+export const inviteCode = z.string().trim().min(8).max(100);
+
+/** Opening a web account with an invitation. */
+export const signupRequest = z.object({
+  code: inviteCode,
+  username: z.string().trim().min(3).max(32),
+  password: accountPassword,
+  telegram: telegramLoginData.optional(),
+});
+export type SignupRequest = z.infer<typeof signupRequest>;
+
+/** A customer's web account: username and password. */
+export const accountLoginRequest = z.object({
+  username: z.string().trim().min(1).max(64),
+  password: z.string().min(1).max(256),
+});
+
+/** For someone already in (Telegram or a web key): their own web account. */
+export const createAccountRequest = z.object({
+  username: z.string().trim().min(3).max(32),
+  password: accountPassword,
+  telegram: telegramLoginData.optional(),
+});
+
+/** A new password: with the current one, or proving their Telegram. */
+export const changePasswordRequest = z.object({
+  password: accountPassword,
+  current: z.string().max(256).optional(),
+  telegram: telegramLoginData.optional(),
+});
+
+/**
  * Web accounts: `platform` (everything), `platform_limited` (everything but
  * managing web accounts) or `linked` (acts as its Telegram account).
  */
@@ -92,6 +148,8 @@ export const authResponse = z.object({
   webRole: webRole.optional(),
   /** A customer's web key: the GB it opens. */
   webShop: z.object({ id: z.string(), slug: z.string() }).optional(),
+  /** A customer's web account (username and password): who, and how their Telegram was tied. */
+  account: z.object({ username: z.string(), linkState: z.enum(['confirmed', 'staff']) }).optional(),
 });
 export type AuthResponse = z.infer<typeof authResponse>;
 

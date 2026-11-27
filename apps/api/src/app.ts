@@ -84,6 +84,10 @@ export function createApp(deps: AppDeps): Hono<AppBindings> {
   api.route('/images', imageRoutes());
   // The web's entrance message, for anyone (before signing in).
   api.get('/web/banner', async (c) => c.json({ text: await webBanner(c.get('db')) }));
+  // What the web pages need before signing in: the login bot for "Log in with Telegram".
+  api.get('/web/config', (c) =>
+    c.json({ loginBot: c.get('env').LOGIN_BOT_TOKEN ? (c.get('env').LOGIN_BOT_USERNAME ?? null) : null }),
+  );
   api.route('/web-accounts', webAccountRoutes());
 
   // Shop routes: the `X-Shop` header (id or slug) picks the shop.
