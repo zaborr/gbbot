@@ -20,7 +20,7 @@ import type { AppBindings } from '../context.js';
 import type { Database } from '../db/client.js';
 import type { Env } from '../config/env.js';
 import { requireAuth, requireFullPlatform, requireSuperAdmin } from '../auth/middleware.js';
-import { privatePreview, privateSettings, setPrivateSettings } from '../services/members.js';
+import { forgetMembership, privatePreview, privateSettings, setPrivateSettings } from '../services/members.js';
 import { findReport, listReports, reportCaption, reportFile, sendReportTo } from '../services/testingReports.js';
 import {
   createShop,
@@ -334,6 +334,14 @@ export function platformRoutes(): Hono<AppBindings> {
   app.put('/vip-club', zValidator('json', updateVipClubRequest), async (c) =>
     c.json(await withNames(c.get('db'), await updatePlatformVipClub(c.get('db'), c.get('env'), c.req.valid('json')))),
   );
+
+  // Members by list (private mode): groups (the bot checks) and people. Not VIP, not guests.
+  app.get('/members', async (c) => c.json(await withNames(c.get('db'), await getPlatformClub(c.get('db'), 'member'))));
+  app.put('/members', zValidator('json', updateVipClubRequest), async (c) => {
+    const club = await updatePlatformClub(c.get('db'), c.get('env'), c.req.valid('json'), 'member');
+    forgetMembership();
+    return c.json(await withNames(c.get('db'), club));
+  });
 
   // The platform-wide guests (shops can count them as their guests).
   app.get('/guests', async (c) => c.json(await withNames(c.get('db'), await getPlatformClub(c.get('db'), 'guest'))));

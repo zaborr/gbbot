@@ -1,8 +1,11 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
-import { orders, platformSettings, shops, users, webAdmins, webKeys } from '../db/schema.js';
+import { groupMembers, orders, platformSettings, shops, users, webAdmins, webKeys } from '../db/schema.js';
 import { managesSomething } from './team.js';
+import { getPlatformClub, isGroupMember } from './vip.js';
+import { TelegramApi } from '../telegram/api.js';
+import { botToken } from './activeBot.js';
 
 /**
  * Private mode: who is in. Members are whoever manages something (staff),
@@ -50,7 +53,9 @@ export async function memberReason(
   db: Database,
   env: Env,
   userId: number,
-): Promise<'staff' | 'account' | 'key' | 'orders' | 'list' | null> {
+  /** Ask Telegram about groups (false: only what is remembered; for the preview of everyone). */
+  live = true,
+): Promise<'staff' | 'account' | 'key' | 'orders' | 'list' | 'group' | null> {
   if (await managesSomething(db, env, userId)) return 'staff';
   if (await db.query.webAdmins.findFirst({ where: eq(webAdmins.telegramId, userId), columns: { id: true } })) {
     return 'account';
@@ -75,6 +80,29 @@ export async function memberReason(
   )`
     : sql`(${platformSettings.vipClub} -> 'userIds' @> ${id}::jsonb or ${platformSettings.guestList} -> 'userIds' @> ${id}::jsonb)`;
   if (await db.query.platformSettings.findFirst({ where: platformList, columns: { id: true } })) return 'list';
+  // The member list (by id or @username) and every group of the lists (members,
+  // VIP, guests, of the platform or a GB): the bot checks, or what was last known.
+  const club = await getPlatformClub(db, 'member');
+  if (club.userIds.includes(userId) || (handle !== undefined && club.usernames.includes(handle))) return 'list';
+  const groups = new Set<number>(club.groups.map((g) => g.chatId));
+  const settings = await db.query.platformSettings.findFirst({ columns: { vipClub: true, guestList: true } });
+  for (const g of [...(settings?.vipClub.groups ?? []), ...(settings?.guestList.groups ?? [])]) groups.add(g.chatId);
+  const shopClubs = await db.select({ vip: shops.vipClub, guest: shops.guestList }).from(shops);
+  for (const s of shopClubs) for (const g of [...s.vip.groups, ...s.guest.groups]) groups.add(g.chatId);
+  if (groups.size > 0 && !live) {
+    const seen = await db
+      .select({ chatId: groupMembers.chatId })
+      .from(groupMembers)
+      .where(and(eq(groupMembers.userId, userId), inArray(groupMembers.chatId, [...groups])))
+      .limit(1);
+    return seen.length > 0 ? 'group' : null;
+  }
+  if (groups.size > 0) {
+    const telegram = new TelegramApi(botToken(env));
+    for (const chatId of groups) {
+      if (await isGroupMember(telegram, chatId, userId, Date.now(), db)) return 'group';
+    }
+  }
   return null;
 }
 
@@ -125,7 +153,7 @@ export async function privatePreview(db: Database, env: Env): Promise<{
   const onlyOrders: Array<{ telegramId: number; name: string }> = [];
   let total = 0;
   for (const p of people) {
-    const reason = await memberReason(db, env, p.id);
+    const reason = await memberReason(db, env, p.id, false);
     if (!reason) continue;
     total += 1;
     byReason[reason] = (byReason[reason] ?? 0) + 1;

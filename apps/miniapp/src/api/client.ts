@@ -558,6 +558,14 @@ export class ApiClient {
   }
 
   /** The platform-wide guests. */
+  platformGetMembers(): Promise<VipClub> {
+    return this.request<VipClub>('/platform/members');
+  }
+
+  platformUpdateMembers(input: UpdateVipClubRequest): Promise<VipClub> {
+    return this.request<VipClub>('/platform/members', { method: 'PUT', body: JSON.stringify(input) });
+  }
+
   platformGetGuests(): Promise<VipClub> {
     return this.request<VipClub>('/platform/guests');
   }

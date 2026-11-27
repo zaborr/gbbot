@@ -105,6 +105,12 @@ const envSchema = z.object({
    */
   LOGIN_BOT_CLIENT_ID: z.coerce.number().int().positive().optional(),
   LOGIN_BOT_CLIENT_SECRET: z.string().optional(),
+  /**
+   * The checking bot: a third bot, administrator (with no rights) of the VIP,
+   * guest and member groups, that answers "is X in the group?" when the shop's
+   * bot cannot. Empty = only the shop's bot asks.
+   */
+  CHECK_BOT_TOKEN: z.string().optional(),
   /** How long a customer's web account session lasts, in days. */
   WEB_ACCOUNT_SESSION_DAYS: z.coerce.number().int().min(1).max(90).default(30),
   /** How long a web session lasts. */

@@ -26,7 +26,7 @@ export function VipClubEditor({
 }: {
   club: VipClubWithNames<VipClub>;
   /** VIP club, or guest list (same shape, other texts). */
-  kind?: 'vip' | 'guest';
+  kind?: 'vip' | 'guest' | 'member';
   /** Screen title (the admin menu's words). */
   title?: string;
   /** Shops only: whether the platform's members also count. */
@@ -83,7 +83,7 @@ export function VipClubEditor({
       {title && <PageTitle title={title} />}
 
       <Section>
-        <Cell multiline>{t(kind === 'guest' ? 'guests.intro' : 'vip.intro')}</Cell>
+        <Cell multiline>{t(kind === 'member' ? 'members.intro' : kind === 'guest' ? 'guests.intro' : 'vip.intro')}</Cell>
       </Section>
 
       <Section header={t('vip.groups')} footer={t('vip.groupsFooter')}>

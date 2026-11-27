@@ -393,6 +393,11 @@ export const platformSettings = pgTable('platform_settings', {
    */
   privateMode: boolean('private_mode').notNull().default(false),
   /**
+   * Members by list (private mode): in its groups (the bot checks), or by id or
+   * @username. Not VIP nor guest: only lets them in.
+   */
+  memberClub: jsonb('member_club').$type<VipClub>().notNull().default({ groups: [], userIds: [], usernames: [] }),
+  /**
    * From then on, members coming through Telegram must have made their web
    * account (username and password) to see the GBs. Null: no such rule.
    */

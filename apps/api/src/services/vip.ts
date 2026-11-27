@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import {
   EMPTY_VIP_CLUB,
   type ShopVipClub,
@@ -62,19 +62,29 @@ export async function isGroupMember(
     member = isMemberStatus(await telegram.getChatMember(chatId, userId));
     if (db) await rememberMember(db, chatId, userId, member);
   } catch (error) {
-    // Bot down, removed from the group, Telegram unreachable…: what was last
-    // known stays (a VIP does not lose it because the bot cannot ask).
     console.warn(`VIP check in chat ${chatId} failed:`, error instanceof Error ? error.message : error);
-    member = cached?.member ?? (db ? await lastKnownMember(db, chatId, userId, now) : false);
+    // The checking bot (a third one, admin of the groups with no rights) asks instead.
+    const answer = checker ? await checker.getChatMember(chatId, userId).then(isMemberStatus, () => null) : null;
+    if (answer !== null) {
+      member = answer;
+      if (db) await rememberMember(db, chatId, userId, member);
+    } else {
+      // Nobody can ask: what was last known stays (a VIP does not lose it
+      // because the bot cannot ask), until they are seen leaving.
+      member = cached?.member ?? (db ? await lastKnownMember(db, chatId, userId) : false);
+    }
   }
   membershipCache.set(key, { member, until: now + (member ? MEMBER_TTL_MS : NOT_MEMBER_TTL_MS) });
   return member;
 }
 
-/** How long the last "is a member" is trusted when Telegram cannot be asked. */
-const LAST_KNOWN_MS = 30 * 24 * 60 * 60 * 1000;
+/** The checking bot (CHECK_BOT_TOKEN): set at start-up when configured. */
+let checker: Pick<TelegramApi, 'getChatMember'> | null = null;
+export function setGroupChecker(next: Pick<TelegramApi, 'getChatMember'> | null): void {
+  checker = next;
+}
 
-async function rememberMember(db: Database, chatId: number, userId: number, member: boolean): Promise<void> {
+export async function rememberMember(db: Database, chatId: number, userId: number, member: boolean): Promise<void> {
   if (member) {
     await db
       .insert(groupMembers)
@@ -85,16 +95,26 @@ async function rememberMember(db: Database, chatId: number, userId: number, memb
   }
 }
 
-async function lastKnownMember(db: Database, chatId: number, userId: number, now: number): Promise<boolean> {
+async function lastKnownMember(db: Database, chatId: number, userId: number): Promise<boolean> {
   const row = await db.query.groupMembers.findFirst({
     where: and(eq(groupMembers.chatId, chatId), eq(groupMembers.userId, userId)),
   });
-  return Boolean(row && now - row.checkedAt.getTime() < LAST_KNOWN_MS);
+  return row !== undefined;
 }
 
-/** Old "was a member" answers go (kept 30 days at most). */
-export async function forgetOldMembers(db: Database, now = Date.now()): Promise<void> {
-  await db.delete(groupMembers).where(lt(groupMembers.checkedAt, new Date(now - LAST_KNOWN_MS)));
+/**
+ * Someone joined or left a group the bot administers (Telegram tells it):
+ * remembered at once, and the answer in memory follows.
+ */
+export async function groupMemberChanged(
+  db: Database,
+  chatId: number,
+  userId: number,
+  now: TelegramChatMember,
+): Promise<void> {
+  const member = isMemberStatus(now);
+  await rememberMember(db, chatId, userId, member);
+  membershipCache.set(`${chatId}:${userId}`, { member, until: Date.now() + (member ? MEMBER_TTL_MS : NOT_MEMBER_TTL_MS) });
 }
 
 /**
@@ -181,17 +201,21 @@ async function saveShopClub(db: Database, shopId: string, kind: ClubKind, club: 
     .where(eq(shops.id, shopId));
 }
 
-export async function getPlatformClub(db: Database, kind: ClubKind): Promise<VipClub> {
+/** The platform has one more list: its members (private mode), only by groups or people. */
+export type PlatformClubKind = ClubKind | 'member';
+
+export async function getPlatformClub(db: Database, kind: PlatformClubKind): Promise<VipClub> {
   const row = await db.query.platformSettings.findFirst({ where: eq(platformSettings.id, 1) });
-  return normalizeClub((kind === 'vip' ? row?.vipClub : row?.guestList) ?? EMPTY_VIP_CLUB);
+  const club = kind === 'vip' ? row?.vipClub : kind === 'guest' ? row?.guestList : row?.memberClub;
+  return normalizeClub(club ?? EMPTY_VIP_CLUB);
 }
 
 export function getPlatformVipClub(db: Database): Promise<VipClub> {
   return getPlatformClub(db, 'vip');
 }
 
-async function savePlatformClub(db: Database, club: VipClub, kind: ClubKind = 'vip'): Promise<void> {
-  const set = kind === 'vip' ? { vipClub: club } : { guestList: club };
+async function savePlatformClub(db: Database, club: VipClub, kind: PlatformClubKind = 'vip'): Promise<void> {
+  const set = kind === 'vip' ? { vipClub: club } : kind === 'guest' ? { guestList: club } : { memberClub: club };
   await db
     .insert(platformSettings)
     .values({ id: 1, ...set, updatedAt: new Date() })
@@ -400,7 +424,7 @@ export async function updatePlatformClub(
   db: Database,
   env: Env,
   input: UpdateVipClubRequest,
-  kind: ClubKind,
+  kind: PlatformClubKind,
   telegram = new TelegramApi(botToken(env)),
 ): Promise<VipClub> {
   const club = await clubFromRequest(env, input, await getPlatformClub(db, kind), telegram);

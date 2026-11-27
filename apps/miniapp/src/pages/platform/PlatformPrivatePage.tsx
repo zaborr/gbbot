@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import { api, ApiClientError } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
@@ -14,6 +15,7 @@ const REASONS = [
   ['account', 'private.reason.account'],
   ['key', 'private.reason.key'],
   ['list', 'private.reason.list'],
+  ['group', 'private.reason.group'],
   ['orders', 'private.reason.orders'],
 ] as const;
 
@@ -24,6 +26,7 @@ const REASONS = [
  */
 export function PlatformPrivatePage(): React.JSX.Element {
   const { isSuperAdmin } = useSession();
+  const navigate = useNavigate();
   const [reloadKey, setReloadKey] = useState(0);
   const current = useAsync(() => api.platformPrivate(), [reloadKey]);
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof api.platformPrivatePreview>> | null>(null);
@@ -115,6 +118,10 @@ export function PlatformPrivatePage(): React.JSX.Element {
           ))}
         </Section>
       )}
+
+      <Section footer={t('members.menuHint')}>
+        <Cell onClick={() => navigate('/platform/members')}>{t('members.title')}</Cell>
+      </Section>
 
       <Section header={t('private.deadlineTitle')} footer={t('private.deadlineFooter')}>
         <Cell>{accountDeadline ? t('private.deadlineOn', { date: formatDateTime(accountDeadline) }) : t('private.deadlineNone')}</Cell>

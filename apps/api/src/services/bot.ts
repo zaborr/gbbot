@@ -1,11 +1,12 @@
 import { isMember, privateSettings } from './members.js';
+import { groupMemberChanged } from './vip.js';
 import { handleLabelMessage } from './labels.js';
 import { langFrom, type Lang } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { languagesOf } from './notifications.js';
 import { tr } from '../i18n/messages.js';
-import { TelegramApi, TelegramError, type InlineKeyboard } from '../telegram/api.js';
+import { TelegramApi, TelegramError, type InlineKeyboard, type TelegramChatMember } from '../telegram/api.js';
 import type { TelegramUpdate } from '../telegram/types.js';
 import { handleUploadChoice, handleUploadedFile } from './uploads.js';
 import { handleUpdateButton, isUpdateCommand, updateReply } from './serverUpdate.js';
@@ -76,6 +77,15 @@ export async function handleBotMessage(
   telegram = new TelegramApi(botToken(env)),
   db?: Database,
 ): Promise<void> {
+  // Someone joined or left one of the groups (VIP, guests, members): remembered,
+  // so it still counts when the bot cannot ask.
+  if (update.chat_member) {
+    if (db) {
+      const { chat, new_chat_member: now } = update.chat_member;
+      await groupMemberChanged(db, chat.id, now.user.id, now as TelegramChatMember);
+    }
+    return;
+  }
   if (update.my_chat_member) {
     await handleAddedToChat(update.my_chat_member, telegram, db);
     return;
@@ -173,6 +183,8 @@ export async function configureBot(
         'message',
         'my_chat_member',
         'callback_query',
+        // Joins and leaves in the groups it administers (VIP, guests, members).
+        'chat_member',
       ]);
       console.log(`Telegram webhook set to ${url}`);
       return true;
