@@ -631,6 +631,13 @@
       "when": 1797710400000,
       "tag": "0089_web_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1797796800000,
+      "tag": "0090_private_mode",
+      "breakpoints": true
     }
   ]
 }

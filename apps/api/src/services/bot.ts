@@ -1,3 +1,4 @@
+import { isMember, privateSettings } from './members.js';
 import { handleLabelMessage } from './labels.js';
 import { langFrom, type Lang } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
@@ -126,7 +127,17 @@ export async function handleBotMessage(
     await answerServerCommand(env, telegram, message.chat.id, lang);
     return;
   }
-  const reply = buildStartReply(await miniAppUrl(telegram), message.from?.first_name, lang);
+  const url = await miniAppUrl(telegram);
+  // Private mode: someone who is not in gets a neutral answer (the app shows the entrance).
+  if (db && fromId !== undefined && (await privateSettings(db)).privateMode && !(await isMember(db, env, fromId))) {
+    await telegram.sendMessage(
+      message.chat.id,
+      tr(lang, 'start.private'),
+      url ? { inline_keyboard: [[{ text: tr(lang, 'start.privateButton'), web_app: { url } }]] } : undefined,
+    );
+    return;
+  }
+  const reply = buildStartReply(url, message.from?.first_name, lang);
   await telegram.sendMessage(message.chat.id, reply.text, reply.keyboard);
 }
 

@@ -9,6 +9,7 @@ import { sessionScope } from './middleware/customerSite.js';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { telegramLoginEnabled, telegramLoginStatus } from './services/telegramLogin.js';
+import { privateSettings } from './services/members.js';
 import { requireDisclaimer } from './auth/middleware.js';
 import { authRoutes } from './routes/auth.js';
 import { catalogRoutes } from './routes/catalog.js';
@@ -88,7 +89,12 @@ export function createApp(deps: AppDeps): Hono<AppBindings> {
   // The web's entrance message, for anyone (before signing in).
   api.get('/web/banner', async (c) => c.json({ text: await webBanner(c.get('db')) }));
   // What the web pages need before signing in: whether "Log in with Telegram" works.
-  api.get('/web/config', (c) => c.json({ telegramLogin: telegramLoginEnabled(c.get('env')) }));
+  api.get('/web/config', async (c) =>
+    c.json({
+      telegramLogin: telegramLoginEnabled(c.get('env')),
+      privateMode: (await privateSettings(c.get('db'))).privateMode,
+    }),
+  );
   // A started "Log in with Telegram": done yet? (the page asks every few seconds)
   api.post('/web/telegram/result', zValidator('json', z.object({ state: z.string().min(16).max(100) })), (c) =>
     c.json({ status: telegramLoginStatus(c.req.valid('json').state) }),

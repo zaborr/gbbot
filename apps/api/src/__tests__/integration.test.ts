@@ -1,6 +1,7 @@
 import { createHmac, generateKeyPairSync } from 'node:crypto';
 import { generateKeyPair as generateJoseKeys, SignJWT } from 'jose';
 import { setTelegramLoginTransport } from '../services/telegramLogin.js';
+import { forgetMembership } from '../services/members.js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import type { Pool } from 'pg';
@@ -33,6 +34,7 @@ import {
   botSettings,
   webNotices,
   users,
+  platformSettings,
   webAdmins,
 } from '../db/schema.js';
 import { runRetention } from '../services/retention.js';
@@ -5442,5 +5444,58 @@ describeDb('API integration', () => {
     expect(list.find((i) => i.id === group.id)).toMatchObject({ uses: 1, revoked: true });
 
     await db.delete(webAdmins).where(inArray(webAdmins.telegramId, [555030001, 555030002, ADMIN_ID]));
+  });
+
+  it('keeps the GBs for members in private mode, with an invitation at the entrance', async () => {
+    const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}`, 'content-type': 'application/json' };
+    const set = async (body: unknown): Promise<void> => {
+      expect((await request('/api/platform/private', { method: 'PUT', headers: admin, body: JSON.stringify(body) })).status).toBe(200);
+    };
+    const shopsOf = async (h: Record<string, string>): Promise<{ gate: string; shops: unknown[] }> =>
+      (await (await request('/api/shops', { headers: h })).json()) as { gate: string; shops: unknown[] };
+    const stranger = { Authorization: `Bearer ${await authToken(555040001, 'Stranger', 'stranger_x')}` };
+    expect((await shopsOf(stranger)).gate).toBe('none');
+
+    await set({ privateMode: true });
+    const preview = (await (await request('/api/platform/private/preview', { headers: admin })).json()) as { total: number };
+    expect(preview.total).toBeGreaterThan(0);
+    // Not a member: the entrance, and no GB anywhere.
+    const outside = await shopsOf(stranger);
+    expect(outside.gate).toBe('invite');
+    expect(outside.shops).toEqual([]);
+    const blocked = await request('/api/products', { headers: stranger });
+    expect(blocked.status).toBe(403);
+    expect(((await blocked.json()) as { error: { code: string } }).error.code).toBe('private');
+    // Staff always in.
+    expect((await shopsOf(admin)).gate).toBe('none');
+
+    // At the entrance in Telegram: an invitation and their web account at once.
+    const invite = (await (
+      await request('/api/admin/invites', { method: 'POST', headers: admin, body: JSON.stringify({ kind: 'group', days: 1 }) })
+    ).json()) as { code: string };
+    const joined = await request('/api/me/join', {
+      method: 'POST',
+      headers: { ...stranger, 'content-type': 'application/json' },
+      body: JSON.stringify({ code: invite.code, username: `stranger${Date.now() % 100000}`, password: 'long enough pass' }),
+    });
+    expect(joined.status).toBe(201);
+    expect((await shopsOf(stranger)).gate).toBe('none');
+
+    // Past the deadline: a member through Telegram makes their web account first.
+    const before = (await db.query.platformSettings.findFirst())!.guestList;
+    await db
+      .update(platformSettings)
+      .set({ guestList: { ...before, userIds: [...before.userIds, 555040002] } })
+      .where(eq(platformSettings.id, 1));
+    await set({ accountDeadline: new Date(Date.now() - 60_000).toISOString() });
+    const guest = { Authorization: `Bearer ${await authToken(555040002, 'Guest')}`, 'content-type': 'application/json' };
+    expect((await shopsOf(guest)).gate).toBe('account');
+    expect((await request('/api/me/account', { method: 'POST', headers: guest, body: JSON.stringify({ username: `guest${Date.now() % 100000}`, password: 'long enough pass' }) })).status).toBe(201);
+    expect((await shopsOf(guest)).gate).toBe('none');
+
+    await set({ privateMode: false, accountDeadline: null });
+    await db.update(platformSettings).set({ guestList: before }).where(eq(platformSettings.id, 1));
+    await db.delete(webAdmins).where(inArray(webAdmins.telegramId, [555040001, 555040002]));
+    forgetMembership();
   });
 });

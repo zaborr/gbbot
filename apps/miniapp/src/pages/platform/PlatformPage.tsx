@@ -57,6 +57,7 @@ function Platform(): React.JSX.Element {
         <Cell onClick={() => navigate('/import-gb')}>{t('shops.importGb')}</Cell>
         <Cell onClick={() => navigate('/platform/organizers')}>{t('platform.organizers')}</Cell>
         <Cell onClick={() => navigate('/platform/supervisors')}>{t('platform.supervisors')}</Cell>
+        <Cell onClick={() => navigate('/platform/private')}>{t('private.menu')}</Cell>
         <Cell onClick={() => navigate('/platform/vip')}>{t('platform.vipClub')}</Cell>
         <Cell onClick={() => navigate('/platform/guests')}>{t('platform.guests')}</Cell>
         <Cell onClick={() => navigate('/platform/blacklist')}>{t('platform.blacklist')}</Cell>

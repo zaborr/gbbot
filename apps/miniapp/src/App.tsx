@@ -76,6 +76,7 @@ import { WebNoticesPage } from './pages/WebNoticesPage.js';
 import { WebBanner, WebMainButton, WebSignIn, WebTopBar } from './components/WebChrome.js';
 import { WebCustomerSignIn } from './components/WebAccount.js';
 import { AccountPage } from './pages/AccountPage.js';
+import { PlatformPrivatePage } from './pages/platform/PlatformPrivatePage.js';
 
 /** Web mode has no customer screens (no cart, no orders): a GB opens on its admin. */
 function WebToAdmin(): React.JSX.Element {
@@ -127,6 +128,7 @@ function Shell(): React.JSX.Element {
       <Route path="/platform/guests" element={<PlatformGuestsPage />} />
       <Route path="/platform/organizers" element={<PlatformOrganizersPage />} />
       <Route path="/platform/supervisors" element={<PlatformSupervisorsPage />} />
+      <Route path="/platform/private" element={<PlatformPrivatePage />} />
       <Route path="/platform/notices" element={<PlatformNoticesPage />} />
       <Route path="/platform/blacklist" element={<PlatformBlacklistPage />} />
       <Route path="/platform/testing-reports" element={<PlatformTestingReportsPage />} />

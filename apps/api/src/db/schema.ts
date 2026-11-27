@@ -387,6 +387,16 @@ export const platformSettings = pgTable('platform_settings', {
   webBanner: text('web_banner'),
   /** People who must not see any GB. */
   blacklist: jsonb('blacklist').$type<Blacklist>().notNull().default({ userIds: [], usernames: [] }),
+  /**
+   * Private mode: only members see anything (whoever bought, is on a list, has
+   * a web account, is staff); everyone else gets the entrance with the game.
+   */
+  privateMode: boolean('private_mode').notNull().default(false),
+  /**
+   * From then on, members coming through Telegram must have made their web
+   * account (username and password) to see the GBs. Null: no such rule.
+   */
+  accountDeadline: timestamp('account_deadline', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

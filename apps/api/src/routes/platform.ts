@@ -20,6 +20,7 @@ import type { AppBindings } from '../context.js';
 import type { Database } from '../db/client.js';
 import type { Env } from '../config/env.js';
 import { requireAuth, requireFullPlatform, requireSuperAdmin } from '../auth/middleware.js';
+import { privatePreview, privateSettings, setPrivateSettings } from '../services/members.js';
 import { findReport, listReports, reportCaption, reportFile, sendReportTo } from '../services/testingReports.js';
 import {
   createShop,
@@ -267,6 +268,31 @@ export function platformRoutes(): Hono<AppBindings> {
 
   // The message on the web's entrance (the bot is down…).
   app.get('/web-banner', async (c) => c.json({ text: await webBanner(c.get('db')) }));
+
+  // Private mode: only members see the GBs; and a deadline for members through
+  // Telegram to have made their web account.
+  app.get('/private', async (c) => {
+    const s = await privateSettings(c.get('db'));
+    return c.json({ privateMode: s.privateMode, accountDeadline: s.accountDeadline?.toISOString() ?? null });
+  });
+  app.put(
+    '/private',
+    zValidator(
+      'json',
+      z.object({ privateMode: z.boolean().optional(), accountDeadline: z.iso.datetime().nullable().optional() }),
+    ),
+    async (c) => {
+      const { privateMode, accountDeadline } = c.req.valid('json');
+      await setPrivateSettings(c.get('db'), {
+        ...(privateMode === undefined ? {} : { privateMode }),
+        ...(accountDeadline === undefined ? {} : { accountDeadline: accountDeadline === null ? null : new Date(accountDeadline) }),
+      });
+      const s = await privateSettings(c.get('db'));
+      return c.json({ privateMode: s.privateMode, accountDeadline: s.accountDeadline?.toISOString() ?? null });
+    },
+  );
+  // Before switching it on: who would be in, and who only because they once ordered.
+  app.get('/private/preview', async (c) => c.json(await privatePreview(c.get('db'), c.get('env'))));
   app.put('/web-banner', zValidator('json', z.object({ text: z.string().max(1000).nullable() })), async (c) => {
     await setWebBanner(c.get('db'), c.req.valid('json').text);
     return c.json({ ok: true });
