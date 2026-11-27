@@ -326,6 +326,8 @@ const en = {
   'start.privateButton': 'Open',
   'web.expelled': '⛔ {who} expelled {whom} from the platform: {reason}',
   'web.inviteForYou': '🎟️ {who} made you an invitation to open your web account. If you did not ask for it, tell the staff.',
+  'bots.webNotice': '🤖 The bot is now {bot}. Open it in Telegram: your orders and lists are still there.',
+  'bots.addByHand': '🤖 Add {bot} as administrator (no rights needed) in these groups, so it can check who is in them: {groups}',
 } as const;
 
 export type BotMessageKey = keyof typeof en;
@@ -644,6 +646,8 @@ const es: Record<BotMessageKey, string> = {
   'start.privateButton': 'Abrir',
   'web.expelled': '⛔ {who} ha expulsado a {whom} de la plataforma: {reason}',
   'web.inviteForYou': '🎟️ {who} te ha creado una invitación para abrir tu cuenta web. Si no la pediste, avisa al staff.',
+  'bots.webNotice': '🤖 El bot ahora es {bot}. Ábrelo en Telegram: tus pedidos y listas siguen ahí.',
+  'bots.addByHand': '🤖 Añade {bot} como administrador (sin permisos) en estos grupos, para que pueda comprobar quién está: {groups}',
 };
 
 const it: Record<BotMessageKey, string> = {
@@ -960,6 +964,8 @@ const it: Record<BotMessageKey, string> = {
   'start.privateButton': 'Apri',
   'web.expelled': '⛔ {who} ha espulso {whom} dalla piattaforma: {reason}',
   'web.inviteForYou': '🎟️ {who} ti ha creato un invito per aprire il tuo account web. Se non l\'hai chiesto, avvisa lo staff.',
+  'bots.webNotice': '🤖 Il bot ora è {bot}. Aprilo in Telegram: i tuoi ordini e le liste sono ancora lì.',
+  'bots.addByHand': '🤖 Aggiungi {bot} come amministratore (senza permessi) in questi gruppi, così può controllare chi c\'è: {groups}',
 };
 
 const pt: Record<BotMessageKey, string> = {
@@ -1276,6 +1282,8 @@ const pt: Record<BotMessageKey, string> = {
   'start.privateButton': 'Abrir',
   'web.expelled': '⛔ {who} expulsou {whom} da plataforma: {reason}',
   'web.inviteForYou': '🎟️ {who} criou-te um convite para abrires a tua conta web. Se não pediste, avisa a equipa.',
+  'bots.webNotice': '🤖 O bot agora é {bot}. Abre-o no Telegram: os teus pedidos e listas continuam lá.',
+  'bots.addByHand': '🤖 Adiciona {bot} como administrador (sem permissões) nestes grupos, para poder verificar quem lá está: {groups}',
 };
 
 const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };

@@ -1,14 +1,15 @@
-import { asc, desc, eq } from 'drizzle-orm';
+import { asc, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 import type { BotGroupStatus, BotSwitchNotices, BotSwitchReason, VipGroup } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
-import { botSettings, botSwitches, creatorAccounts, platformSettings, shops } from '../db/schema.js';
+import { botSettings, botSwitches, creatorAccounts, customerNotices, platformSettings, shops, webAdmins, webKeys } from '../db/schema.js';
 import { tr } from '../i18n/messages.js';
 import { CreatorError, creatorApi, type CreatorApi, type CreatorCredentials } from './creator.js';
 import { accountFailed, credentialsOf } from './creatorAccounts.js';
 import { languagesOf } from './notifications.js';
+import { notifyPlatform } from './webNotices.js';
 
-/** Every guests/VIP group the bot checks members of (GBs and the platform), once each. */
+/** Every guests/VIP/members group the bot checks members of (GBs and the platform), once each. */
 export async function allGroups(db: Database): Promise<VipGroup[]> {
   const found = new Map<number, VipGroup>();
   const add = (groups: VipGroup[] | undefined): void => {
@@ -18,9 +19,12 @@ export async function allGroups(db: Database): Promise<VipGroup[]> {
     add(shop.vip.groups);
     add(shop.guests.groups);
   }
-  for (const row of await db.select({ vip: platformSettings.vipClub, guests: platformSettings.guestList }).from(platformSettings)) {
+  for (const row of await db
+    .select({ vip: platformSettings.vipClub, guests: platformSettings.guestList, members: platformSettings.memberClub })
+    .from(platformSettings)) {
     add(row.vip.groups);
     add(row.guests.groups);
+    add(row.members.groups);
   }
   return [...found.values()];
 }
@@ -128,7 +132,34 @@ export async function announceSwitch(
 
   if (settings) notices.groups = await addBotToGroups(db, env, bot, api);
 
+  // On the web too: everyone with a web account or key gets it in 🔔 (their
+  // language), and the platform is told which groups still need the new bot
+  // as administrator (added by hand when no creator account could).
+  await tellWeb(db, env, bot);
+
   const [last] = await db.select({ id: botSwitches.id }).from(botSwitches).orderBy(desc(botSwitches.at)).limit(1);
   if (last) await db.update(botSwitches).set({ notices }).where(eq(botSwitches.id, last.id));
   return notices;
+}
+
+async function tellWeb(db: Database, env: Env, bot: string): Promise<void> {
+  try {
+    const holders = [
+      ...new Set([
+        ...(await db.select({ id: webAdmins.telegramId }).from(webAdmins).where(isNotNull(webAdmins.telegramId))).map((r) => r.id!),
+        ...(await db.selectDistinct({ id: webKeys.userId }).from(webKeys).where(isNull(webKeys.revokedAt))).map((r) => r.id),
+      ]),
+    ];
+    const langs = await languagesOf(db, holders);
+    if (holders.length > 0) {
+      await db.insert(customerNotices).values(holders.map((id) => ({ userId: id, text: tr(langs.get(id) ?? 'en', 'bots.webNotice', { bot: `@${bot}` }) })));
+    }
+    const status = (await db.query.botSettings.findFirst())?.groupStatus ?? {};
+    const missing = (await allGroups(db)).filter((g) => !status[String(g.chatId)]?.ok).map((g) => g.title || String(g.chatId));
+    if (missing.length > 0) {
+      await notifyPlatform(db, env, (lang) => tr(lang, 'bots.addByHand', { bot: `@${bot}`, groups: missing.join(', ') }));
+    }
+  } catch (error) {
+    console.error('Could not tell the web about the new bot:', error);
+  }
 }
