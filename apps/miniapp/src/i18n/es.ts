@@ -60,7 +60,7 @@ export const es: Record<MessageKey, string> = {
   'acct.withPassword': 'O con usuario y contraseña',
   'acct.withTelegram': 'Entra con Telegram',
   'acct.withTelegramFooter': 'Telegram confirma quién eres, sin contraseña. ¿Primera vez? Te pedirá una contraseña, por si Telegram falla. ¿Olvidaste la contraseña? Entra por aquí y cámbiala en 👤 Mi cuenta.',
-  'acct.withoutTelegram': 'Crear la cuenta sin Telegram',
+  'acct.withoutTelegram': 'O sin Telegram: elige usuario y contraseña',
   'acct.yourAccount': 'Tu cuenta web',
   'actions.cancel': 'Cancelar pedido',
   'actions.cancelRefund': 'Cancelar pedido (devolver {amount})',

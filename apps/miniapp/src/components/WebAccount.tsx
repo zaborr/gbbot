@@ -268,14 +268,13 @@ function ClaimAccount({
 
 /**
  * Opening a web account with an invitation: Telegram first (then a password).
- * A personal one can also be opened without Telegram (its ID is the staff's).
+ * A personal one, also right below without Telegram (its ID is the staff's).
  */
 function WebSignUp({ initialCode, onBack }: { initialCode: string; onBack: () => void }): React.JSX.Element {
   const { signInWithSession } = useSession();
   const bot = useLoginBot();
   const [code] = useState(initialCode);
   const info = useAsync(() => api.inviteInfo(code), [code]);
-  const [manual, setManual] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [again, setAgain] = useState('');
@@ -313,13 +312,8 @@ function WebSignUp({ initialCode, onBack }: { initialCode: string; onBack: () =>
       <Section header={t('acct.signUpTelegram')} footer={bot ? t('acct.signUpTelegramFooter') : undefined}>
         {bot ? <TelegramLoginButton purpose="signup" code={code} /> : <Cell multiline>{t('acct.noLoginBot')}</Cell>}
       </Section>
-      {personal && !manual && (
-        <Section>
-          <Cell onClick={() => setManual(true)}>{t('acct.withoutTelegram')}</Cell>
-        </Section>
-      )}
-      {personal && manual && (
-        <Section header={t('acct.chooseLogin')} footer={error ?? (mismatch ? t('acct.passwordsDiffer') : t('acct.passwordRule'))}>
+      {personal && (
+        <Section header={t('acct.withoutTelegram')} footer={error ?? (mismatch ? t('acct.passwordsDiffer') : t('acct.passwordRule'))}>
           <Input header={t('acct.username')} autoCapitalize="none" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
           <Input header={t('acct.password')} type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
           <Input header={t('acct.passwordAgain')} type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} />

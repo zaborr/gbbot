@@ -58,7 +58,7 @@ export const en = {
   'acct.withPassword': 'Or with username and password',
   'acct.withTelegram': 'Log in with Telegram',
   'acct.withTelegramFooter': 'Telegram confirms who you are, no password. First time? It will ask you for a password, in case Telegram is down. Forgot your password? Log in here and change it in 👤 My account.',
-  'acct.withoutTelegram': 'Create the account without Telegram',
+  'acct.withoutTelegram': 'Or without Telegram: choose a username and password',
   'acct.yourAccount': 'Your web account',
   'actions.cancel': 'Cancel order',
   'actions.cancelRefund': 'Cancel order (refund {amount})',
