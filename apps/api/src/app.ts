@@ -8,7 +8,7 @@ import { rateLimit } from './middleware/rateLimit.js';
 import { sessionScope } from './middleware/customerSite.js';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { telegramLoginEnabled, telegramLoginStatus } from './services/telegramLogin.js';
+import { telegramLoginEnabled, telegramLoginResult } from './services/telegramLogin.js';
 import { privateSettings } from './services/members.js';
 import { requireDisclaimer } from './auth/middleware.js';
 import { authRoutes } from './routes/auth.js';
@@ -95,9 +95,9 @@ export function createApp(deps: AppDeps): Hono<AppBindings> {
       privateMode: (await privateSettings(c.get('db'))).privateMode,
     }),
   );
-  // A started "Log in with Telegram": done yet? (the page asks every few seconds)
-  api.post('/web/telegram/result', zValidator('json', z.object({ state: z.string().min(16).max(100) })), (c) =>
-    c.json({ status: telegramLoginStatus(c.req.valid('json').state) }),
+  // Back from "Log in with Telegram": confirmed or not, and what the page was doing.
+  api.post('/web/telegram/result', zValidator('json', z.object({ ticket: z.string().min(16).max(100) })), (c) =>
+    c.json(telegramLoginResult(c.req.valid('json').ticket)),
   );
   api.route('/web-accounts', webAccountRoutes());
 

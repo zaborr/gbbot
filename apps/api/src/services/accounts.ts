@@ -251,13 +251,31 @@ export async function createOwnAccount(
 }
 
 /** The login bot proved their Telegram: the account tied to it, now confirmed. */
-export async function accountByTelegram(db: Database, env: Env, telegram: string): Promise<AccountRow> {
+export async function accountByTelegram(
+  db: Database,
+  env: Env,
+  telegram: string,
+  /** An invitation they came with (used only when they have no account yet). */
+  code?: string,
+): Promise<AccountRow> {
   const peeked = peekTelegramIdentity(telegram);
   const row = await accountOf(db, peeked.id);
   if (!row) {
-    // Someone who was already a customer (orders, lists, a key…): Telegram has
-    // just proved it is them, so they make their account now, with no
-    // invitation. The proof stays for that next step.
+    // With an invitation, or someone who was already a customer (orders,
+    // lists, a key…): Telegram has just proved it is them, so they make their
+    // account now. The proof stays for that next step.
+    if (code !== undefined) {
+      const invite = await usableInvite(db, code);
+      if (!invite) {
+        takeTelegramIdentity(telegram);
+        throw badInvite();
+      }
+      if (invite.kind === 'personal' && invite.telegramId !== peeked.id) {
+        takeTelegramIdentity(telegram);
+        throw ApiError.conflict('telegram_mismatch', 'This invitation is for another Telegram account');
+      }
+      throw ApiError.conflict('make_account', 'Choose your username and password to finish');
+    }
     if (await isMember(db, env, peeked.id)) {
       throw ApiError.conflict('make_account', 'Choose your username and password to finish');
     }
