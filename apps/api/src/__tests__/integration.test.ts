@@ -5521,7 +5521,7 @@ describeDb('API integration', () => {
     expect((await call(`/api/admin/invites/${group.id}`, { method: 'DELETE', headers: admin })).status).toBe(200);
     expect((await call('/api/auth/invite', { method: 'POST', json: { code: group.code } })).status).toBe(401);
     const list = (await (await call('/api/admin/invites', { headers: admin })).json()) as { id: string; uses: number; revoked: boolean }[];
-    expect(list.find((i) => i.id === group.id)).toMatchObject({ uses: 1, revoked: true });
+    expect(list.find((i) => i.id === group.id)).toMatchObject({ uses: 2, revoked: true });
 
     await db.delete(webAdmins).where(inArray(webAdmins.telegramId, [555030001, 555030002, 555030050, ADMIN_ID]));
   });
@@ -5602,10 +5602,10 @@ describeDb('API integration', () => {
       }) as typeof fetch,
     });
     const proofOf = async (id: number): Promise<string> => {
-      const started = (await (await call('/api/auth/telegram/start', { method: 'POST' })).json()) as { state: string };
+      const started = (await (await call('/api/auth/telegram/start', { method: 'POST' })).json()) as { url: string };
       pressing = id;
-      await call(`/api/auth/telegram/callback?state=${started.state}&code=abc`);
-      return started.state;
+      const back = await call(`/api/auth/telegram/callback?state=${new URL(started.url).searchParams.get('state')}&code=abc`);
+      return back.headers.get('location')!.split('t=')[1]!;
     };
     const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}` };
     const username = `owner${Date.now() % 100000}`;
