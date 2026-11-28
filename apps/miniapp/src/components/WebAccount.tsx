@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
-import { api, ApiClientError, type TelegramAuth } from '../api/client.js';
+import { api, ApiClientError } from '../api/client.js';
 import { useSession } from '../providers/SessionProvider.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { Input } from './Field.js';
 import { PageTitle } from './PageTitle.js';
-import { TelegramLoginButton } from './TelegramLogin.js';
+import {
+  TelegramLoginButton,
+  isTelegramReturn,
+  parseTelegramContext,
+  stashTelegram,
+  takeTelegram,
+  ticketFromAddress,
+} from './TelegramLogin.js';
+import { Loader } from './Loader.js';
 import { WebBanner, WebKeySignIn } from './WebChrome.js';
 import { SnakeGame } from './SnakeGame.js';
 import { QrCode } from './QrCode.js';
@@ -29,14 +37,25 @@ function useLoginBot(): boolean {
 }
 
 /**
- * The customers' web entrance: their account (username and password, or
- * Telegram) or an invitation to open one. A web key only from its own link
- * (/s/<slug>); the staff go to /admin themselves.
+ * The customers' web entrance: "Log in with Telegram" (the first time it also
+ * asks for a password), their username and password, or an invitation. A web
+ * key only from its own link (/s/<slug>); the staff go to /admin themselves.
  */
 export function WebCustomerSignIn(): React.JSX.Element {
   const [code] = useState(codeFromAddress);
   const [signup, setSignup] = useState<string | null>(code);
   const [withKey, setWithKey] = useState(() => /^#\/s\//.test(window.location.hash));
+  const [back, setBack] = useState(isTelegramReturn);
+  if (back) {
+    return (
+      <TelegramReturn
+        onBack={() => {
+          window.history.replaceState(null, '', `${window.location.pathname}#/`);
+          setBack(false);
+        }}
+      />
+    );
+  }
   if (signup !== null) return <WebSignUp initialCode={signup} onBack={() => setSignup(null)} />;
   if (withKey) return <WebKeySignIn onBack={() => setWithKey(false)} />;
   return <WebAccountSignIn onInvite={(c) => setSignup(c)} />;
@@ -45,7 +64,6 @@ export function WebCustomerSignIn(): React.JSX.Element {
 function WebAccountSignIn({ onInvite }: { onInvite: (code: string) => void }): React.JSX.Element {
   const { signInWithSession } = useSession();
   const config = useAsync(() => api.webConfig(), []).data;
-  const [claimProof, setClaimProof] = useState<string | null>(null);
   const bot = config?.telegramLogin ?? false;
   const privateMode = config?.privateMode ?? false;
   const [username, setUsername] = useState('');
@@ -53,24 +71,28 @@ function WebAccountSignIn({ onInvite }: { onInvite: (code: string) => void }): R
   const [invite, setInvite] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const run = (work: () => Promise<void>): void => {
-    setBusy(true);
-    setError(null);
-    void work()
-      .catch((err: unknown) => setError(errorText(err)))
-      .finally(() => setBusy(false));
-  };
   return (
     <List style={{ maxWidth: 420, margin: '0 auto' }}>
       <WebBanner />
       <PageTitle title={t('acct.signInTitle')} />
+      {bot && (
+        <Section header={t('acct.withTelegram')} footer={t('acct.withTelegramFooter')}>
+          <TelegramLoginButton purpose="login" />
+        </Section>
+      )}
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          run(async () => signInWithSession(await api.accountLogin(username.trim(), password)));
+          setBusy(true);
+          setError(null);
+          void api
+            .accountLogin(username.trim(), password)
+            .then(signInWithSession)
+            .catch((err: unknown) => setError(errorText(err)))
+            .finally(() => setBusy(false));
         }}
       >
-        <Section footer={error ?? undefined}>
+        <Section header={bot ? t('acct.withPassword') : undefined} footer={error ?? t('acct.signInHint')}>
           <Input
             header={t('acct.username')}
             autoCapitalize="none"
@@ -92,27 +114,6 @@ function WebAccountSignIn({ onInvite }: { onInvite: (code: string) => void }): R
           </div>
         </Section>
       </form>
-      {bot && (
-        <Section header={t('acct.withTelegram')} footer={t('acct.withTelegramFooter')}>
-          {claimProof ? (
-            <ClaimAccount proof={claimProof} onBack={() => setClaimProof(null)} />
-          ) : (
-            <TelegramLoginButton
-              onAuth={(proof) =>
-                run(async () => {
-                  try {
-                    signInWithSession(await api.telegramLogin(proof));
-                  } catch (err) {
-                    // Already a customer, with no account yet: choose username and password now.
-                    if (err instanceof ApiClientError && err.code === 'make_account') setClaimProof(proof);
-                    else throw err;
-                  }
-                })
-              }
-            />
-          )}
-        </Section>
-      )}
       <Section header={t('acct.haveInvite')} footer={t('acct.haveInviteFooter')}>
         <Input
           header={t('acct.inviteCode')}
@@ -137,132 +138,105 @@ function WebAccountSignIn({ onInvite }: { onInvite: (code: string) => void }): R
   );
 }
 
-/** Already a customer (Telegram just proved it), no account yet: username and password, and in. */
-function ClaimAccount({ proof, onBack }: { proof: string; onBack: () => void }): React.JSX.Element {
-  const { signInWithSession } = useSession();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [again, setAgain] = useState('');
-  const [busy, setBusy] = useState(false);
+/**
+ * Back from Telegram (`#/tg?t=…`): finishes what the page was doing. Signing
+ * in or up: in, or (no account yet) a password first. Confirming, a new
+ * password or managing: on to 👤 My account, which picks it up.
+ */
+export function TelegramReturn({ onBack }: { onBack?: () => void }): React.JSX.Element {
+  const { status, signInWithSession } = useSession();
+  const signedIn = status === 'ready';
+  const [ticket] = useState(ticketFromAddress);
+  const [claim, setClaim] = useState<{ code?: string; username: string | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const mismatch = password !== '' && again !== '' && password !== again;
+  const back = (): void => {
+    if (onBack) onBack();
+    else window.location.hash = '#/';
+  };
+  useEffect(() => {
+    if (!ticket) {
+      setError(t('acct.telegramFailed'));
+      return;
+    }
+    let live = true;
+    void (async () => {
+      const result = await api.telegramLoginResult(ticket);
+      const context = parseTelegramContext(result.context);
+      if (result.status !== 'ready') throw new Error(t('acct.telegramFailed'));
+      if (signedIn) {
+        if (context.p === 'confirm' || context.p === 'reset' || context.p === 'manage') stashTelegram(context.p, ticket);
+        window.location.hash = context.p === 'login' || context.p === 'signup' ? '#/' : '#/cuenta';
+        return;
+      }
+      try {
+        const session = await api.telegramLogin(ticket, context.c);
+        window.location.hash = '#/';
+        signInWithSession(session);
+      } catch (err) {
+        // No account yet (an invitation, or already a customer): a password first.
+        if (err instanceof ApiClientError && err.code === 'make_account') {
+          if (live) setClaim({ ...(context.c ? { code: context.c } : {}), username: result.username });
+          return;
+        }
+        throw err;
+      }
+    })().catch((err: unknown) => {
+      if (live) setError(err instanceof Error && !(err instanceof ApiClientError) ? err.message : errorText(err));
+    });
+    return () => {
+      live = false;
+    };
+    // Once, with the ticket it came back with.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (claim && ticket) return <ClaimAccount proof={ticket} code={claim.code} suggested={claim.username} onBack={back} />;
+  if (!error) return <Loader />;
   return (
-    <>
-      <Cell multiline>{t('acct.claimIntro')}</Cell>
-      <Input header={t('acct.username')} autoCapitalize="none" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
-      <Input header={t('acct.password')} type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
-      <Input header={t('acct.passwordAgain')} type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} />
-      <div className="gb-hint" style={{ padding: '0 16px' }}>
-        {error ?? (mismatch ? t('acct.passwordsDiffer') : t('acct.passwordRule'))}
-      </div>
-      <div style={{ display: 'flex', gap: 8, padding: 16 }}>
-        <Button stretched mode="bezeled" onClick={onBack}>
-          {t('web.back')}
-        </Button>
-        <Button
-          stretched
-          loading={busy}
-          disabled={username.trim().length < 3 || password.length < 10 || password !== again}
-          onClick={() => {
-            setBusy(true);
-            setError(null);
-            void api
-              .telegramClaim({ telegram: proof, username: username.trim(), password })
-              .then(signInWithSession)
-              .catch((err: unknown) => setError(errorText(err)))
-              .finally(() => setBusy(false));
-          }}
-        >
-          {t('acct.createAccount')}
-        </Button>
-      </div>
-    </>
+    <List style={{ maxWidth: 420, margin: '0 auto' }}>
+      <PageTitle title={t('acct.signInTitle')} />
+      <Section footer={error}>
+        <div style={{ padding: 16 }}>
+          <Button stretched mode="bezeled" onClick={back}>
+            {t('web.back')}
+          </Button>
+        </div>
+      </Section>
+    </List>
   );
 }
 
-/** Opening a web account with an invitation; a group's needs their Telegram (the login bot). */
-function WebSignUp({ initialCode, onBack }: { initialCode: string; onBack: () => void }): React.JSX.Element {
+/**
+ * The first time with Telegram, no account yet: a username (their Telegram
+ * one to start with) and a password, for when Telegram or the bot fail.
+ */
+function ClaimAccount({
+  proof,
+  code,
+  suggested,
+  onBack,
+}: {
+  proof: string;
+  code?: string | undefined;
+  suggested: string | null;
+  onBack: () => void;
+}): React.JSX.Element {
   const { signInWithSession } = useSession();
-  const bot = useLoginBot();
-  const [code] = useState(initialCode);
-  const info = useAsync(() => api.inviteInfo(code), [code]);
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState((suggested ?? '').toLowerCase());
   const [password, setPassword] = useState('');
   const [again, setAgain] = useState('');
-  const [telegram, setTelegram] = useState<TelegramAuth | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (info.error) {
-    return (
-      <List style={{ maxWidth: 420, margin: '0 auto' }}>
-        <PageTitle title={t('acct.signUpTitle')} />
-        <Section footer={info.error}>
-          <div style={{ padding: 16 }}>
-            <Button stretched mode="bezeled" onClick={onBack}>
-              {t('web.back')}
-            </Button>
-          </div>
-        </Section>
-      </List>
-    );
-  }
-  const group = info.data?.kind === 'group';
   const mismatch = password !== '' && again !== '' && password !== again;
-  const ready =
-    info.data !== null &&
-    username.trim().length >= 3 &&
-    password.length >= 10 &&
-    password === again &&
-    (!group || telegram !== null);
-
   return (
     <List style={{ maxWidth: 420, margin: '0 auto' }}>
       <WebBanner />
-      <PageTitle title={t('acct.signUpTitle')} />
-      {info.data?.kind === 'personal' && (
-        <Section>
-          <Cell multiline>{t('acct.personalFor', { name: info.data.name ?? '' })}</Cell>
-        </Section>
-      )}
-      <Section header={t('acct.chooseLogin')} footer={mismatch ? t('acct.passwordsDiffer') : t('acct.passwordRule')}>
-        <Input
-          header={t('acct.username')}
-          autoCapitalize="none"
-          autoComplete="username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-        <Input
-          header={t('acct.password')}
-          type="password"
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <Input
-          header={t('acct.passwordAgain')}
-          type="password"
-          autoComplete="new-password"
-          value={again}
-          onChange={(e) => setAgain(e.target.value)}
-        />
-      </Section>
-      <Section
-        header={group ? t('acct.linkTelegram') : t('acct.confirmTelegram')}
-        footer={group ? t('acct.linkTelegramFooter') : t('acct.confirmTelegramFooter')}
-      >
-        {telegram ? (
-          <Cell multiline after={<Button size="s" mode="plain" onClick={() => setTelegram(null)}>{t('acct.change')}</Button>}>
-            {t('acct.telegramReady')}
-          </Cell>
-        ) : bot ? (
-          <TelegramLoginButton onAuth={setTelegram} label={t('acct.linkButton')} />
-        ) : (
-          <Cell multiline>{t('acct.noLoginBot')}</Cell>
-        )}
-      </Section>
-      <Section footer={error ?? undefined}>
+      <PageTitle title={t('acct.claimTitle')} />
+      <Section footer={error ?? (mismatch ? t('acct.passwordsDiffer') : t('acct.passwordRule'))}>
+        <Cell multiline>{t('acct.claimIntro')}</Cell>
+        <Input header={t('acct.username')} autoCapitalize="none" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
+        <Input header={t('acct.password')} type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <Input header={t('acct.passwordAgain')} type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} />
         <div style={{ display: 'flex', gap: 8, padding: 16 }}>
           <Button stretched mode="bezeled" onClick={onBack}>
             {t('web.back')}
@@ -270,12 +244,12 @@ function WebSignUp({ initialCode, onBack }: { initialCode: string; onBack: () =>
           <Button
             stretched
             loading={busy}
-            disabled={!ready}
+            disabled={username.trim().length < 3 || password.length < 10 || password !== again}
             onClick={() => {
               setBusy(true);
               setError(null);
               void api
-                .signUp({ code, username: username.trim(), password, ...(telegram ? { telegram } : {}) })
+                .telegramClaim({ telegram: proof, username: username.trim(), password, ...(code ? { code } : {}) })
                 .then((session) => {
                   window.location.hash = '#/';
                   signInWithSession(session);
@@ -288,6 +262,91 @@ function WebSignUp({ initialCode, onBack }: { initialCode: string; onBack: () =>
           </Button>
         </div>
       </Section>
+    </List>
+  );
+}
+
+/**
+ * Opening a web account with an invitation: Telegram first (then a password).
+ * A personal one can also be opened without Telegram (its ID is the staff's).
+ */
+function WebSignUp({ initialCode, onBack }: { initialCode: string; onBack: () => void }): React.JSX.Element {
+  const { signInWithSession } = useSession();
+  const bot = useLoginBot();
+  const [code] = useState(initialCode);
+  const info = useAsync(() => api.inviteInfo(code), [code]);
+  const [manual, setManual] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [again, setAgain] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const backButton = (
+    <div style={{ padding: 16 }}>
+      <Button stretched mode="bezeled" onClick={onBack}>
+        {t('web.back')}
+      </Button>
+    </div>
+  );
+  if (info.error) {
+    return (
+      <List style={{ maxWidth: 420, margin: '0 auto' }}>
+        <PageTitle title={t('acct.signUpTitle')} />
+        <Section footer={info.error}>{backButton}</Section>
+      </List>
+    );
+  }
+  const personal = info.data?.kind === 'personal';
+  const mismatch = password !== '' && again !== '' && password !== again;
+  const ready = info.data !== null && username.trim().length >= 3 && password.length >= 10 && password === again;
+
+  return (
+    <List style={{ maxWidth: 420, margin: '0 auto' }}>
+      <WebBanner />
+      <PageTitle title={t('acct.signUpTitle')} />
+      {personal && (
+        <Section>
+          <Cell multiline>{t('acct.personalFor', { name: info.data?.name ?? '' })}</Cell>
+        </Section>
+      )}
+      <Section header={t('acct.signUpTelegram')} footer={bot ? t('acct.signUpTelegramFooter') : undefined}>
+        {bot ? <TelegramLoginButton purpose="signup" code={code} /> : <Cell multiline>{t('acct.noLoginBot')}</Cell>}
+      </Section>
+      {personal && !manual && (
+        <Section>
+          <Cell onClick={() => setManual(true)}>{t('acct.withoutTelegram')}</Cell>
+        </Section>
+      )}
+      {personal && manual && (
+        <Section header={t('acct.chooseLogin')} footer={error ?? (mismatch ? t('acct.passwordsDiffer') : t('acct.passwordRule'))}>
+          <Input header={t('acct.username')} autoCapitalize="none" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
+          <Input header={t('acct.password')} type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <Input header={t('acct.passwordAgain')} type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} />
+          <div style={{ padding: 16 }}>
+            <Button
+              stretched
+              loading={busy}
+              disabled={!ready}
+              onClick={() => {
+                setBusy(true);
+                setError(null);
+                void api
+                  .signUp({ code, username: username.trim(), password })
+                  .then((session) => {
+                    window.location.hash = '#/';
+                    signInWithSession(session);
+                  })
+                  .catch((err: unknown) => setError(errorText(err)))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              {t('acct.createAccount')}
+            </Button>
+          </div>
+        </Section>
+      )}
+      <Section>{backButton}</Section>
     </List>
   );
 }
@@ -313,6 +372,8 @@ export function AccountSections({
   const [currentPassword, setCurrentPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  // Back from Telegram for a new password: it is them, no current one needed.
+  const [resetProof, setResetProof] = useState(() => takeTelegram('reset'));
   useEffect(() => setNote(null), [reload]);
 
   const run = (work: () => Promise<string | null>): void => {
@@ -329,6 +390,21 @@ export function AccountSections({
       .catch((err: unknown) => setNote(errorText(err)))
       .finally(() => setBusy(false));
   };
+  // Back from Telegram to confirm the account's Telegram: done now.
+  useEffect(() => {
+    const proof = takeTelegram('confirm');
+    if (proof) {
+      run(async () => {
+        await api.confirmMyAccount(proof);
+        return t('acct.confirmed');
+      });
+    }
+    // Once, when the page opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (resetProof) setNote(t('acct.resetReady'));
+  }, [resetProof]);
   if (current.loading && !current.data) return <Section>{null}</Section>;
   const account = current.data?.account ?? null;
   const mismatch = password !== '' && again !== '' && password !== again;
@@ -376,20 +452,12 @@ export function AccountSections({
       {!inTelegram && !account.manages && current.data?.managesSomething && <ManageOnWeb />}
       <Section header={t('acct.yourAccount')} footer={note ?? undefined}>
         <Cell subtitle={account.linkState === 'confirmed' ? t('acct.linkConfirmed') : t('acct.linkByStaff')}>{account.username}</Cell>
-        {account.linkState === 'staff' && bot && (
-          <TelegramLoginButton
-            label={t('acct.confirmButton')}
-            onAuth={(proof) =>
-              run(async () => {
-                await api.confirmMyAccount(proof);
-                return t('acct.confirmed');
-              })
-            }
-          />
+        {account.linkState === 'staff' && bot && !inTelegram && (
+          <TelegramLoginButton purpose="confirm" label={t('acct.confirmButton')} />
         )}
       </Section>
       <Section header={t('acct.changePassword')} footer={mismatch ? t('acct.passwordsDiffer') : t('acct.changeFooter')}>
-        {!inTelegram && (
+        {!inTelegram && !resetProof && (
           <Input
             header={t('acct.currentPassword')}
             type="password"
@@ -404,10 +472,14 @@ export function AccountSections({
           <Button
             stretched
             loading={busy}
-            disabled={!passwordsOk || (!inTelegram && currentPassword === '')}
+            disabled={!passwordsOk || (!inTelegram && !resetProof && currentPassword === '')}
             onClick={() =>
               run(async () => {
-                const fresh = await api.changeMyPassword({ password, ...(inTelegram ? {} : { current: currentPassword }) });
+                const fresh = await api.changeMyPassword({
+                  password,
+                  ...(inTelegram ? {} : resetProof ? { telegram: resetProof } : { current: currentPassword }),
+                });
+                setResetProof(null);
                 if (!inTelegram) replaceWebToken(fresh.token, fresh.expiresAt);
                 return t('acct.passwordChanged');
               })
@@ -416,23 +488,10 @@ export function AccountSections({
             {t('acct.changePassword')}
           </Button>
         </div>
-        {!inTelegram && bot && (
+        {!inTelegram && bot && !resetProof && (
           <>
             <Cell multiline>{t('acct.forgotWithTelegram')}</Cell>
-            <TelegramLoginButton
-              label={t('acct.resetButton')}
-              onAuth={(proof) => {
-                if (!passwordsOk) {
-                  setNote(t('acct.typeNewFirst'));
-                  return;
-                }
-                run(async () => {
-                  const fresh = await api.changeMyPassword({ password, telegram: proof });
-                  replaceWebToken(fresh.token, fresh.expiresAt);
-                  return t('acct.passwordChanged');
-                });
-              }}
-            />
+            <TelegramLoginButton purpose="reset" label={t('acct.resetButton')} />
           </>
         )}
       </Section>
@@ -450,6 +509,16 @@ function ManageOnWeb(): React.JSX.Element {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  // Back from Telegram: it is them, show the authenticator's code to scan.
+  useEffect(() => {
+    const proof = takeTelegram('manage');
+    if (proof) {
+      void api
+        .startManaging(proof)
+        .then(setEnrol)
+        .catch((err: unknown) => setNote(errorText(err)));
+    }
+  }, []);
   if (done) {
     return (
       <Section header={t('acct.manageTitle')}>
@@ -465,16 +534,7 @@ function ManageOnWeb(): React.JSX.Element {
   if (!enrol) {
     return (
       <Section header={t('acct.manageTitle')} footer={note ?? t('acct.manageFooter')}>
-        <TelegramLoginButton
-          label={t('acct.manageButton')}
-          onAuth={(proof) => {
-            setNote(null);
-            void api
-              .startManaging(proof)
-              .then(setEnrol)
-              .catch((err: unknown) => setNote(errorText(err)));
-          }}
-        />
+        <TelegramLoginButton purpose="manage" label={t('acct.manageButton')} />
       </Section>
     );
   }

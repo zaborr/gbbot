@@ -842,12 +842,13 @@ export class ApiClient {
     return this.request('/platform/private/preview');
   }
 
-  telegramLoginStart(): Promise<{ url: string; state: string }> {
-    return this.request('/auth/telegram/start', { method: 'POST' });
+  /** Where to go for "Log in with Telegram"; `context` comes back with the ticket. */
+  telegramLoginStart(context: string): Promise<{ url: string }> {
+    return this.request('/auth/telegram/start', { method: 'POST', body: JSON.stringify({ context }) });
   }
 
-  telegramLoginResult(state: string): Promise<{ status: 'waiting' | 'ready' | 'failed' }> {
-    return this.request('/web/telegram/result', { method: 'POST', body: JSON.stringify({ state }) });
+  telegramLoginResult(ticket: string): Promise<{ status: 'ready' | 'failed'; context: string; username: string | null }> {
+    return this.request('/web/telegram/result', { method: 'POST', body: JSON.stringify({ ticket }) });
   }
 
   inviteInfo(code: string): Promise<{ kind: 'group' | 'personal'; name: string | null }> {
@@ -862,13 +863,13 @@ export class ApiClient {
     return this.request<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });
   }
 
-  /** Someone who was already a customer, proved by Telegram: their account, no invitation. */
-  telegramClaim(input: { telegram: TelegramAuth; username: string; password: string }): Promise<AuthResponse> {
+  /** The first time with Telegram (an invitation, or already a customer): their account. */
+  telegramClaim(input: { telegram: TelegramAuth; username: string; password: string; code?: string }): Promise<AuthResponse> {
     return this.request<AuthResponse>('/auth/telegram/claim', { method: 'POST', body: JSON.stringify(input) });
   }
 
-  telegramLogin(telegram: TelegramAuth): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/auth/telegram', { method: 'POST', body: JSON.stringify({ telegram }) });
+  telegramLogin(telegram: TelegramAuth, code?: string): Promise<AuthResponse> {
+    return this.request<AuthResponse>('/auth/telegram', { method: 'POST', body: JSON.stringify({ telegram, ...(code ? { code } : {}) }) });
   }
 
   myAccount(): Promise<{

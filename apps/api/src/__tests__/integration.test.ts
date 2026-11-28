@@ -5355,18 +5355,45 @@ describeDb('API integration', () => {
         return new Response(JSON.stringify({ id_token: idToken }), { status: 200 });
       }) as typeof fetch,
     });
-    /** "Log in with Telegram" as the page does it: start, Telegram comes back, ready → the proof. */
-    const telegramOf = async (id: number, username: string): Promise<string> => {
-      const started = (await (await call('/api/auth/telegram/start', { method: 'POST' })).json()) as { url: string; state: string };
+    /** "Log in with Telegram" as the page does it: start, Telegram sends the browser back with a ticket. */
+    const telegramOf = async (id: number, username: string, context = 'test'): Promise<string> => {
+      const started = (await (await call('/api/auth/telegram/start', { method: 'POST', json: { context } })).json()) as {
+        url: string;
+        state?: string;
+      };
       expect(started.url).toContain('https://oauth.telegram.org/auth?');
       expect(started.url).toContain('code_challenge_method=S256');
+      // Whoever starts it gets no way to pick up the result: only the browser sent back does.
+      expect(started.state).toBeUndefined();
+      const state = new URL(started.url).searchParams.get('state')!;
       pressing = { id, username };
-      const back = await call(`/api/auth/telegram/callback?state=${started.state}&code=abc`);
-      expect(back.status).toBe(200);
+      const back = await call(`/api/auth/telegram/callback?state=${state}&code=abc`);
+      expect(back.status).toBe(302);
       expect(tokenRequest).toContain('code_verifier=');
-      expect(await (await call('/api/web/telegram/result', { method: 'POST', json: { state: started.state } })).json()).toEqual({ status: 'ready' });
-      return started.state;
+      const location = back.headers.get('location')!;
+      expect(location).toMatch(/\/#\/tg\?t=[\w-]{16,}$/);
+      const ticket = location.split('t=')[1]!;
+      expect(await (await call('/api/web/telegram/result', { method: 'POST', json: { ticket } })).json()).toEqual({
+        status: 'ready',
+        context,
+        username,
+      });
+      // The same address twice (reloaded): no second ticket.
+      expect((await call(`/api/auth/telegram/callback?state=${state}&code=abc`)).headers.get('location')).toMatch(/\/#\/tg$/);
+      return ticket;
     };
+    // Cancelled in Telegram: back to the page, which learns it failed (and what it was doing).
+    {
+      const started = (await (await call('/api/auth/telegram/start', { method: 'POST', json: { context: 'x' } })).json()) as { url: string };
+      const state = new URL(started.url).searchParams.get('state')!;
+      const back = await call(`/api/auth/telegram/callback?state=${state}&error=access_denied`);
+      const ticket = back.headers.get('location')!.split('t=')[1]!;
+      expect(await (await call('/api/web/telegram/result', { method: 'POST', json: { ticket } })).json()).toEqual({
+        status: 'failed',
+        context: 'x',
+        username: null,
+      });
+    }
     const admin = { Authorization: `Bearer ${await authToken(ADMIN_ID, 'Admin')}` };
     const stamp = Date.now() % 100000;
 
@@ -5400,6 +5427,24 @@ describeDb('API integration', () => {
     expect((await call('/api/me/web-access', { headers: asAna })).status).toBe(403);
     // The same Telegram twice: no.
     expect((await signUp({ code: group.code, username: `ana2${stamp}`, password, telegram: await telegramOf(555030001, 'ana_t') })).status).toBe(409);
+
+    // Telegram first, with the invitation: no account yet → a password, and in.
+    const firstTime = await telegramOf(555030004, 'eva_t');
+    const askedEva = await call('/api/auth/telegram', { method: 'POST', json: { telegram: firstTime, code: group.code } });
+    expect(askedEva.status).toBe(409);
+    expect(((await askedEva.json()) as { error: { code: string } }).error.code).toBe('make_account');
+    const eva = await call('/api/auth/telegram/claim', {
+      method: 'POST',
+      json: { telegram: firstTime, username: `eva${stamp}`, password, code: group.code },
+    });
+    expect(eva.status).toBe(201);
+    expect(((await eva.json()) as { account: { linkState: string } }).account.linkState).toBe('confirmed');
+    // Next time: Telegram and straight in, invitation or not.
+    expect((await call('/api/auth/telegram', { method: 'POST', json: { telegram: await telegramOf(555030004, 'eva_t'), code: group.code } })).status).toBe(200);
+    // A wrong invitation: refused at once.
+    expect(
+      (await call('/api/auth/telegram', { method: 'POST', json: { telegram: await telegramOf(555030005, 'x_t'), code: 'river-AAAAA-BBBBB-CCCCC-sage' } })).status,
+    ).toBe(401);
 
     // Signing in: username and password, or Telegram.
     expect((await call('/api/auth/login', { method: 'POST', json: { username: `ANA${stamp}`, password } })).status).toBe(200);

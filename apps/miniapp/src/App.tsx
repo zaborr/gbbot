@@ -74,7 +74,7 @@ import { lang, onLangChange, t } from './i18n/index.js';
 import { isCustomerWeb, isWebMode } from './lib/web.js';
 import { WebNoticesPage } from './pages/WebNoticesPage.js';
 import { WebBanner, WebMainButton, WebSignIn, WebTopBar } from './components/WebChrome.js';
-import { WebCustomerSignIn } from './components/WebAccount.js';
+import { TelegramReturn, WebCustomerSignIn } from './components/WebAccount.js';
 import { AccountPage } from './pages/AccountPage.js';
 import { PlatformPrivatePage } from './pages/platform/PlatformPrivatePage.js';
 import { PlatformMembersPage } from './pages/platform/PlatformMembersPage.js';
@@ -119,6 +119,8 @@ function Shell(): React.JSX.Element {
       <Route path="/cuenta" element={<AccountPage />} />
       {/* An invitation opened while already signed in: nothing to do there. */}
       <Route path="/alta" element={<Navigate to="/" replace />} />
+      {/* Back from "Log in with Telegram" while signed in (confirming, a new password…). */}
+      <Route path="/tg" element={<TelegramReturn />} />
       <Route path="/platform" element={<PlatformPage />} />
       <Route path="/platform/shops/:id" element={<PlatformShopPage />} />
       <Route path="/platform/retention" element={<PlatformRetentionPage />} />
