@@ -60,7 +60,7 @@ export const it: Record<MessageKey, string> = {
   'acct.withPassword': 'Oppure con nome utente e password',
   'acct.withTelegram': 'Accedi con Telegram',
   'acct.withTelegramFooter': 'Telegram conferma chi sei, senza password. Prima volta? Ti chiederà una password, nel caso Telegram non funzioni. Password dimenticata? Entra da qui e cambiala in 👤 Il mio account.',
-  'acct.withoutTelegram': 'Crea l\'account senza Telegram',
+  'acct.withoutTelegram': 'Oppure senza Telegram: scegli nome utente e password',
   'acct.yourAccount': 'Il tuo account web',
   'actions.cancel': 'Annulla ordine',
   'actions.cancelRefund': 'Annulla ordine (rimborsa {amount})',
